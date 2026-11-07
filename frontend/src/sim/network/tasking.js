@@ -124,6 +124,9 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     }
   }
 
+  // Is the track between this effector's minimum range (a missile's, to arm and turn onto it) and its reach?
+  const inEnvelope = (s, tr) => { const r = distToTrack(s, tr); return r <= s.def.range && r >= (s.def.minRange ?? 0); };
+
   // Should the fusion node offer this track to this effector? Keeps expensive rounds for the targets that need them.
   function eligible(s, tr) {
     const def = s.def;
@@ -235,7 +238,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
           }
         }
         else if (!tr) completeTask(s, 'TASK_STATUS_FAILED', ['track lost']);
-        else if (distToTrack(s, tr) > s.def.range) {
+        else if (!inEnvelope(s, tr)) {
           sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${tr.short}`, 'Target left engagement envelope');
           completeTask(s, 'TASK_STATUS_COMPLETED', ['target left engagement envelope']);
         }
@@ -243,7 +246,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
       // best target: the most urgent track this effector can reach, for the harm it would do and how soon it arrives (skipping one it just rejected)
       let best = null, bd = Infinity;
       for (const tr of live) {
-        if (distToTrack(s, tr) > s.def.range) continue;
+        if (!inEnvelope(s, tr)) continue;
         if (!eligible(s, tr) || ctx.roundsCover(s, tr.drone)) continue;
         const dd = urgency(tr);
         if (dd < bd) { bd = dd; best = tr; }

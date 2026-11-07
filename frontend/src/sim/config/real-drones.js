@@ -70,9 +70,9 @@ export const REAL_DRONES = {
   },
   molniya2: {
     variantOf: 'fpv', origin: 'Russia', name: 'Molniya-2 (first-person-view fixed wing)', label: 'Molniya-2',
-    evade: 0.75, model: 'fw', airframe: 'Fixed wing', speed: 29, alt: [30, 150], size: 1.5, rcs: 0.05, warhead: 4.5, cost: 1600,
+    evade: 0.75, model: 'fw', airframe: 'Fixed wing', speed: 29, alt: [30, 150], size: 1.5, rcs: 0.05, warhead: 4.5, cost: 1600, hops: true,
     usedBy: 'Russia. Its use is solid; the maker rests on Wikipedia alone.',
-    published: 'Cruise 90 to 120 km/h (game uses 105). One source gives about 400 m up, but a Ukrainian electronic warfare adviser says it flies too low for radar (2026), which the game follows. Range 30 to 60 km. Wingspan about 1.5 m, about 10 kg. Warhead 3 to 6 kg (game uses 4.5). Electric. Flown over a first-person video radio link; which bands is not public, so they are its type’s. One analyst and press figures.',
+    published: 'Cruise 90 to 120 km/h (game uses 105). One source gives about 400 m up, but a Ukrainian electronic warfare adviser says it flies too low for radar (2026), which the game follows. Range 30 to 60 km. Wingspan about 1.5 m, about 10 kg. Warhead 3 to 6 kg (game uses 4.5). Electric. Flown over a first-person video radio link; which bands is not public, so they are its type’s. The same adviser says it hops frequency too fast for standard jamming, so a reactive jammer cannot follow it and only a barrage touches it. One analyst and press figures.',
     assumed: 'Height 30 to 150 m, for low. Agility 0.75, as an operator-guided small fixed-wing drone; it is reported to manoeuvre erratically near the end.',
     costRef: {
       note: '$1,600 from Russian media and industry, via United24; other reports say about $300. Game uses $1,600.',

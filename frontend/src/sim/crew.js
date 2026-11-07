@@ -1,7 +1,8 @@
 // Systems off the network (def.networked === false) fight on their own: the crew picks the nearest drone it can see in reach, and
-// fires or jams once it has reacted. A machine gunner or a soldier with a jammer sees by eye, 100 to 200 m in daylight, worse in poor
-// light. A wearable detector warns of a drone with a radio link within 400 m: the crew is ready by the time it comes into sight, and
-// a jammer is pointed down its bearing straight away. Nothing here draws a random number.
+// fires or jams once it has reacted. A machine gunner or a soldier with a jammer sees by eye, a quadcopter at about 300 m and a Shahed
+// at about 2 km in daylight, less in poor light. It hears a loud drone further off, and a wearable detector warns of a drone with a radio
+// link within 400 m: warned either way, the crew is ready by the time it comes into sight, and a jammer is pointed down its bearing
+// straight away. Nothing here draws a random number.
 
 import { CREW, TERRAIN, WORLD } from './config/index.js';
 import { CONDITIONS, ENV } from './conditions.js';
@@ -14,9 +15,14 @@ const EYE_HEIGHT = 2.5; // metres: a gunner standing in a vehicle, when the syst
 export const crewed = (def) => def.networked === false;
 
 // How far (m) this crew can see this drone.
-export const sightRange = (drone) => Math.min(CREW.eyeMax, CREW.eyeBase + CREW.eyePerMetre * drone.def.size) * Math.max(CREW.nightFloor, CONDITIONS[ENV.now].visible);
-// Does its detector warn of this drone? It hears a radio link, so not a fibre-optic or silent one.
-export const alerts = (s, d) => !!d.def.rfEmitter && s.pos.distanceTo(d.pos) * WORLD.metresPerUnit <= CREW.alertRange;
+export const sightRange = (drone) => Math.min(CREW.eyeMax, drone.def.size / Math.tan((CREW.eyeAngle * Math.PI) / 180)) * Math.max(CREW.nightFloor, CONDITIONS[ENV.now].visible);
+// How far (m) this crew hears this drone: sound needs no line of sight, but rain drowns it.
+export const hearingRange = (drone) => CREW.earRange * (drone.def.sound ?? 1) * CONDITIONS[ENV.now].acoustic;
+// Is the crew warned of this drone: by its detector, which hears a radio link (so not a fibre-optic or silent one), or by ear?
+export const alerts = (s, d) => {
+  const metres = s.pos.distanceTo(d.pos) * WORLD.metresPerUnit;
+  return (!!d.def.rfEmitter && metres <= CREW.alertRange) || metres <= hearingRange(d);
+};
 
 export function crewSees(s, d) {
   const m = WORLD.metresPerUnit;

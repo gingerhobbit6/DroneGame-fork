@@ -64,14 +64,14 @@ export const EU_SYSTEMS = {
   },
   gun_skyranger: {
     product: 'Rheinmetall Skyranger 30 on Boxer', variantOf: 'gun_l', size: 'L', name: 'Skyranger 30', short: 'SKR', model: 'gun', cost: 12000000, shotCost: 4000, color: 0xff8a65, role: 'effector', kind: 'gun', published: 3000, muzzleY: 2.4, fire: 'guided', mobile: 'vehicle',
-    health: 40, signature: 0.3, emits: [],
+    health: 40, armour: 2, signature: 0.3, emits: [],
     pk: 0.85, damage: 60, splash: 15, fuze: 15, cooldown: 1, missileSpeed: 1100, magazine: 16, storage: 16, reloadTime: 900,
     desc: 'German 30 mm turret on an armoured Boxer, firing airburst rounds, with its own radar, networked with other air defence.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Gun', 'Airburst'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Mobile networked 30 mm air defence gun', analogues: ['Rheinmetall Skyranger 30'],
       published: 'A 30 mm gun at up to 1,200 rounds a minute, with AHEAD airburst, 252 (or 300) ready rounds, about 3 km against air targets, a 20 km AESA radar and EO sights, on a Boxer 8x8.',
-      basis: 'Game range 3 km. A shot is a 16-round burst. Hit chance 0.85 a burst and the rest are ASSUMPTIONS. It is drawn on a Patria-like 8x8.',
+      basis: 'Game range 3 km. A shot is a 16-round burst. Hit chance 0.85 a burst and the rest are ASSUMPTIONS. It is drawn on a Patria-like 8x8. Its armoured hull halves what a strike does to it (armour 2): an ASSUMPTION.',
       confidence: 'Maker’s brochure; performance is an assumption',
       sources: [
         { label: 'ARTEC: Boxer Skyranger 30 brochure', url: 'https://www.artec-boxer.com/fileadmin/user_upload/product-brochures/Update/Artec-BOXER-Skyranger-30-brochure.pdf' },
@@ -82,14 +82,14 @@ export const EU_SYSTEMS = {
   },
   gun_gepard: {
     product: 'Flakpanzer Gepard (twin 35 mm)', variantOf: 'gun_l', size: 'L', name: 'Gepard', short: 'GEP', model: 'gun', cost: 5000000, shotCost: 1500, color: 0xf4511e, role: 'effector', kind: 'gun', published: 3500, muzzleY: 2.4, fire: 'guided', mobile: 'vehicle',
-    health: 40, signature: 0.5, emits: [],
-    pk: 0.4, damage: 60, splash: 0, fuze: 5, cooldown: 1, missileSpeed: 1175, magazine: 40, storage: 40, reloadTime: 1200,
+    health: 40, armour: 2, signature: 0.5, emits: [],
+    pk: 0.73, rangeLoss: 0.75, damage: 60, splash: 0, fuze: 5, cooldown: 1, missileSpeed: 1175, magazine: 40, storage: 40, reloadTime: 1200,
     desc: 'German twin 35 mm gun tank, given to Ukraine, where its crews down many Shaheds. It has its own search and tracking radars; here it is networked like the other radar guns.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Gun'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Stand-alone self-propelled 35 mm air defence gun', analogues: ['Flakpanzer Gepard'],
       published: 'Twin 35 mm guns at 1,100 rounds a minute combined, 320 air-defence rounds a gun, with its own search and tracking radars. Crews report bursts of 7 to 11 rounds and 20 to 30 a target including misses, at about 3 km; one crew reportedly downed more than 10 Shaheds and two cruise missiles.',
-      basis: 'Game range 3.5 km and its radar seeing 15 km are ASSUMPTIONS. A shot is a 16-round burst. Hit chance 0.4 a burst gives about the reported 20 to 30 rounds a kill. Gepards fight stand-alone in Ukraine; here, with its own radar, it is networked like the other radar guns.',
+      basis: 'Game range 3.5 km and its radar seeing 15 km are ASSUMPTIONS. A shot is a 16-round burst. Hit chance 0.73 a burst close in falls with range, to a quarter at its limit, as a gun’s spread grows and its rounds have no airburst (an ASSUMPTION); at about 3 km that leaves what 0.4 gave before, about the reported 20 to 30 rounds a kill. Gepards fight stand-alone in Ukraine; here, with its own radar, it is networked like the other radar guns. Its armoured hull halves what a strike does to it (armour 2): an ASSUMPTION.',
       confidence: 'Crew reports in the press; performance is an assumption',
       sources: [
         { label: 'Espreso: how many shots Gepard takes to down a Shahed', url: 'https://global.espreso.tv/russia-ukraine-war-how-many-shots-does-it-take-for-gepard-to-down-shahed-and-what-is-best-weapon-against-drones' },

@@ -55,9 +55,10 @@ export function hears(s, d, jammers) {
 
 // What this jammer, switched on, does to this drone: which links it jams and how hard, or null. A barrage jams every drone on its active
 // bands. Reactive jams only the links of a drone its library knows and its receiver hears, harder, and never GNSS, which a drone only receives.
+// It cannot follow a link that hops frequency faster than it can (def.hops), so only a barrage touches one.
 export function jamming(s, d, jammers) {
   const links = d.def.links || {}, reactive = s.def.technique === 'reactive';
-  if (reactive && !(libraryKnows(s.def, d.def) && hears(s, d, jammers))) return null;
+  if (reactive && (d.def.hops || !(libraryKnows(s.def, d.def) && hears(s, d, jammers)))) return null;
   const jams = (band, k) => !!band && s.jamBands.has(band) && jamReaches(s, d, band, k);
   // shortcut: video is jammed at the drone, though its receiver is with the operator; jamming it there needs the operator on the map
   const control = jams(links.control, fromOperator(d)), video = jams(links.video), gnss = !reactive && !!links.gnss && jams('gnss');

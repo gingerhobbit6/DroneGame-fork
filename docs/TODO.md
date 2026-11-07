@@ -117,7 +117,7 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [ ] The casualty radii are anchored on one small munition; bigger warheads are likely more lethal than K x cube root gives. A second published anchor (a mortar or shell with its fill and radii) would firm them up
 - [x] A Gun row of its own (key 0): a crewed L7A2 GPMG and L111A1 .50 cal on pickups, the 12.7 mm remote weapon station, Terrahawk Paladin, Skyranger 30, Gepard and Skynex. Guns with a radar of their own are networked; the hit chances of the crewed machine guns (8% and 12% a burst) are well below the networked guns'
 - [x] Handheld jammers carried by a soldier, off the network: DroneShield DroneGun Mk4, NT Service EDM4S SkyWiper and Kvertus AD G-6
-- [x] Crews off the network (`networked: false`): they cannot be wired and nothing tasks them. They see a drone by eye 100 to 200 m off by its size (half that at night), and a wearable detector warns them of a drone with a radio link within 400 m, so they are ready when it comes into sight and a jammer can be pointed down its bearing
+- [x] Crews off the network (`networked: false`): they cannot be wired and nothing tasks them. They see a drone by eye by its size (half as far at night; see the realism rules below), and a wearable detector warns them of a drone with a radio link within 400 m, so they are ready when it comes into sight and a jammer can be pointed down its bearing
 - [x] A handheld jammer's beam (30°, published for the Kvertus, assumed for the rest) points at the drone its soldier is jamming. The DroneGun Tactical and MkIII are handheld crew entries of their own; the standard small and medium jammers are now generic networked tripod jammers with the same figures, so saved laydowns and results do not move
 - [ ] Every gun's hit chance, range and price is an assumption; the crews' sight, detector range and reaction time are assumptions too
 - [x] Fast rounds passed through their targets: a GPMG round flies about 42 m a step against a 2 m fuze, so it never burst, and the .50 cal hit about a third as often as its figure. Rounds now burst where their path came closest, and gun rounds leave the muzzle aimed at the target rather than climbing like a missile. The reference digests did not move
@@ -126,11 +126,28 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 
 - [ ] Ammunition: 8 of the 17 systems that fire rounds take their magazine from a published figure; storage is published for Starstreak only, and reload time for the DroneHunter only. The Sting's magazine, storage and reload, which decide play more than any other, are all assumed
 - [ ] Hit chance: 5 of 17 rest on a reported figure (NASAMS, Sting, DroneHunter, P1-SUN, Gepard). The Paladin's 1.0 and the Gepard's 0.4 come from the same Gepard crew reports, which needs a look, and the Paladin's 300 m/s round is about a quarter of the other 30 to 35 mm guns
-- [ ] No effector has a ceiling or a minimum range: reach is a sphere round the system. Starstreak's published 300 m minimum is ignored, and interceptor drones can climb to a Geran at 2 to 4 km
+- [x] Missiles have a minimum range (`minRange`): Starstreak's published 300 m, CAMM's reported "under 1 km" taken as 1 km, and 300 m or 1 km by class for the rest. A missile leaves a closer drone to something else
+- [ ] No effector has a ceiling: reach is still a sphere round the system, so interceptor drones can climb to a Geran at 2 to 4 km, and the range rings do not show a missile's dead zone inside its minimum range
 - [ ] Starstreak, NASAMS, Rapid Ranger and Sky Sabre are capped at 400 m/s, well below the real missiles. Guns now fly at 840 to 1,175 m/s and hit, so the reason for the cap needs checking
 - [ ] The P1-SUN flies at 80 m/s, copied from the Sting, though its own source gives 310 km/h (about 86 m/s)
 - [ ] Heights are reported for only about 7 of 30 real drones, and warheads are assumed or unverified for the Matrice 30T, Matrice 300, EVO Max 4T, Agras T30, ASN-301 and Skywalker. No range is published for the AUDS jammer or the K-CEMA Jupiter
 - [ ] The Skywalker is drawn at 0.35 m, its type's size, as its own span is not public; a Skywalker X8 is 2.1 m. Lancet-3's 1 m span is assumed and its length taken as 1.65 times that
+
+**Realism rules (2026-11-07)**
+
+- [x] A jammed drone does what its kind does (`lostLink`): one flown by hand comes down; a DJI or Autel drone, or a reconnaissance drone on an autopilot, turns for home, and drifts down only if its satellite navigation is jammed too. Losing video only blinds a drone that flies itself. Drones turned for home are counted in the ledger (`turned`) and leave the map
+- [x] A last-mile homing module (`terminal`, 500 m by the makers' claims) carries a drone through the last stretch, out of a jammer's reach. A new real drone, the last-mile FPV, has one
+- [x] Anti-jam antennas cut GNSS drift. Jam resistance had only touched control and video links, so the Geran-3's antennas did nothing against GNSS jamming
+- [x] A reactive jammer cannot follow a link that hops frequency (`hops`), as reported for the Molniya-2; a barrage still jams it
+- [x] Crews see a drone where its span fills 0.065°, the angle at which half the observers in two field trials saw a small quadcopter: a 7-inch quad at about 290 m and a Shahed at about 2.2 km, not 115 and 200 m. They hear a drone 300 m off per unit of its loudness, half that in rain, so a handheld jammer can turn to a silent Shahed by ear
+- [x] Plain guns (GPMG, .50 cal, the 12.7 mm station and the Gepard) keep a quarter of their hit chance at full range (`rangeLoss`), where airburst guns keep three quarters. The Gepard's close-in chance went from 0.4 to 0.73, so at about 3 km it still gives the reported 20 to 30 rounds a kill
+- [x] Armour (`armour`) halves a strike on the Gepard, the Skyranger 30, the Stormer HVM and any system on a Patria
+- [x] An acoustic sensor's bearing points to where the drone was when the sound left it, 3 s and about 150 m behind a Shahed a kilometre off
+- [ ] The generic first-person-view drones in the waves never carry a homing module. Fitting them from some wave onward would be the realistic form of the enemy adapting, and a balance change
+- [ ] No wind: it would change drone speeds over the ground, how well quadcopters fly, and how far sound carries, upwind and down
+- [ ] Casualty radii, checked against a second anchor: a design paper gives an M107 155 mm shell (6.95 kg of Composition B) a 100% kill radius of about 20 to 30 m, where the rule gives 17 m. A little low, so left as it is
+- [ ] Armour is a flat halving and every armour figure is an assumption; a shaped-charge first-person-view drone can still knock out an armoured vehicle
+- [ ] The fusion node judges an unnamed track by the average of every drone in the catalogue, so adding a real drone shifts play: the last-mile FPV moved the laser laydowns by up to three waves. Weighting the average by what the waves actually send would stop that
 
 **Patrol prototype** (see `docs/PATROL_MODE.md`)
 

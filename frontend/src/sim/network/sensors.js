@@ -14,6 +14,12 @@ import { RB_UNITS, rbDatum, round, clamp } from './core.js';
 export { reachFor };
 
 const STARE_LOOKS = 3; // looks a camera takes at each height while it searches for a track with none
+const SOUND_SPEED = 343; // m/s, in air at 20 °C
+
+// Sound takes time to arrive: what an acoustic sensor hears now left the drone `metres` / 343 s ago, so it points to where the drone was
+// then, 3 s and about 150 m behind a Shahed a kilometre off. Its velocity (per second, in the units of pos), taken back that long,
+// stands in for its path.
+export const heardAt = (pos, vel, metres) => { const late = metres / SOUND_SPEED; return { x: pos.x - vel.x * late, y: pos.y - vel.y * late, z: pos.z - vel.z * late }; };
 
 export function createSensors(core, feed) {
   const { ctx, mpu, T, nodes, tracker, fusion, send, deliver, antennaM, rel, bearingOf } = core;
@@ -113,11 +119,14 @@ export function createSensors(core, feed) {
     return { east: hr * Math.sin(az), north: hr * Math.cos(az), up: rng * Math.sin(el), hr, rng };
   }
 
+  // Where an acoustic sensor hears a drone: where it was when the sound left it (heardAt).
+  const heardFrom = (s, d) => { const now = rel(s, d); return d.vel ? rel(s, { pos: heardAt(d.pos, d.vel, now.rng) }) : now; };
+
   // Build one detection (a real drone `d`, or a false alarm when d is null), send the SAPIENT DetectionReport, and return
   // what the fusion node's tracker needs.
   function measure(s, d) {
     const def = s.def, n = def.sapient.noise || {};
-    const r = d ? rel(s, d) : falseGeometry(s);
+    const r = d ? (def.kind === 'acoustic' ? heardFrom(s, d) : rel(s, d)) : falseGeometry(s);
     if (!r) return null;
     const b = bearingOf(r);
     const reach = (d ? reachTo(s, d) : def.range) * zoomOf(s), k = errorScale(def, r.rng, reach); // a weak signal gives a worse measurement, and the sensor knows it

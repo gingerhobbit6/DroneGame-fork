@@ -3,12 +3,15 @@
 // says what was set by rule because nothing is public. Published flight performance and reported payload mass only (docs/SECURITY_NOTES.md).
 
 
-const COMMERCIAL = { links: { control: 'control24', video: 'video58', gnss: true }, protocol: 'commercial' }; // a maker's own link
+// A maker's own link. Its flight controller flies it, and on losing its controller it returns home after a few seconds (the Mavic 3
+// manual gives six), or drifts if its satellite navigation is lost too (drones.js).
+const COMMERCIAL = { links: { control: 'control24', video: 'video58', gnss: true }, protocol: 'commercial', lostLink: 'home' };
 const HOBBY_LONG = { links: { control: 'control900', video: 'video58' }, protocol: 'hobby' }; // long-range control on 900 MHz, video on 5.8 GHz
 const QUAD_HEIGHT = 'Height 60 to 200 m, around the one reported case of a Mavic 3T at about 150 m (Kyiv Post, 2024).';
 const HRW = { label: 'Human Rights Watch: drones in Kherson', url: 'https://www.hrw.org/report/2025/06/03/hunted-from-above/russias-use-of-drones-to-attack-civilians-in-kherson-ukraine' };
 const MANUAL = { label: 'UNITED24: Russian drone manual, about 300 g', url: 'https://united24media.com/latest-news/russian-drone-operators-use-homemade-chemical-munitions-in-combat-leaked-manual-reveals-7266' };
 const CNA = { label: 'CNA: Russian uncrewed systems', url: 'https://www.cna.org/reports/2023/03/Russian-Uncrewed-Systems-Ukraine.pdf' };
+const NO_PRICE_MODULE = 'The 7-inch quad’s price: no price was found for the homing module, so attack cost sums involving it are rough.';
 const KYIV_POST = { label: 'Kyiv Post: Mavic 3T at about 150 m', url: 'https://www.kyivpost.com/post/28820' };
 
 export const COTS_DRONES = {
@@ -105,6 +108,22 @@ export const COTS_DRONES = {
         { label: 'Grepow: 7-inch first-person-view drones', url: 'https://www.grepow.com/blog/what-is-a-7-inch-fpv-drone.html' },
         { label: 'RobotShop: iFlight 7-inch', url: 'https://uk.robotshop.com/products/iflight-sh-cinelr-7-o4-6s-hd' },
         { label: 'Militarnyi: first-person-view drones', url: 'https://militarnyi.com/en/articles/fpv-drones-weapons-that-changed-the-modern-war' },
+      ],
+    },
+  },
+  fpvlastmile: {
+    variantOf: 'fpv', origin: 'Commercial off the shelf', name: 'First-person-view quadcopter with a last-mile homing module (not one product)', label: 'Last-mile FPV',
+    speed: 31, size: 0.33, warhead: 1.75, cost: 700, terminal: 500,
+    usedBy: 'Ukrainian units, with modules from The Fourth Law and TAF Drones. A category, not a product.',
+    published: 'Retrofit modules lock onto a target and fly the last stretch themselves, so jamming and lost video no longer stop the drone: up to 500 m for the TFL-1 and the TAF Last Mile module, by their makers. These are company claims, not independent tests. Flight figures copy the 7-inch quad.',
+    assumed: 'Homing over the last 500 m, the makers’ figure. Price is the 7-inch quad’s: no module price was found.',
+    costRef: {
+      note: NO_PRICE_MODULE,
+      confidence: 'Not public',
+      sources: [
+        { label: 'Kyiv Post: FPV drones with autonomous terminal guidance', url: 'https://www.kyivpost.com/post/60152' },
+        { label: 'Defence Connect: The Fourth Law final approach module', url: 'https://www.defenceconnect.com.au/industry/16455-fourth-law-announces-successful-results-with-fpv-drone-final-approach-autonomy-module' },
+        { label: 'Euromaidan Press: terminal guidance past jamming', url: 'https://euromaidanpress.com/2025/05/29/new-footage-shows-ukraines-fpv-drone-bypasses-jamming-in-autonomous-strike/' },
       ],
     },
   },

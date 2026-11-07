@@ -64,7 +64,7 @@ describe('the fusion node with its threat library', () => {
         if (tr.model === 'Mavic 3' && sim.net.siteDist(tr) >= FUSION.critZone && !given) early++;
       }
     });
-    expect(sim.ledger.killedBy.jammer?.mavic3 ?? 0).toBeGreaterThan(0); // the jammers do the work
+    expect((sim.ledger.killedBy.jammer?.mavic3 ?? 0) + (sim.ledger.turned.mavic3 ?? 0)).toBeGreaterThan(0); // the jammers do the work: down, or turned for home
     expect(engaged).toBeGreaterThan(0);
     expect(early).toBe(0);
   }, 120000);

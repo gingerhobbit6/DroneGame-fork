@@ -2,7 +2,7 @@
 // site: a radar, a jammer that is switched on, a system with a Starlink or cellular terminal. Everything else heads for its own
 // target in the area the player drew (one of the systems, people or buildings there), or for the station if there is none.
 
-import { WORLD, COMMS, STRUCTURES } from './config/index.js';
+import { WORLD, COMMS, STRUCTURES, PATROL_VEHICLES } from './config/index.js';
 import { u, hdist, hereU } from './units.js';
 import { tally } from './economy.js';
 import { removeStructure } from './laydown.js';
@@ -88,11 +88,15 @@ export function pickTarget(w, d) {
   return { x: best.pos.x, z: best.pos.z, structure: best };
 }
 
+// Armour keeps out the blast and fragments that wreck a truck: a system on an armoured hull, its own or a vehicle's, takes 1 / armour of
+// a strike's damage. A Shahed still knocks it out in one or two.
+export const armourOf = (def) => Math.max(def.armour ?? 1, PATROL_VEHICLES[def.vehicle]?.armour ?? 1);
+
 export function hitStructure(w, d, s) {
   const { state, ledger, net } = w;
   w.emit('explosion', { pos: d.pos, r: u(60), color: 0xff5252 });
   blastOnGround(w, d, s.pos.x, s.pos.z);
-  if (!state.sandbox) s.health -= d.def.damage * (1 + spotterBonus(w)); // the sandbox protects the laydown too
+  if (!state.sandbox) s.health -= (d.def.damage * (1 + spotterBonus(w))) / armourOf(s.def); // the sandbox protects the laydown too
   state.hits++;
   removeDrone(w, d);
   net.raiseAlert('critical', `${d.def.name} struck ${s.name}: ${Math.max(Math.round(s.health), 0)}% health left`, s.pos, 'DISCRETE_PRIORITY_HIGH');

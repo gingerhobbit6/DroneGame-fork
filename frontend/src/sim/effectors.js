@@ -93,7 +93,8 @@ export function updateStructures(w, dt) {
     updateMagazine(w, s, dt);
     if (crewed(def)) crewTask(w, s, dt); // off the network, its crew picks its own target
     if (def.kind === 'jammer' && s.mode === 'Jam') tally(w.ledger.jamTime, def.id, dt);
-    const t = s.task && state.time >= (s.task.activeAt || 0) && !s.task.drone.dead && s.pos.distanceTo(s.task.drone.pos) <= u(def.range) ? s.task.drone : null; // acts once its task has arrived
+    const near = s.task && s.pos.distanceTo(s.task.drone.pos);
+    const t = s.task && state.time >= (s.task.activeAt || 0) && !s.task.drone.dead && near <= u(def.range) && near >= u(def.minRange ?? 0) ? s.task.drone : null; // acts once its task has arrived
     FIRE[def.fire](w, s, t, dt);
   }
 }
