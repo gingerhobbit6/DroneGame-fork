@@ -5,7 +5,7 @@
 import { Vector3 } from 'three';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DRONES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
-import { jamming } from '../src/sim/jamming.js';
+import { canFollow, jamming } from '../src/sim/jamming.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { terrainState } from '../src/sim/terrain.js';
 import { u } from '../src/sim/units.js';
@@ -104,5 +104,13 @@ describe('a reactive jammer', () => {
     expect(jamming(s, eastOf(s, 'molniya2', 800), sim.structures)).toBeNull();
     sim.commands.configureUnit(s, 'technique', 'barrage');
     expect(jamming(s, eastOf(s, 'molniya2', 800), sim.structures)).not.toBeNull();
+  });
+
+  it('is not waited for by the fusion node against a link it cannot follow', () => {
+    const reactive = { technique: 'reactive', library: 'full' }, barrage = { technique: 'barrage' };
+    expect(canFollow(reactive, DRONES.fpv)).toBe(true);
+    expect(canFollow(reactive, DRONES.molniya2)).toBe(false); // the soft-kill wait asks this too (tasking.js breakers)
+    expect(canFollow({ technique: 'reactive', library: 'commercial' }, DRONES.fpv)).toBe(false); // a library that does not know its link
+    expect(canFollow(barrage, DRONES.molniya2)).toBe(true);
   });
 });

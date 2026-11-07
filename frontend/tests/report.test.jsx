@@ -49,7 +49,7 @@ describe('the deployment report', () => {
     expect(game.sim.state).toMatchObject({ over: true, ended: true });
     expect($('.card h1').textContent).toBe('DEPLOYMENT ENDED');
     expect($('#deployment-report').textContent).toContain('after 1 full wave(s)');
-    expect($('#report-used').textContent).toContain('jamming');
+    expect($('#report-used').textContent).toContain('Interceptor drones'); // they take the first wave before it reaches the jammers
   }, 60000);
 
   it('cannot end a deployment that has not started', () => {

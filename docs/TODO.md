@@ -149,6 +149,17 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [ ] Armour is a flat halving and every armour figure is an assumption; a shaped-charge first-person-view drone can still knock out an armoured vehicle
 - [ ] The fusion node judges an unnamed track by the average of every drone in the catalogue, so adding a real drone shifts play: the last-mile FPV moved the laser laydowns by up to three waves. Weighting the average by what the waves actually send would stop that
 
+**Fusion and jammer tactics (2026-11-07)**
+
+- [x] The fusion node gives no rounds to a track flying away from the site and heading for none of your systems (turned for home by a jammer, or a spotter going), and stops an engagement whose target turns to leave. It also spares rounds on ghost tracks drifting away
+- [x] The soft-kill wait and a jammer's own receiver ask whether a reactive jammer can follow the link (`canFollow`): the fusion node had held fire 10 s for a jammer that could not touch a Molniya
+- [ ] Ranking threats by how fast they close on the site, rather than by speed, was tried and made play worse: 4 of 6 mixed runs let strikes through where none had. Velocities from bearing-only sensors can point anywhere, and emitter-seeking drones go for systems further out. Ranking by predicted time to each defended asset needs better velocity estimates first
+- [ ] Each launcher picks its own most urgent track. A shared weapon-to-target pairing would weigh cost per kill and the chance of a kill before the drone arrives
+- [ ] A target is offered once it is in reach, with no check that a round can meet it before it arrives or while it stays in reach
+- [ ] Video links are jammed at the drone, though the pilot receives them. Jamming them where they are received needs pilots on the map
+- [ ] No GNSS spoofing, which Ukraine's Pokrova system uses to send Shaheds off course on purpose, and no protocol takeover, which systems such as D-Fend's EnforceAir claim lands a commercial drone where they choose
+- [ ] A directional jammer such as the AUDS keeps its facing; the fusion node could slew it to the track, as soldiers aim the handheld jammers
+
 **Patrol prototype** (see `docs/PATROL_MODE.md`)
 
 - [x] A first playable slice: people walk a looped route with a radar and a launcher, and strike drones attack the patrol

@@ -5,10 +5,10 @@ import { FUSION, DRONES } from '../config/index.js';
 import { canFire } from '../magazine.js';
 import { DETECT_PX, IDENTIFY_PX, zoomMax } from '../camera-model.js';
 import { inArcOf } from '../sensor-model.js';
-import { bandGhz, libraryKnows } from '../rf-model.js';
+import { bandGhz } from '../rf-model.js';
 import { antennaHeight, reachOnPath, typicalAltitude } from '../site-range.js';
 import { terrainState } from '../terrain.js';
-import { hears } from '../jamming.js';
+import { canFollow, hears } from '../jamming.js';
 import { threatLibrary } from './threats.js';
 
 // s: a jammer on its own receiver that has heard nothing for this long stops to listen. It switches once a second, so a barrage, deaf to
@@ -23,8 +23,22 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   const faces = (s, tr) => inArcOf(s.def, s.pos, { x: tr.est.east / mpu(), z: -tr.est.north / mpu() }); // a sector antenna only jams what it faces
   const { sendStatus } = registration;
   let believe = threatLibrary(); // what the fusion node may believe about each track (threats.js), built again each pass
-  // Seconds until a track arrives, for each point of harm it would do: the lower, the sooner it must be dealt with.
+  // Seconds until a track arrives, for each point of harm it would do: the lower, the sooner it must be dealt with. By its speed, not how
+  // fast it closes on the site: ranking by that lost the radar sooner (4 of 6 mixed runs let strikes through), as a velocity from
+  // bearing-only sensors can point anywhere, and emitter-seeking drones go for systems further out.
   const urgency = (tr) => siteDist(tr) / Math.max(tr.speed ?? 0, FUSION.minClosing) / Math.max(believe(tr).harm, 1);
+  // Is this track closing on the site, or on one of your systems as an emitter-seeking drone goes for a radar further out, faster than a
+  // hovering drone drifts?
+  function headingForAny(tr) {
+    if (!tr.vel) return true;
+    const m = mpu(), c = ctx.siteCentre();
+    return [[c.x * m, -c.z * m], ...[...nodes.values()].map((s) => [s.pos.x * m, -s.pos.z * m])].some(([east, north]) => {
+      const de = east - tr.est.east, dn = north - tr.est.north, dist = Math.hypot(de, dn);
+      return !dist || (de * tr.vel[0] + dn * tr.vel[1]) / dist > FUSION.minClosing;
+    });
+  }
+  // Flying away from the site and heading for none of your systems: turned for home, or a spotter going. Not worth a round.
+  const leaving = (tr) => (tr.closing ?? 0) < -FUSION.minClosing && !headingForAny(tr);
   // How far a jammer reaches at full power towards a point (east, north, up in metres) on a band, over the ground in between. The fusion
   // node knows the map, as a planning tool does, so it judges a jammer's reach through the trees and hills, not in an open field.
   let reachMemo = new Map();
@@ -50,7 +64,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     const b = believe(tr), links = b.breakable && b.model ? [b.model.links.control, b.model.links.video].filter(Boolean) : [];
     if (!links.length) return [];
     return [...nodes.values()].filter((j) => j.def.kind === 'jammer' && !j.offline && j.def.networked !== false && (!['receiver', 'manual'].includes(j.def.trigger) || j.mode === 'Jam')
-      && links.some((band) => j.jamBands.has(band)) && (j.def.technique !== 'reactive' || libraryKnows(j.def, b.model)));
+      && links.some((band) => j.jamBands.has(band)) && canFollow(j.def, b.model));
   }
   // How holding fire for a jammer has gone against each model: a model that keeps outlasting the jammers is not waited for again,
   // as a crew would learn. Drones grow harder to jam each wave, so this matters more as the attack goes on.
@@ -187,7 +201,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   // heard nothing for LOOK seconds it switches off to listen, and back on at once if something is still there.
   function hearsThreat(s) {
     const all = [...nodes.values()];
-    if (ctx.drones.some((d) => (s.def.technique !== 'reactive' || libraryKnows(s.def, d.def)) && hears(s, d, all))) s.heardAt = T();
+    if (ctx.drones.some((d) => canFollow(s.def, d.def) && hears(s, d, all))) s.heardAt = T();
     return T() - (s.heardAt ?? -Infinity) < LOOK;
   }
 
@@ -241,12 +255,15 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
         else if (!inEnvelope(s, tr)) {
           sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${tr.short}`, 'Target left engagement envelope');
           completeTask(s, 'TASK_STATUS_COMPLETED', ['target left engagement envelope']);
+        } else if (leaving(tr)) {
+          sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${tr.short}`, 'Target is leaving');
+          completeTask(s, 'TASK_STATUS_COMPLETED', ['target is leaving']);
         }
       }
       // best target: the most urgent track this effector can reach, for the harm it would do and how soon it arrives (skipping one it just rejected)
       let best = null, bd = Infinity;
       for (const tr of live) {
-        if (!inEnvelope(s, tr)) continue;
+        if (!inEnvelope(s, tr) || leaving(tr)) continue;
         if (!eligible(s, tr) || ctx.roundsCover(s, tr.drone)) continue;
         const dd = urgency(tr);
         if (dd < bd) { bd = dd; best = tr; }

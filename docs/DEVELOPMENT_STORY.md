@@ -369,6 +369,8 @@ Balance, measured with `npm run balance` on three seeds, did not move where the 
 
 The game version went to 0.17.0, as old saved runs no longer replay the same, and the reference digests were recorded again.
 
+Alex then asked whether the jammers and the fusion engine were smart enough. The tracking is realistic: a Kalman filter per track, statistical gating, triangulation from bearings with the ghosts that brings, and SAPIENT messages with their delays. The decisions had gaps. The fusion node ranked a drone flying away as urgent as one flying in, because it divided distance by speed, and it held fire for a reactive jammer that the last change had made unable to follow a Molniya. The second was a one-line fix. Ranking by closing speed instead turned out worse: four of six mixed runs let strikes through where none had, because a track's velocity from bearing-only sensors can point anywhere and emitter-seeking drones fly at a radar further out, not at the site. So ranking stays by speed, and closing speed is used only to leave alone a drone that is flying away from the site and heading for none of your systems. In the first mixed wave the only track it now leaves alone is a ghost, made where radar and RF bearings crossed, drifting away: an interceptor had gone after it, so now the interceptors take all five drones before the jammers are needed. In the reference runs the mixed runs killed one more and two fewer drones, and the second let none through where one had. Over three seeds the mixed laydown lasted 19, 12 and 17 waves, against 15, 14 and 14; the laser laydowns moved by a wave or two either way, about their spread from one change to the next.
+
 ## Numbers at the end of Phase 8
 
 | | Before | After |
