@@ -6,7 +6,7 @@
 // independent test results. Edit freely, or use the in-game Tuning panel.
 
 // Stored with saved laydowns and runs. Raise it when a change means old saves no longer replay the same.
-export const GAME_VERSION = '0.15.0';
+export const GAME_VERSION = '0.16.0';
 
 export const WORLD = {
   metresPerUnit: 20,     // 3D scene scale: 1 scene unit = this many metres
@@ -72,6 +72,8 @@ export const SENSING = {
   pdEdge: 1.35, pdSlope: 6,
   rangeCap: 2.2,         // detections beyond this many "reaches" are ignored
   clutterPenalty: 0.3,   // detection chance multiplier for a low flyer inside radar ground clutter
+  clutterSpeed: 5,       // m/s: a radar's Doppler filter loses a low flyer in ground clutter only below this speed. An ASSUMPTION;
+                         // drone radars are Doppler radars, so a drone moving faster stands out from the still ground
 };
 
 // SAPIENT fusion / C2 behaviour (seconds of simulated time, metres)

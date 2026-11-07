@@ -68,8 +68,9 @@ export function errorScale(def, range, reach) {
 }
 export const ERROR_AT_LIMIT = Math.hypot(1, EDGE_ERROR);
 
-// Is a low flyer at this spot lost in ground clutter, for a radar this far away?
-export const inClutter = (def, world, x, z, agl, horizontal) => !!def.lowAlt && agl < def.lowAlt && horizontal > def.lowRange * COVER_CLUTTER[world.coverAt(x, z)];
+// Is a low flyer at this spot lost in ground clutter, for a radar this far away? Only one moving slower than a radar's Doppler filter
+// can tell from the still ground (speed in m/s); hills, trees and buildings hide the rest through line of sight.
+export const inClutter = (def, world, x, z, agl, horizontal, speed) => !!def.lowAlt && speed < SENSING.clutterSpeed && agl < def.lowAlt && horizontal > def.lowRange * COVER_CLUTTER[world.coverAt(x, z)];
 
 const predictions = new WeakMap(); // world -> results, because the same spot is asked for by the ring, the panel and the cursor
 
@@ -107,7 +108,7 @@ function calculate(def, droneDef, world, x, z, alt, open) {
       if (Math.abs(b.x) > world.R || Math.abs(b.z) > world.R) { limited = true; break; }
       b.y = world.groundAt(b.x, b.z) + alt;
       const inBand = inCover(def, (i * 360) / BEARINGS, (Math.atan2(b.y - a.y, r) * 180) / Math.PI);
-      const ok = inBand && Math.hypot(r, b.y - a.y) <= reachOnPath(def, droneDef, world, a, b) * 1.001 && !inClutter(def, world, b.x, b.z, alt, r);
+      const ok = inBand && Math.hypot(r, b.y - a.y) <= reachOnPath(def, droneDef, world, a, b) * 1.001 && !inClutter(def, world, b.x, b.z, alt, r, droneDef.speed);
       total += r;
       if (ok) { seen += r; started = true; } else if (started || inBand) unbroken = false; // close in, over or under the beam is a gap, not the edge
       if (unbroken && ok) first[i] = r;

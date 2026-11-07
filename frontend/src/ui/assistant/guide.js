@@ -1,7 +1,7 @@
 // What the wizard knows: which steps are done, and which weapon answers which drone. It only reads the game, and only what
 // the player could see for themselves: the config and the laydown, never the wave queue or where drones really are.
 
-import { DRONE_CLASSES, STRUCTURES, TOOLBAR } from '../../sim/config/index.js';
+import { DRONE_CLASSES, SENSING, STRUCTURES, TOOLBAR } from '../../sim/config/index.js';
 import { reachFor } from '../../sim/network/sensors.js';
 import { typicalAltitude } from '../../sim/site-range.js';
 
@@ -50,7 +50,7 @@ export const kindName = (kind) => familyOf(kind).name;
 // Ground clutter also hides a low flyer from radar beyond its low-flyer range.
 export function reachAgainst(def, drone) {
   const flies = typicalAltitude(drone);
-  const reach = def.role !== 'sensor' ? def.range : Math.min(reachFor(def, drone), def.lowAlt && flies < def.lowAlt ? def.lowRange : Infinity);
+  const reach = def.role !== 'sensor' ? def.range : Math.min(reachFor(def, drone), def.lowAlt && flies < def.lowAlt && drone.speed < SENSING.clutterSpeed ? def.lowRange : Infinity);
   return Math.sqrt(Math.max(reach ** 2 - flies ** 2, 0));
 }
 

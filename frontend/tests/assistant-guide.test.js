@@ -59,7 +59,7 @@ describe('which system to recommend', () => {
   const warned = (def, threats) => threats.filter((d) => warningAgainst(def, d) >= WARNING[def.role]).length;
   it('follows the threat, not a default size', () => {
     expect(systemFor('radar', [DRONES.spotter], 15e6).size).toBe('S'); // high and easy to see
-    expect(systemFor('radar', [DRONES.fo], 15e6).size).toBe('L'); // low, in the clutter: it needs all the reach it can get
+    expect(systemFor('radar', [DRONES.fo], 15e6).size).toBe('M'); // the small radar's 1 km gives under a minute's warning of it
     expect(new Set(DRONE_CLASSES.map((d) => systemFor('radar', [d], 15e6).id)).size).toBeGreaterThan(1);
   });
   it('warns of the most threats, then costs the least', () => {
@@ -73,8 +73,10 @@ describe('which system to recommend', () => {
     expect(systemFor('radar', [DRONES.fo], 100000).cost).toBeLessThanOrEqual(100000);
     expect(systemFor('radar', [DRONES.fo], 1).kind).toBe('radar');
   });
-  it('takes a low flyer out of radar reach beyond its low-flyer range', () => {
-    expect(reachAgainst(STRUCTURES.radar, DRONES.fo)).toBeCloseTo(STRUCTURES.radar.lowRange, -1);
+  it('takes a slow low flyer out of radar reach beyond its low-flyer range, but not a moving one', () => {
+    const hovering = { ...DRONES.fo, speed: 3 }; // slower than a Doppler filter can tell from the ground
+    expect(reachAgainst(STRUCTURES.radar, hovering)).toBeCloseTo(STRUCTURES.radar.lowRange, -1);
+    expect(reachAgainst(STRUCTURES.radar, DRONES.fo)).toBeGreaterThan(STRUCTURES.radar.lowRange); // low, but moving at 18 m/s
     expect(reachAgainst(STRUCTURES.radar, DRONES.fpv)).toBeGreaterThan(STRUCTURES.radar.lowRange);
   });
   it('recommends by kind on the checklist, and never a system that answers nothing', () => {

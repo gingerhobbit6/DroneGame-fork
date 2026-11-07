@@ -182,7 +182,7 @@ function limitsOf(def) {
   const band = elevationBand(def), arc = coverArc(def);
   const edge = (e) => (e < 0 ? `${-e}° below the horizon` : e > 0 ? `${e}° up` : 'the horizon');
   const looks = def.kind === 'radar' && `${arc < 360 ? `Looks through ${arc}° facing ${def.facing ?? 0}°` : 'Looks all round'}${band ? `, from ${edge(band[0])} to ${edge(band[1])}` : ''}${def.blank ? `, blind over ${arcsText(def.blank)}` : ''}`;
-  if (def.lowAlt) return `${looks ? `${looks}. ` : ''}Below ${def.lowAlt} m, unreliable beyond about ${def.lowRange} m (ground clutter)`;
+  if (def.lowAlt) return `${looks ? `${looks}. ` : ''}Below ${def.lowAlt} m, a drone moving slower than ${SENSING.clutterSpeed} m/s is lost in ground clutter beyond about ${def.lowRange} m`;
   if (def.fov) return `${def.fov}° search view${hasZoom(def) ? `, ${def.trackFov}° on a cue` : ''}, so it must be pointed. Another sensor cues it. ${CHANNELS[def.channels].label}${def.channels === 'both' ? ' channels' : ' only'}`;
   if (def.fire === 'beam') return 'Needs a clear line of sight, and engages one target at a time';
   if (def.kind === 'jammer') return jammerLimits(def, arc);

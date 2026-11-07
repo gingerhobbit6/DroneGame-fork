@@ -60,7 +60,8 @@ export function createSensors(core, feed) {
     if (!inCover(def, b.az, b.el)) return 0; // outside a radar's arc, or above or below its beam
     const T3 = terrainState.data, m = mpu();
     const dxm = d.pos.x * m, dzm = d.pos.z * m, dym = d.pos.y * m;
-    const p = inClutter(def, T3, dxm, dzm, dym - T3.groundAt(dxm, dzm), r.hr) ? SENSING.clutterPenalty : 1; // lost in clutter
+    const speed = d.vel ? Math.hypot(d.vel.x, d.vel.y, d.vel.z) * m : d.def.speed; // a coverage probe has no velocity: its type's speed
+    const p = inClutter(def, T3, dxm, dzm, dym - T3.groundAt(dxm, dzm), r.hr, speed) ? SENSING.clutterPenalty : 1; // lost in clutter
     const blind = blindSpeed(def);
     if (blind && d.vel && Math.abs((d.vel.x * r.east - d.vel.z * r.north + d.vel.y * r.up) * m) < blind * r.rng) return 0; // too slow, or crossing, for its clutter filter
     const reach = reachTo(s, d) * zoom;
