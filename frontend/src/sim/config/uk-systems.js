@@ -89,16 +89,16 @@ export const UK_SYSTEMS = {
     },
   },
   jammer_jupiter: {
-    product: 'Kirintec K-CEMA Jupiter', variantOf: 'jammer', size: 'M', name: 'K-CEMA Jupiter', short: 'KJP', model: 'jammer', cost: 300000, shotCost: 0, color: 0x4527a0, role: 'effector', kind: 'jammer', published: 1100, mount: 3, mobile: 'vehicle', fire: 'jam',
+    product: 'Kirintec K-CEMA Jupiter', variantOf: 'jammer', size: 'M', name: 'K-CEMA Jupiter', short: 'KJP', model: 'jammer', cost: 300000, shotCost: 0, color: 0x4527a0, role: 'effector', kind: 'jammer', published: 3900, mount: 3, mobile: 'vehicle', fire: 'jam',
     health: 30, signature: 1.5, emits: [], bands: ['control900', 'control24', 'video58', 'gnss'], slow: 0.5, killTime: 5, receiver: 'full',
-    desc: 'The vehicle-mounted K-CEMA, with the same 20 MHz to 6 GHz reach across the spectrum as the NEO and its own receiver. Little else is published, so it plays as a NEO on a vehicle. Autonomous/fibre drones ignore it. No cost per use.',
+    desc: 'The vehicle-mounted K-CEMA, with the same 20 MHz to 6 GHz spectrum as the NEO and its own receiver, but up to 600 W, so it reaches about 3.9 km against 1.1 km for the NEO. Autonomous/fibre drones ignore it. No cost per use.',
     sapient: { nodeType: 'NODE_TYPE_JAMMER', subType: ['RF', 'GNSS'], scan: 'SCAN_TYPE_FIXED', modes: ['Standby', 'Jam'] },
     ref: {
       class: 'Vehicle CEMA jammer and receiver',
       analogues: ['Kirintec K-CEMA Jupiter'],
-      published: 'Vehicle-mounted, combining several cyber and electromagnetic functions in one system, to detect and defeat signals from 20 MHz to 6 GHz, extendable with K-CEMA Kore. No power, range or price is published.',
-      basis: 'Everything beyond the band is an ASSUMPTION: its power, range, receiver and library are taken from the K-CEMA NEO, the same family. Raise its range in the Sources tab if a vehicle fit should reach further. It is mounted on a vehicle, so it stands 3 m up.',
-      confidence: 'ASSUMPTION: almost nothing is published',
+      published: 'Vehicle-mounted, combining several cyber and electromagnetic functions in one system, to detect and defeat signals from 20 MHz to 6 GHz, extendable with K-CEMA Kore. Up to 600 W of output (Alex; one trade report gives 450 W). No range or price is published.',
+      basis: 'Range from its power, as for the other jammers with none published: 600 W against 40 W for the DroneGun Tactical at 1 km, reach going with the square root, gives 3.9 km. The receiver and library are taken from the K-CEMA NEO, the same family: an ASSUMPTION. It is mounted on a vehicle, so it stands 3 m up.',
+      confidence: 'Power from Alex and a trade report; range worked out from it',
       sources: [
         { label: 'DALO Industry Days: K-CEMA Jupiter', url: 'https://www.daloindustrydays.com/products/product/kirintec-kcema-jupiter' },
         { label: 'Kirintec: K-CEMA NEO datasheet', url: 'https://www.kirintec.com/wp-content/uploads/2022/12/Kirintec-K-CEMA-NEO-A4-0722-WEB.pdf' },

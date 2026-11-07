@@ -54,6 +54,7 @@ describe('the UK and European systems', () => {
   it('sets a jammer with no published range by its power, reach going with the square root', () => {
     expect(STRUCTURES.jammer_sf.range / STRUCTURES.jammer_neo.range).toBeCloseTo(Math.sqrt(800 / 45), 0); // 800 W against 45 W
     expect(STRUCTURES.jammer_neo.range / STRUCTURES.jammer.range).toBeCloseTo(Math.sqrt(45 / 40), 1); // the DroneGun Tactical stands for 40 W
+    expect(STRUCTURES.jammer_jupiter.range / STRUCTURES.jammer.range).toBeCloseTo(Math.sqrt(600 / 40), 1); // up to 600 W
   });
 
   it('gives K-CEMA its own receiver as standard, refunded if it is taken off', () => {

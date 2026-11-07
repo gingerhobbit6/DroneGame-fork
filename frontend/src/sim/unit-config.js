@@ -2,7 +2,7 @@
 // Every field changes the simulation, and every gain has a cost: price, older data, a louder signature or more false alarms.
 // The limits, prices and threshold factors are assumptions: tune them here. Saved values are untrusted, so only keys in this table are read.
 
-import { STRUCTURES } from './config/index.js';
+import { STRUCTURES, TX_POWER } from './config/index.js';
 import { BANDS, CLUTTER, arcsText, bandOf, bandRange, bandSharpness, beamGain, lowestEdge, parseArcs } from './sensor-model.js';
 import { CHANNELS, PIXELS } from './camera-model.js';
 import { weatherRange } from './conditions.js';
@@ -30,6 +30,14 @@ const receiverPrice = (v) => (v === 'off' ? 0 : STRUCTURES[RECEIVER_LIKE].cost *
 const choicesOf = (table) => Object.fromEntries(Object.entries(table).map(([k, v]) => [k, v.label]));
 const MAST_PRICE = 0.015, RELOAD_PRICE = 0.1; // share of the system's price, per metre and per second
 const THRESHOLD = { low: { range: 1.1, falseAlarm: 2 }, high: { range: 0.9, falseAlarm: 0.5 } };
+// Transmit power in watts, from a tenth of the rated output up to it, in steps of about a twentieth: 1, 2 or 5 of a power of ten.
+const watts = (id) => TX_POWER[id].watts;
+function wattStep(id) {
+  const s = watts(id) / 20, p = 10 ** Math.floor(Math.log10(s)), m = s / p;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+}
+const POWERED = [...RADARS, ...JAMMERS];
+const wattLimits = (id) => [Math.max(wattStep(id), Math.round(watts(id) / 10 / wattStep(id)) * wattStep(id)), watts(id)];
 
 export const UNIT_FIELDS = [
   {
@@ -39,9 +47,11 @@ export const UNIT_FIELDS = [
     help: 'Higher sees over more trees and terrain, at a price.',
   },
   {
-    key: 'power', label: 'Transmit power', unit: '%', step: 5, base: () => 100, limits: { ...each(RADARS, [10, 100]), ...each(JAMMERS, [10, 100]) },
-    range: (v, c) => (c.kind === 'radar' ? Math.pow(v / 100, 0.25) : Math.sqrt(v / 100)), signature: (v) => v / 100,
+    key: 'watts', label: 'Transmit power', unit: 'W', step: Object.fromEntries(POWERED.map((id) => [id, wattStep(id)])), base: (c) => watts(c.id),
+    limits: Object.fromEntries(POWERED.map((id) => [id, wattLimits(id)])),
+    range: (v, c) => (c.kind === 'radar' ? Math.pow(v / watts(c.id), 0.25) : Math.sqrt(v / watts(c.id))), signature: (v, c) => v / watts(c.id),
     help: 'Less power means less range, and is quieter to emitter-seeking drones.',
+    note: (id) => `Rated ${watts(id)} W: ${TX_POWER[id].confidence === 'assumption' ? 'an assumption, none published' : `${TX_POWER[id].confidence}, ${TX_POWER[id].basis}`}.`,
   },
   {
     // The tracker stretches its timeouts by each sensor's update interval (tracker.js), so a slow scan holds its tracks.
@@ -226,8 +236,8 @@ function cleanValue(field, id, value) {
   if (field.arcs || field.bands) return field.parse(value, id);
   if (field.choices) return Object.hasOwn(field.choices, value) ? value : undefined;
   if (!Number.isFinite(value)) return undefined;
-  const [min, max] = field.limits[id];
-  return Math.min(max, Math.max(min, Number((min + Math.round((value - min) / field.step) * field.step).toFixed(2))));
+  const [min, max] = field.limits[id], step = stepOf(field, id);
+  return Math.min(max, Math.max(min, Number((min + Math.round((value - min) / step) * step).toFixed(2))));
 }
 
 // Only what differs from the catalogue is kept, so a unit with no changes saves and plays exactly as before.
@@ -240,8 +250,13 @@ export function setSetting(settings, field, id, value) {
   return true;
 }
 
+// A field's step: one for every system, or each its own, as transmit power in watts is.
+export const stepOf = (field, id) => (typeof field.step === 'object' ? field.step[id] : field.step);
+
 export function cleanSettings(id, saved) {
   const settings = {};
+  // saved before transmit power was in watts: a share of the rated output, in per cent
+  if (saved && typeof saved === 'object' && Number.isFinite(saved.power) && !Object.hasOwn(saved, 'watts') && TX_POWER[id]) saved = { ...saved, watts: (saved.power / 100) * watts(id) };
   if (saved && typeof saved === 'object') for (const f of fieldsFor(id)) if (Object.hasOwn(saved, f.key)) setSetting(settings, f, id, saved[f.key]);
   return settings;
 }

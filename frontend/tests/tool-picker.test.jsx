@@ -144,7 +144,7 @@ describe('the list', () => {
     show();
     act(() => game.setTool('radar'));
     expect($('#place-mount')).not.toBeNull();
-    commit($('#place-power'), '50');
+    commit($('#place-watts'), '6'); // half the IRIS's rated 12 W
     expect($('#tool-picker').textContent).toContain('2.6 km');
     commit($('#place-mount'), '500');
     expect($('#place-mount').value).toBe('35');
@@ -156,11 +156,11 @@ describe('the list', () => {
   it('keeps settings separately for each system', () => {
     show();
     act(() => game.setTool('radar'));
-    commit($('#place-power'), '50');
+    commit($('#place-watts'), '6');
     fireEvent.click($('[data-pick="radar_a800"]'));
-    expect($('#place-power').value).toBe('100');
+    expect($('#place-watts').value).toBe('4'); // the A800's own rated output
     fireEvent.click($('[data-pick="radar"]'));
-    expect($('#place-power').value).toBe('50');
+    expect($('#place-watts').value).toBe('6');
   });
 
   it('only accepts settings that belong to the system', () => {
@@ -172,10 +172,10 @@ describe('the list', () => {
 describe('placing with chosen settings', () => {
   it('places the unit with them, and charges its real price', () => {
     const before = sim.state.budget;
-    expect(game.commands.place('radar', 30, 0, { mount: 35, power: 50 })).toBeNull();
+    expect(game.commands.place('radar', 30, 0, { mount: 35, watts: 6 })).toBeNull();
     const [s] = sim.structures;
     expect(s.def.mount).toBe(35);
-    expect(s.def.settings.power).toBe(50);
+    expect(s.def.settings.watts).toBe(6);
     expect(sim.state.budget).toBe(before - 1035000);
     expect(sim.ledger.capex).toBe(1035000);
   });
@@ -193,12 +193,12 @@ describe('placing with chosen settings', () => {
   });
 
   it('the real systems survive the rebuild at wave 1 with their settings', () => {
-    game.commands.place('radar_a800', 30, 0, { power: 50 });
+    game.commands.place('radar_a800', 30, 0, { watts: 2 });
     game.commands.place('interceptor_p1', -30, 0);
     sim.state.warnedWire = true;
     game.commands.startWave();
     const a800 = sim.structures.find((s) => s.def.id === 'radar_a800');
-    expect(a800.def.settings.power).toBe(50);
+    expect(a800.def.settings.watts).toBe(2);
     expect(a800.short).toBe('A80-01');
     expect(sim.structures.find((s) => s.def.id === 'interceptor_p1').def.shotCost).toBe(1000);
   });

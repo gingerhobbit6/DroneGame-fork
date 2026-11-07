@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { BUILD, SPECTRUM, STRUCTURES } from '../sim/config/index.js';
 import { money } from '../sim/economy.js';
-import { fieldsFor, settingValue } from '../sim/unit-config.js';
+import { fieldsFor, settingValue, stepOf } from '../sim/unit-config.js';
 import { useArmed } from './hooks.js';
 import { NumberInput } from './NumberInput.jsx';
 
@@ -41,10 +41,10 @@ export function UnitField({ field, id, value, changed, onChange, locked, prefix 
               onBlur={(e) => { if (e.target.value !== field.show(value)) change(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
             />
           )
-          : <NumberInput key={attempt} id={inputId} value={value} step={field.step} min={limits[0]} max={limits[1]} disabled={locked} onCommit={change} />}
+          : <NumberInput key={attempt} id={inputId} value={value} step={stepOf(field, id)} min={limits[0]} max={limits[1]} disabled={locked} onCommit={change} />}
       <button className="up-reset" aria-label={`Reset ${field.label}`} title="Back to this size's standard value" disabled={locked || !changed} onClick={() => change(null)}>↺</button>
       <span className="muted">
-        {field.help}{field.choices || field.arcs ? '' : ` ${limits[0]} to ${limits[1]} ${field.unit}.`}
+        {field.help}{field.choices || field.arcs ? '' : ` ${limits[0]} to ${limits[1]} ${field.unit}.`}{field.note ? ` ${field.note(id)}` : ''}
         {price !== 0 && <b> {price > 0 ? '+' : '-'}{money(Math.abs(price))}</b>}
       </span>
     </div>
