@@ -11,6 +11,7 @@ import { DeploymentReport } from './DeploymentReport.jsx';
 import { useGame, useTick } from './hooks.js';
 import { WorldPicker } from './WorldPicker.jsx';
 import { ConditionsPicker } from './ConditionsPicker.jsx';
+import { PackPicker } from './account/PackPicker.jsx';
 
 const STAGES = [['1. See', 'Place sensors'], ['2. Stop', 'Place effectors'], ['3. Connect', 'Network it all'], ['4. Prove', 'Rehearse, then fight']];
 
@@ -46,10 +47,11 @@ function StartCard({ openDock }) {
     <div className={wantReal ? 'card welcome picking' : 'card welcome'}>
       <div className="wz-debrief-head">SITE GUARD</div>
       <h1>Defend a site</h1>
-      <p className="lead">You place and network sensors and weapons on a fixed {money(ECONOMY.budget)} budget, then watch your system try to find and stop inbound drones. The heart of it is the gap between where drones really are and where your system believes they are.</p>
+      <p className="lead">You place and network sensors and weapons, from a deployment pack or on a {money(ECONOMY.budget)} budget, then watch your system try to find and stop inbound drones. The heart of it is the gap between where drones really are and where your system believes they are.</p>
       {!wantReal && <div className="stages">{STAGES.map(([head, text]) => <div key={head}><b>{head}</b>{text}</div>)}</div>}
       <p className="muted">A game and a teaching tool. Most figures are vendor claims or labelled assumptions, so do not base real decisions on it.</p>
       <WorldPicker wantReal={wantReal} onWantReal={setWantReal} onWorld={setRealWorld} guiding={onSiteStep} onStopGuiding={() => setGuiding(false)} />
+      <PackPicker />
       <div className="start-conditions"><ConditionsPicker id="start-conditions" /></div>
       <details className="seeds">
         <summary>Advanced: scenario and terrain seeds</summary>

@@ -264,6 +264,19 @@ describe('the login gate', { timeout: 30000 }, () => {
     expect(game.attach).toHaveBeenCalledTimes(1);
   });
 
+  it('limits the game to the deployed pack through the whole login path, and lifts it when the pack is withdrawn', async () => {
+    await deployFirstPack();
+    expect(game.sim.state).toMatchObject({ packed: true, kit: { radar_a800: 1 } });
+    game.sim.commands.deploy('1', '1');
+    expect(game.sim.commands.place('radar', 30, 0)).toMatch(/not in your deployment pack/);
+    const storage = game.storage;
+    cleanup();
+    api.auth.me.mockResolvedValueOnce(USER);
+    gate(storage); // the page loaded again, with the pack kept
+    await settle();
+    expect(game.sim.state.kit).toEqual({ radar_a800: 1 });
+  });
+
   it('keeps the deployed pack across a reload, for its owner only', async () => {
     await deployFirstPack();
     expect(JSON.parse(game.storage.getItem(DEPLOYED))).toEqual({ username: 'operator', id: 1 });

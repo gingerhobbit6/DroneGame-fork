@@ -75,6 +75,8 @@ class SecurityHeaders:
                 headers.update(HEADERS)
                 if scope["path"].startswith("/api/"):
                     headers["Cache-Control"] = "no-store"  # profiles and saves must not linger in a browser cache after signing out
+                elif headers.get("content-type", "").startswith("text/html"):
+                    headers["Cache-Control"] = "no-cache"  # check for a new build each load; the hashed scripts it names can be kept
             await send(message)
 
         await self.app(scope, receive, with_headers)

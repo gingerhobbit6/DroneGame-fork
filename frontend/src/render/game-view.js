@@ -27,6 +27,8 @@ const LOOKS = {
 };
 
 // getMapSource(world): the pictures, roads and names for a real world. The simulation never sees them.
+const WHEEL_ZOOM = 2, PINCH_ZOOM = 8; // OrbitControls zoom speeds, against its default of 1
+
 export function createGameView(canvas, labelLayer, sim, getMapSource = () => null) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); // the camera goes from metres to kilometres away
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -41,6 +43,13 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   controls.zoomToCursor = true; // so the camera can close in on a drone in the air, not only on the ground it looks at
   controls.maxDistance = 1200;
   controls.enableDamping = true;
+  // Map-style, which suits a trackpad: drag slides the map over the ground, right-drag or Shift, Ctrl or Cmd with a drag turns
+  // the view, and the wheel, a two-finger scroll or a pinch zooms. One finger pans a touch screen and two zoom and turn it.
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  controls.screenSpacePanning = false; // a drag moves across the ground, not up the screen into the sky
+  // A pinch arrives as many tiny wheel steps with Ctrl held, so it zooms far more per step than a wheel notch. Both are tuned by hand.
+  canvas.addEventListener('wheel', (e) => { controls.zoomSpeed = e.ctrlKey ? PINCH_ZOOM : WHEEL_ZOOM; }, { capture: true, passive: true });
 
   const sky = new THREE.HemisphereLight(0xbcd4ff, 0x203020, 0.9);
   scene.add(sky);

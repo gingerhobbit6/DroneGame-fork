@@ -6,14 +6,17 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { Vector3 } from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
-import { STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
+import { DRONES, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
+import { effectorFor, kitLeft, sensorChecklist, stepStatus } from '../src/ui/assistant/guide.js';
 import { closestOnPath } from '../src/sim/effectors.js';
 import { magazineWord, updateMagazine } from '../src/sim/magazine.js';
 import { hereU, u } from '../src/sim/units.js';
 import { view } from '../src/render/view.js';
 import { App } from '../src/ui/App.jsx';
+import { GameContext } from '../src/ui/hooks.js';
 import { AccountContext } from '../src/ui/account/pack.js';
 import { ProfileHub } from '../src/ui/account/ProfileHub.jsx';
+import { Overlay } from '../src/ui/Overlay.jsx';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -91,6 +94,61 @@ describe('the toolbar with a pack deployed', { timeout: 30000 }, () => {
     expect($('#tool-picker').textContent).toContain('Your deployment pack holds no laser systems.');
     fireEvent.click(screen.getByRole('button', { name: 'Add some to the pack' }));
     expect(editPack).toHaveBeenCalled();
+  });
+});
+
+describe('the wizard with a pack deployed', () => {
+  beforeEach(() => game.sim.commands.setPacked({ radar_a400: 1, rf_s: 1, jammer: 1 }));
+
+  it("recommends only the pack's sensors, and is done once they are all placed", () => {
+    expect(sensorChecklist(game.sim).map((r) => [r.kind, r.def.id])).toEqual([['radar', 'radar_a400'], ['rf', 'rf_s']]);
+    expect(stepStatus(game.sim, null).sensors).toBe(false);
+    game.sim.addStructure('radar_a400', 30, 0);
+    game.sim.addStructure('rf_s', -30, 0);
+    expect(sensorChecklist(game.sim).every((r) => r.done)).toBe(true);
+    expect(stepStatus(game.sim, null).sensors).toBe(true);
+  });
+
+  it("recommends only the pack's effectors, and moves on once nothing left in it would help", () => {
+    expect(effectorFor(DRONES.fpv, Infinity, kitLeft(game.sim)).id).toBe('jammer');
+    expect(stepStatus(game.sim, null).effectors).toBe(false);
+    game.sim.addStructure('jammer', 0, 30);
+    expect(effectorFor(DRONES.fpv, Infinity, kitLeft(game.sim))).toBeUndefined();
+    expect(stepStatus(game.sim, null).effectors).toBe(true);
+  });
+});
+
+describe('choosing a pack on the start screen', { timeout: 30000 }, () => {
+  const start = (account = {}) => {
+    game.sim.commands.leave(); // back to the start screen
+    const value = { user: USER, activeUnit: null, deploy: vi.fn(), openProfile: vi.fn(), ...account };
+    render(<GameContext.Provider value={game}><AccountContext.Provider value={value}><Overlay /></AccountContext.Provider></GameContext.Provider>);
+    return value;
+  };
+
+  it('deploys the pack chosen, or none for a budget', async () => {
+    const made = await api.units.create(PACK);
+    const account = start();
+    await settle();
+    const select = $('#start-pack-select');
+    expect([...select.options].map((o) => o.textContent)).toEqual(['None: buy any system, on a budget', '1 Troop (1 sensor · 2 effectors)']);
+    fireEvent.change(select, { target: { value: String(made.id) } });
+    expect(account.deploy).toHaveBeenCalledWith(expect.objectContaining({ id: made.id, name: '1 Troop' }));
+    fireEvent.change(select, { target: { value: '' } });
+    expect(account.deploy).toHaveBeenLastCalledWith(null);
+  });
+
+  it('offers to build one when there are none', async () => {
+    const account = start();
+    await settle();
+    expect($('#start-pack').textContent).toContain('You have no packs yet.');
+    fireEvent.click($('#start-pack-build'));
+    expect(account.openProfile).toHaveBeenCalled();
+  });
+
+  it('is not there without an account', () => {
+    start({ user: null });
+    expect($('#start-pack')).toBeNull();
   });
 });
 

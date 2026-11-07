@@ -13,7 +13,7 @@ import { ATTACK_NOTE, CoverageBars } from '../ZonePanel.jsx';
 import { useGame } from '../hooks.js';
 import { PeopleStep } from './PeopleStep.jsx';
 import { Spotlight } from './Spotlight.jsx';
-import { answer, effectorColumns, effectorFor, kindName, sensorChecklist, unanswered, warningAgainst } from './guide.js';
+import { answer, effectorColumns, effectorFor, kindName, kitLeft, sensorChecklist, unanswered, warningAgainst } from './guide.js';
 import { suggestSpot } from './spots.js';
 
 const WEAK = 0.5; // below this share of the zone, the wizard calls a drone type a weak spot
@@ -122,6 +122,7 @@ function SensorsStep({ next }) {
   return (
     <>
       <p>Undetected drones cannot be targeted, and no one sensor sees them all.</p>
+      {sim.state.kit && <p className="wz-small">{rows.length ? 'Planning with your deployment pack: only the sensors it holds.' : 'Your deployment pack holds no sensors. Add some with Edit this pack in the pack tray.'}</p>}
       <ThreatPicker />
       <div className="wz-list">
         {rows.map((r) => (
@@ -150,7 +151,7 @@ function SensorsStep({ next }) {
 function EffectorsStep({ next }) {
   const { sim } = useGame();
   const columns = effectorColumns(), have = new Set(sim.structures.map((s) => s.def.kind));
-  const gap = unanswered(sim)[0], fix = gap && effectorFor(gap, sim.state.budget);
+  const kit = kitLeft(sim), gap = unanswered(sim)[0], fix = gap && effectorFor(gap, kit ? Infinity : sim.state.budget, kit);
   const spotter = Object.values(DRONES).find((d) => d.loiterDist);
   return (
     <>
@@ -167,7 +168,8 @@ function EffectorsStep({ next }) {
         </tbody>
       </table>
       <p className="wz-small wz-muted">Last: kept for close calls, at {money(STRUCTURES.missile.shotCost)} a shot against a {money(DRONES.fpv.cost)} drone. Far: spotters orbit {km(spotter.loiterDist)} out and a laser reaches {km(STRUCTURES.laser.range)}.</p>
-      {gap && <p className="wz-warn">Nothing answers {gap.name} yet. For that threat: {kindName(fix.kind)}, {fix.product}, {money(fix.cost)}.</p>}
+      {gap && fix && <p className="wz-warn">Nothing answers {gap.name} yet. For that threat{kit ? ', from your pack' : ''}: {kindName(fix.kind)}, {fix.product}, {money(fix.cost)}.</p>}
+      {gap && !fix && <p className="wz-warn">Nothing answers {gap.name} yet, and nothing left in your deployment pack would. Add a system to the pack that does, or plan around it.</p>}
       {fix && <PlaceSteps def={fix} />}
       <p>{money(sim.state.budget)} left. Every shot comes out of this too, and nothing is earned back.</p>
       <SpotReason />

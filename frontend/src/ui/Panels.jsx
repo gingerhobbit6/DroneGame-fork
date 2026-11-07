@@ -38,7 +38,7 @@ export function Legend() {
       <summary>Legend</summary>
       <div className="label">THREATS</div>
       {LEGEND.map(([c, text]) => <div key={c}><i style={{ background: c }} />{text}</div>)}
-      <div className="hint">Click a system for details · drag to orbit · right-drag to pan · scroll to zoom</div>
+      <div className="hint">Click a system for details · drag to move · right-drag or Shift-drag to turn · scroll or pinch to zoom</div>
     </details>
   );
 }

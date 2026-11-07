@@ -161,6 +161,15 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [x] Large systems (size L, such as NASAMS, Skynex and Gepard) reload from storage only once the wave is over; small and medium ones, such as a GPMG, reload as they fight. Alex chose this over a reserve of rounds per pack
 - [ ] With a pack deployed, resupply between waves still refills every launcher in full
 - [ ] A loaded saved laydown and the patrol column's systems are not checked against the pack's kit
+- [x] The wizard plans with the deployed pack: its sensor step lists only the kinds the pack holds, with the pack's own system, and its effector step suggests only what is left in the pack. Each step is done once nothing left in the pack would help
+- [x] Map controls suit a trackpad: drag pans over the ground, right-drag or Shift, Ctrl or Cmd with a drag turns the view, and a pinch zooms four times faster per step than a wheel notch (`WHEEL_ZOOM` and `PINCH_ZOOM` in `render/game-view.js`, tuned by hand)
+- [x] Transmit power is set in watts, from a tenth of each radar's or jammer's rated RF output up to it (`config/tx-power.js`). 7 of the 15 real systems publish an output, 3 more come from secondary sources, and the rest are labelled assumptions, said so beside the setting. A power saved as a percentage loads as that share of the rated watts
+- [ ] Rated outputs to confirm: EchoGuard (2 W), Giraffe 1X (150 W) and Spexer 2000 3D (100 W) are worked out from their power draw, and the DroneGun Mk4, MkIII and Tactical publish none. The IRIS may be 2 x 12 W
+- [x] The start screen has a Deployment pack choice after where to defend: one of your packs, deployed at once, or none to buy systems on a budget, with a link to build or edit packs (`ui/account/PackPicker.jsx`)
+- [x] The HUD shows kills, leaks, people killed and injured, and ammunition (rounds left of all carried, and how many are loaded), with the spend below in smaller, quieter text. Site integrity and the budget bar show only in the sandbox
+- [x] The K-CEMA Jupiter is rated at up to 600 W (Alex; one trade report gives 450 W), so by the same square-root rule as the other jammers it reaches 3.9 km, against 1.1 km for the NEO
+- [x] The game's page is sent with `Cache-Control: no-cache`, so a browser checks for a new build each time it loads (`security.py`)
+- [x] Range rings: a selected system's ring is its bright line-of-sight ring again, not a faint white copy, and rings on generated ground are stronger (55% against 35%) and thicker
 
 ## Known limits to fix if they start to matter
 

@@ -318,9 +318,9 @@ describe('the screens', () => {
     expect(sim.people).toHaveLength(0);
   });
 
-  it('shows casualties in the HUD only when there are people', () => {
+  it('shows casualties in the HUD', () => {
     show(<Hud key="h" />);
-    expect($('#killed')).toBeNull();
+    expect($('#killed').textContent).toBe('0');
     act(() => { sim.commands.placePeople(...CLEAR_SPOT, 50, 'open'); blastOnGround(fakeWorld(), shahed(), ...CLEAR_SPOT); game.bump(); });
     expect(Number($('#killed').textContent)).toBe(sim.state.killed);
     expect(Number($('#injured').textContent)).toBe(sim.state.injured);

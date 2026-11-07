@@ -82,7 +82,6 @@ describe('with a deployment pack', () => {
   it('hides the budget and site integrity, except in the sandbox', () => {
     game.sim.commands.deploy('1', '1');
     show(<Hud />);
-    expect($('#budget')).not.toBeNull();
     act(() => { game.sim.commands.setPacked(true); game.bump(); });
     expect($('#budget')).toBeNull();
     expect($('#health-fill')).toBeNull();

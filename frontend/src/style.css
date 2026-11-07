@@ -109,6 +109,7 @@ button.danger:not(:disabled) { border-color: #e57373; color: #ffab91; }
 #health-fill { height: 100%; width: 100%; background: #4caf50; transition: width 0.2s, background 0.2s; }
 .stats { display: flex; justify-content: space-between; margin-top: 8px; color: #9fb2cf; }
 .stats b { color: #fff; }
+.hud-spend { margin-top: 6px; font-size: 11px; color: #7d8fa9; } /* below the counts, and quieter than them */
 
 #hud-top-right { top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; width: 190px; }
 #hud-top-right .row { display: flex; gap: 4px; }
@@ -389,6 +390,10 @@ button.wz-go:hover:not(:disabled) { background: #d4ff4d; }
 .stages div { display: flex; flex-direction: column; gap: 4px; padding: 10px; font-size: 13px; line-height: 18px; color: #b9c7dc; border: 1px solid #2f4468; border-radius: 6px; }
 .stages b { color: #fff; }
 .seeds { margin: 12px 0; font-size: 13px; color: #9fb2cf; }
+.start-pack { margin: 12px 0; font-size: 13px; color: #dbe4f0; }
+.start-pack select { display: block; width: 100%; margin: 6px 0 4px; padding: 6px 8px; background: #0b1424; color: #fff; border: 1px solid #2f4468; border-radius: 6px; font-size: 13px; }
+.start-pack p { margin: 2px 0; }
+.start-pack button.quiet { margin: 0; padding: 0 2px; background: transparent; border: 0; color: #7fd0ff; text-decoration: underline; cursor: pointer; }
 .seeds summary { cursor: pointer; margin-bottom: 6px; }
 .start-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .card .start-actions button { margin-top: 0; min-height: 44px; }

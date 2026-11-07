@@ -46,7 +46,8 @@ describe('HUD', () => {
     expect($('#status img')).toBeNull();
     expect($('#status').textContent).toContain('<img src=x onerror=alert(1)>');
     expect($('#status').textContent).toContain('<b>t</b>');
-    expect($('#budget').textContent).toBe('$15M');
+    expect($('#budget')).toBeNull(); // the budget shows only in the sandbox
+    expect($('#hud-spend').textContent).toBe('Spent $0: systems $0, shots and rounds $0');
   });
   it('reports spotters and the cost exchange during a run', () => {
     armed();
@@ -58,6 +59,8 @@ describe('HUD', () => {
     refresh();
     expect($('#status .warn').textContent).toMatch(/spotter on station/);
     expect($('#status').textContent).toMatch(/per \$1 destroyed/);
+    expect($('#hud-ammo').textContent).toMatch(/Ammunition \d+ of \d+ left · \d+ loaded/);
+    act(() => { game.sim.state.sandbox = true; game.bump(); });
     expect($('#health-fill').style.background).toMatch(/229|e53935/);
   }, 30000);
 });

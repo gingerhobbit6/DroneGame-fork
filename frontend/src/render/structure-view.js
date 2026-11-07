@@ -15,15 +15,15 @@ import { view } from './view.js';
 
 // A real map is bright and busy, so its rings are wider, stronger and darker than on generated ground, or they disappear.
 const onRealMap = () => !!terrainState.data.geo;
-export const ringThickness = (r) => (onRealMap() ? Math.max(1, r * 0.012) : Math.max(0.4, r * 0.006));
+export const ringThickness = (r) => (onRealMap() ? Math.max(1, r * 0.012) : Math.max(0.6, r * 0.009));
 // How far above its system a name tag sits, in scene units: about the top of its model, whose mast is true height up close.
 export function labelLift(def) {
   const b = drawnUnit(), mast = (def.mount ?? 0) / SYSTEM_UNIT_M / Math.sqrt(b / TRUE_UNIT);
   return b * (def.modelScale || 1) * Math.max(4.5, mast + 1.5);
 }
-const ringOpacity = () => (onRealMap() ? 0.8 : 0.35);
+const ringOpacity = () => (onRealMap() ? 0.8 : 0.55);
+const SELECTED_RING_OPACITY = 0.95; // a selected system's ring stands out over the rest, shown even with the rings hidden
 const ringColour = (def) => (onRealMap() ? new THREE.Color(def.color).multiplyScalar(0.7) : def.color);
-const SELECTED_RING_OPACITY = 0.5; // the faint white line shown when selected, as the placement preview draws it
 const ringKey = (s) => `${s.def.range}|${s.def.mount}|${coverKey(s.def)}`; // a radar's facing follows what is defended
 const _m = new THREE.Vector3();
 const turn = (deg) => Math.PI - (deg * Math.PI) / 180; // a compass bearing as a turn of a head whose front is +z
@@ -34,16 +34,13 @@ export function createStructureViews(scene, sim, labels) {
   const views = new Map(); // structure -> view
 
   function makeRing(s, v) {
-    for (const old of [v.ringObj, v.selectRing]) if (old) { v.holder.remove(old.mesh); old.dispose(); }
+    if (v.ringObj) { v.holder.remove(v.ringObj.mesh); v.ringObj.dispose(); }
     const r = u(s.def.range), m = WORLD.metresPerUnit;
-    // Both lines are what this spot really gets against a small drone, with line of sight: the coloured one with the range rings,
-    // the faint white one when the system is selected.
+    // What this spot really gets against a small drone, with line of sight over the ground, as the placing preview shows.
     const radii = usesPath(s.def) ? Array.from(predictRange(s.def, DRONES.fpv, terrainState.data, s.pos.x * m, s.pos.z * m).first, (metres) => u(metres)) : null;
     v.ringObj = drapedRing(r, ringThickness(r), ringColour(s.def), ringOpacity(), 160, 0.5, radii);
-    v.selectRing = drapedRing(r, ringThickness(r) * 1.5, 0xffffff, SELECTED_RING_OPACITY, 160, 0.5, radii);
-    for (const ring of [v.ringObj, v.selectRing]) { ring.update(s.pos.x, s.pos.z); v.holder.add(ring.mesh); }
+    v.ringObj.update(s.pos.x, s.pos.z); v.holder.add(v.ringObj.mesh);
     v.ringObj.mesh.visible = view.rings;
-    v.selectRing.mesh.visible = false;
     v.ringKey = ringKey(s);
     v.ringAt = { x: s.pos.x, z: s.pos.z };
   }
@@ -99,7 +96,8 @@ export function createStructureViews(scene, sim, labels) {
       if (v.ringKey !== ringKey(s)) { makeRing(s, v); setModel(s, v); } // this unit was reconfigured
       if (v.unit !== unit) { v.model.scale.setScalar(unit * (s.def.modelScale || 1)); v.parts.raise(unit / TRUE_UNIT); v.unit = unit; } // true size up close
       const selected = s === view.selected;
-      v.selectRing.mesh.visible = selected;
+      v.ringObj.mesh.visible = view.rings || selected;
+      v.ringObj.mesh.material.opacity = selected ? SELECTED_RING_OPACITY : ringOpacity(); // a real map loaded later needs its stronger rings
       v.label.classList.toggle('selected', selected);
       if (v.parts.spin) v.parts.spin.rotation.y += real * 2.2;
       else v.parts.head.rotation.y = headTurn(s);
