@@ -52,10 +52,9 @@ export function createFusion(core, { raiseAlert }) {
 
   // Moving, but neither closing on the site nor leaving it: what a spotter on station looks like to the fusion node.
   function isCircling(tr) {
-    const dist = siteDist(tr);
-    if (!dist || tr.speed < FUSION.loiterMinSpeed) return false;
+    if (!siteDist(tr) || tr.speed < FUSION.loiterMinSpeed) return false; // inside a drawn area is not circling it
     const e = tracker.estimate(tr, T());
-    const { east, north } = fromSite(tr);
+    const { east, north } = fromSite(tr), dist = Math.hypot(east, north);
     const radial = (east * e.vel[0] + north * e.vel[1]) / dist;
     return Math.abs(radial) < FUSION.loiterRadial * tr.speed;
   }

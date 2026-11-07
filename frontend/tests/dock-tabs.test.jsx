@@ -76,10 +76,12 @@ describe('learn tab', () => {
   }, 30000);
 
   it('follows a track through its messages', () => {
-    running(MIXED, 3600);
+    running(MIXED, 2400);
+    const named = () => [...game.sim.net.tracks.values()].find((t) => t.short);
+    for (let n = 0; n < 6000 && !named(); n += 50) game.sim.run(50); // until a drone is being tracked: the defence may have cleared the sky
     openDock('learn');
     refresh();
-    const tr = [...game.sim.net.tracks.values()].find((t) => t.short);
+    const tr = named();
     expect(tr).toBeTruthy();
     expect(followMessages(tr).length).toBeGreaterThan(0);
     fireEvent.change($('#follow'), { target: { value: tr.id } });

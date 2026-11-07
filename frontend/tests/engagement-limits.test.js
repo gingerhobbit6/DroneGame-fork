@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DRONES, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
-import { hitChance } from '../src/sim/hit-chance.js';
+import { hitChance, meetTime } from '../src/sim/hit-chance.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { armourOf } from '../src/sim/targeting.js';
 import { reachText } from '../src/ui/SystemCard.jsx';
@@ -85,4 +85,14 @@ describe('armour', () => {
     expect(stormer.health).toBe(STRUCTURES.missile_hvm.health - DRONES.fw.damage / 2);
     expect(sim.structures.includes(radar)).toBe(false);
   }, 60000);
+});
+
+describe('meeting a target', () => {
+  it('lets a slow round meet a drone coming its way, but never one going past or away faster than it', () => {
+    expect(meetTime([1000, 0, 0], [-50, 0, 0], 25)).toBeCloseTo(1000 / 75, 6); // head on: they close at 75 m/s
+    expect(meetTime([1000, 0, 0], [20, 0, 0], 80)).toBeCloseTo(1000 / 60, 6); // a slower drone going away is run down
+    expect(meetTime([1000, 0, 0], [50, 0, 0], 25)).toBe(Infinity); // a faster one going away never is
+    expect(meetTime([1000, 0, 0], [0, 50, 0], 25)).toBe(Infinity); // nor one crossing at twice its speed
+    expect(meetTime([1000, 0, 0], [0, 0, 0], 300)).toBeCloseTo(1000 / 300, 6);
+  });
 });

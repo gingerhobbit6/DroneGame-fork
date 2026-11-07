@@ -10,6 +10,7 @@ import { ERROR_AT_LIMIT, predictRange, reachFor, usesPath } from '../sim/site-ra
 import { arcsText, coverArc, elevationBand } from '../sim/sensor-model.js';
 import { CHANNELS, IDENTIFY_PX, RECOGNISE_PX, hasZoom } from '../sim/camera-model.js';
 import { LIBRARIES, covers, libraryKnows } from '../sim/rf-model.js';
+import { canFollow } from '../sim/jamming.js';
 import { terrainState } from '../sim/terrain.js';
 import { fmtTime, hex, useGame, useTick } from './hooks.js';
 import { view } from '../render/view.js';
@@ -102,6 +103,8 @@ function Stores({ s, now, state, frame }) {
 // What this jammer's active bands do to one type of drone.
 function jamEffect(s, drone) {
   const links = drone.links || {}, reactive = s.def.technique === 'reactive';
+  if (s.def.technique === 'spoof') return links.gnss && s.jamBands.has('gnss') ? `turned off course${drone.jamResist > 0 ? `, resists ${Math.round(drone.jamResist * 100)}%` : ''}` : 'not affected';
+  if (s.def.technique === 'takeover') return canFollow(s.def, drone) && s.jamBands.has(links.control) ? 'taken over and landed' : 'not affected';
   if (reactive && !libraryKnows(s.def, drone)) return 'not known to its library';
   const hit = [];
   if (links.control && s.jamBands.has(links.control)) hit.push('control');
@@ -174,6 +177,8 @@ function jammerLimits(def, arc) {
   const lib = def.library && LIBRARIES[def.library];
   const out = [arc < 360 ? `Jams only through ${arc}° facing ${def.facing ?? 0}°` : 'Jams all round', 'A control link is easier to jam the further the drone is from its operator'];
   if (def.technique === 'reactive') out.push(lib?.knows ? `Reactive: only drones its ${lib.name} library knows, while its receiver hears them` : 'Reactive with no library to follow links by, so it jams nothing');
+  if (def.technique === 'spoof') out.push('Spoofing: false GNSS positions turn navigating drones off course; it jams no link');
+  if (def.technique === 'takeover') out.push(lib?.knows?.includes('commercial') ? 'Takes over commercial drones its receiver hears, and lands them' : 'It needs a receiver with a commercial library to take drones over');
   if (def.trigger === 'receiver') out.push(lib ? 'Switches itself on when its receiver hears a drone, even with the network down' : 'It has no receiver, so it never switches itself on');
   if (def.trigger === 'manual') out.push('Jams only while you switch it on');
   return out.join('. ');

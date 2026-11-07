@@ -54,14 +54,14 @@ export const UK_SYSTEMS = {
   },
   jammer_auds: {
     product: 'Blighter AUDS RF inhibitor', variantOf: 'jammer_l', size: 'L', name: 'AUDS jammer', short: 'AUD', model: 'jammer', modelScale: 1.2, cost: 1500000, shotCost: 0, color: 0x651fff, role: 'effector', kind: 'jammer', published: 2000, mount: 9, fire: 'jam',
-    health: 30, signature: 2, emits: [], bands: ['control900', 'control24', 'video58', 'gnss'], slow: 0.5, killTime: 5,
-    desc: 'British quad-band directional jammer from the AUDS system. It covers more bands than the handheld jammers. Autonomous/fibre drones ignore it. No cost per use.',
+    health: 30, signature: 2, emits: [], bands: ['control900', 'control24', 'video58', 'gnss'], slow: 0.5, killTime: 5, slews: true,
+    desc: 'British quad-band directional jammer from the AUDS system, on a pan-and-tilt head: with a sector antenna fitted, the fusion node turns it onto the drone. It covers more bands than the handheld jammers. Autonomous/fibre drones ignore it. No cost per use.',
     sapient: { nodeType: 'NODE_TYPE_JAMMER', subType: ['RF', 'GNSS'], scan: 'SCAN_TYPE_FIXED', modes: ['Standby', 'Jam'] },
     ref: {
       class: 'Fixed directional RF inhibitor',
       analogues: ['Blighter AUDS'],
       published: 'AUDS is quoted at 8 to 10 km, but that is the whole system and mainly its radar. No range is published for the jammer, and its output power is only available on request.',
-      basis: 'Game range 2 km is an ASSUMPTION: twice the handheld DroneGun Tactical, for a larger directional antenna. "Quad band" is read as the game’s four bands.',
+      basis: 'Game range 2 km is an ASSUMPTION: twice the handheld DroneGun Tactical, for a larger directional antenna. "Quad band" is read as the game’s four bands. It turns onto its target at once, as its slew rate is not published: an ASSUMPTION.',
       confidence: 'ASSUMPTION: no published jamming range',
       sources: [
         { label: 'Blighter: AUDS', url: 'https://www.blighter.com/?p=357' },

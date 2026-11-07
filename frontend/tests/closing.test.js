@@ -1,4 +1,4 @@
-// The fusion node judges a track by how fast it closes on the site, not by its speed: a drone flying away is left alone.
+// The fusion node leaves alone a drone flying away, and gives each threat to the cheapest effector with a fair chance at it.
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetAllFigures } from '../src/sim/config/index.js';
@@ -39,5 +39,29 @@ describe('a track flying away', () => {
     for (let i = 0; i < 600; i++) { sim.step(); for (const tr of sim.net.tracks.values()) fastest = Math.max(fastest, tr.closing ?? -Infinity); }
     expect(fastest).toBeGreaterThan(30);
     expect(interceptorShots()).toBeGreaterThan(0);
+  }, 60000);
+});
+
+describe('pairing effectors with threats', () => {
+  // A quadcopter hovering 1.2 km east of the station, outside the critical zone, with a laser and a small missile both able to take it.
+  function quad(laydown) {
+    setUp(sim, { seed: '1', laydown });
+    sim.state.sandbox = true; sim.state.budget = 1e9;
+    const d = sim.spawnDrone('fpv', 0, { jitter: 0, altFrac: 0.5 }), x = u(1200);
+    d.def = { ...d.def, speed: 0 };
+    d.pos.set(x, hereU(x, 0) + u(120), 0);
+    sim.run(300);
+    return d;
+  }
+
+  it('gives a quadcopter to a laser rather than a missile, and leaves the missile alone while the laser has it', () => {
+    quad([['radar', 600, 0], ['laser', 430, 133], ['missile_s', -400, 300]]);
+    expect(sim.ledger.shots.laser?.n).toBeGreaterThan(0);
+    expect(sim.ledger.shots.missile_s).toBeUndefined();
+  }, 60000);
+
+  it('still fires the missile when it is the only effector that can', () => {
+    quad([['radar', 600, 0], ['missile_s', -400, 300]]);
+    expect(sim.ledger.shots.missile_s?.n).toBeGreaterThan(0);
   }, 60000);
 });

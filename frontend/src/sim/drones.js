@@ -12,6 +12,8 @@ import { launchPoint } from './attack-area.js';
 
 const _v = new Vector3();
 const SPOTTER_CLEARANCE = 30; // metres
+// A spoofer drags a drone's course round by up to `turn` radians (120°, so it spirals away rather than in) at `rate` rad/s: ASSUMPTIONS.
+const SPOOF = { turn: 2.1, rate: 0.15 };
 
 // In the sandbox the enemy adapts to the level chosen there instead of to the wave number.
 const effWave = ({ state }) => (state.sandbox ? state.sbLevel : state.wave);
@@ -55,10 +57,10 @@ export function removeDrone(w, d) {
   if (i >= 0) w.drones.splice(i, 1);
 }
 
-// `by` is the id of whatever did the damage ('laser', 'interceptor', 'missile', ...), for the cost ledger.
-function recordKill(w, d, by) {
-  blastInAir(w, d);
-  w.rec.event('kill', `${d.def.name} destroyed by ${by}`, d.uid);
+// `by` is the id of whatever did the damage ('laser', 'interceptor', 'missile', ...), for the cost ledger. A drone landed whole does not go off.
+function recordKill(w, d, by, text = `${d.def.name} destroyed by ${by}`, blast = true) {
+  if (blast) blastInAir(w, d);
+  w.rec.event('kill', text, d.uid);
   w.state.kills++;
   tally(w.ledger.killed, d.type);
   w.ledger.killedBy[by] = w.ledger.killedBy[by] || {};
@@ -156,7 +158,7 @@ function moveStrike(w, d, spd) {
 // A reactive jammer breaks a link sooner. Returns the speed multiplier, or null if the drone came down.
 function applyJamming(w, d, dt) {
   if (d.toGo <= (d.def.terminal ?? 0)) { d.videoJammed = false; return 1; }
-  let ctrl = false, vid = false, gnss = false, killTime = Infinity, ctrlSlow = 1, rate = 1;
+  let ctrl = false, vid = false, gnss = false, spoof = false, takeover = false, killTime = Infinity, ctrlSlow = 1, rate = 1;
   for (const s of w.structures) {
     if (s.def.kind !== 'jammer' || s.mode !== 'Jam') continue;
     const j = jamming(s, d, w.structures);
@@ -164,10 +166,17 @@ function applyJamming(w, d, dt) {
     if (j.control) { ctrl = true; ctrlSlow = Math.min(ctrlSlow, s.def.slow); }
     if (j.video) vid = true;
     if (j.gnss) gnss = true;
+    if (j.spoof) spoof = true;
+    if (j.takeover) takeover = true;
     killTime = Math.min(killTime, s.def.killTime);
     rate = Math.max(rate, j.rate);
   }
   const eff = 1 - d.jamResist, flown = d.def.lostLink !== 'home';
+  if (takeover) { // taken over: once in, the jammer lands it
+    d.takeT = (d.takeT ?? 0) + dt * eff;
+    if (d.takeT >= killTime) { recordKill(w, d, 'jammer', `${d.def.name} taken over and landed`, false); removeDrone(w, d); return null; }
+  }
+  if (spoof) { const pull = SPOOF.turn - d.nav; d.nav += Math.sign(pull) * Math.min(Math.abs(pull), SPOOF.rate * eff * dt); } // anti-jam antennas resist it too
   let slow = 1;
   const jamRate = ctrl ? 1 : vid && flown ? 0.5 : 0;
   if (jamRate && eff > 0 && d.mode !== 'home' && d.mode !== 'egress') { // nothing more to do to one already leaving

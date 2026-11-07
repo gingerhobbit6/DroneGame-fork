@@ -41,6 +41,18 @@ export function inZone(points, x, z) {
   return inside;
 }
 
+// How far a point is from the area's outline, in the units of its points: 0 inside it.
+export function distToZone(points, x, z) {
+  if (inZone(points, x, z)) return 0;
+  let best = Infinity;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [ax, az] = points[j], [bx, bz] = points[i], dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+    const t = len2 ? Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / len2)) : 0;
+    best = Math.min(best, Math.hypot(x - ax - t * dx, z - az - t * dz));
+  }
+  return best;
+}
+
 // A saved laydown's area comes from outside the game, so anything that is not a usable outline counts as no area.
 export const cleanZone = (points) => (Array.isArray(points) && points.length >= 3 && points.every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)) ? points : null);
 

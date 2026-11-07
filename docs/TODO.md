@@ -147,18 +147,19 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [ ] No wind: it would change drone speeds over the ground, how well quadcopters fly, and how far sound carries, upwind and down
 - [ ] Casualty radii, checked against a second anchor: a design paper gives an M107 155 mm shell (6.95 kg of Composition B) a 100% kill radius of about 20 to 30 m, where the rule gives 17 m. A little low, so left as it is
 - [ ] Armour is a flat halving and every armour figure is an assumption; a shaped-charge first-person-view drone can still knock out an armoured vehicle
-- [ ] The fusion node judges an unnamed track by the average of every drone in the catalogue, so adding a real drone shifts play: the last-mile FPV moved the laser laydowns by up to three waves. Weighting the average by what the waves actually send would stop that
+- [x] The fusion node judges an unnamed track by the drones the waves send (the attack mix), not the whole catalogue, so adding a real drone no longer shifts play. A drone a camera names is still known by its own figures
 
 **Fusion and jammer tactics (2026-11-07)**
 
 - [x] The fusion node gives no rounds to a track flying away from the site and heading for none of your systems (turned for home by a jammer, or a spotter going), and stops an engagement whose target turns to leave. It also spares rounds on ghost tracks drifting away
 - [x] The soft-kill wait and a jammer's own receiver ask whether a reactive jammer can follow the link (`canFollow`): the fusion node had held fire 10 s for a jammer that could not touch a Molniya
 - [ ] Ranking threats by how fast they close on the site, rather than by speed, was tried and made play worse: 4 of 6 mixed runs let strikes through where none had. Velocities from bearing-only sensors can point anywhere, and emitter-seeking drones go for systems further out. Ranking by predicted time to each defended asset needs better velocity estimates first
-- [ ] Each launcher picks its own most urgent track. A shared weapon-to-target pairing would weigh cost per kill and the chance of a kill before the drone arrives
-- [ ] A target is offered once it is in reach, with no check that a round can meet it before it arrives or while it stays in reach
-- [ ] Video links are jammed at the drone, though the pilot receives them. Jamming them where they are received needs pilots on the map
-- [ ] No GNSS spoofing, which Ukraine's Pokrova system uses to send Shaheds off course on purpose, and no protocol takeover, which systems such as D-Fend's EnforceAir claim lands a commercial drone where they choose
-- [ ] A directional jammer such as the AUDS keeps its facing; the fusion node could slew it to the track, as soldiers aim the handheld jammers
+- [x] Free effectors are paired with tracks, most urgent first: each track goes to the effector with the lowest cost per kill among those with at least half the best chance at it, so a laser or gun takes a quadcopter before a missile. A track already engaged is left to that engagement until it is inside the critical zone. An engaged effector still switches to a much more urgent track
+- [x] A track is offered to a launcher only if its round can meet it within reach, flying at where the track will be (`meetTime`), so a slow interceptor drone is not sent after a faster drone going past or away
+- [x] Video links are jammed where the pilot receives them, at the launch point, so a jammer by the site rarely touches them. The fusion node counts only on breaking a control link
+- [x] Two more techniques for any jammer: GNSS spoofing, which turns a navigating drone steadily off course (Ukraine's Pokrova is reported to), and taking over a commercial drone its receiver hears and its library knows, which lands it whole (as D-Fend's EnforceAir claims). The turn's size and rate, and the 25% price, are assumptions
+- [x] A jammer on a pan-and-tilt head (the AUDS) with a sector antenna is turned onto the most urgent drone it could jam. It turns at once, as no slew rate is published
+- [x] Threat distance is measured to a drawn area's outline, not its centre, so a long thin area is as close along its whole length
 
 **Patrol prototype** (see `docs/PATROL_MODE.md`)
 

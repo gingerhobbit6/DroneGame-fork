@@ -10,6 +10,7 @@
 // No game rendering here, so it can run headless.
 
 import { WORLD, TERRAIN, COMMS, SPECTRUM, overlaps } from './config/index.js';
+import { noiseBands } from './jamming.js';
 import { terrainState } from './terrain.js';
 import { rand } from './rng.js';
 import { inArcOf } from './sensor-model.js';
@@ -77,7 +78,7 @@ export function createComms(deps) {
     const hits = [];
     for (const j of deps.getJammers()) {
       if (j.mode !== 'Jam' || !j.jamBands) continue;
-      const jf = [...j.jamBands].flatMap((b) => (SPECTRUM.bands[b] ? SPECTRUM.bands[b].f : []));
+      const jf = [...noiseBands(j)].flatMap((b) => (SPECTRUM.bands[b] ? SPECTRUM.bands[b].f : []));
       if (!overlaps(jf, bandF)) continue;
       const jw = where(j), d = Math.hypot(jw.x - w.x, jw.z - w.z), range = j.def.range;
       if (d < range && inArcOf(j.def, j.pos, s.pos)) { q *= clamp(d / range, 0, 1) * 0.5; hits.push(j.short); }

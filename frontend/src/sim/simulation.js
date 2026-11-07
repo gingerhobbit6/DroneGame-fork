@@ -52,6 +52,8 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     drones: w.drones,
     getTime: () => state.time,
     siteCentre: () => state.zoneCentre,
+    zone: () => state.zone, // the drawn area's outline, or null
+    expected: () => state.attack, // the drones the waves send: what an unnamed track is judged to be
     monitoring: () => state.wave > 0 || state.sandbox, // the fusion node only chases lost contact once the attack has started
     onApprovalRequest() { emit('approvalRequest'); emit('toast', 'Engagement request: your decision is needed'); },
     onApprovalDecided() { emit('approvalDecided'); },

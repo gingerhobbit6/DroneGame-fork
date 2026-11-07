@@ -26,6 +26,7 @@ const SECTOR = { arc: 60, gain: 10, price: 0.2 };
 // A jammer's receiver costs what a Small RF detector does with the same library, and reactive jamming, sending only while a link it
 // follows is up, is this much quieter to emitter-seeking drones. Both assumptions.
 const RECEIVER_LIKE = 'rf_s', REACTIVE_QUIET = 0.5;
+const TECHNIQUE_PRICE = 0.25; // share of a jammer's price added for spoofing or taking drones over: an assumption
 const receiverPrice = (v) => (v === 'off' ? 0 : STRUCTURES[RECEIVER_LIKE].cost * (1 + LIBRARIES[v].price));
 const choicesOf = (table) => Object.fromEntries(Object.entries(table).map(([k, v]) => [k, v.label]));
 const MAST_PRICE = 0.015, RELOAD_PRICE = 0.1; // share of the system's price, per metre and per second
@@ -93,9 +94,11 @@ export const UNIT_FIELDS = [
     help: 'Hears drones on the bands it is fitted for, as far as it can jam them, but not through its own barrage. Needed to jam reactively or switch itself on.',
   },
   {
-    key: 'technique', label: 'Technique', base: () => 'barrage', direct: 'technique', limits: each(JAMMERS, true), choices: { barrage: 'Barrage', reactive: 'Reactive' },
-    signature: (v) => (v === 'reactive' ? REACTIVE_QUIET : 1),
-    help: 'Barrage fills its bands for every drone. Reactive follows only the links its receiver hears and its library knows: it breaks them twice as fast at half the noise, and leaves GNSS and every other drone alone.',
+    key: 'technique', label: 'Technique', base: () => 'barrage', direct: 'technique', limits: each(JAMMERS, true),
+    choices: { barrage: 'Barrage', reactive: 'Reactive', spoof: 'GNSS spoofing', takeover: 'Take over commercial drones' },
+    signature: (v) => (v === 'barrage' ? 1 : REACTIVE_QUIET),
+    price: (v, c) => (v === 'spoof' || v === 'takeover' ? TECHNIQUE_PRICE * c.cost : 0),
+    help: 'Barrage fills its bands for every drone. Reactive follows only the links its receiver hears and its library knows: it breaks them twice as fast at half the noise, and leaves GNSS and every other drone alone. GNSS spoofing, on its GNSS band, feeds false positions that turn a navigating drone off course, and jams nothing else. Taking over sends a commercial drone its maker’s commands and lands it whole, if its receiver hears it and its library knows the link.',
   },
   {
     key: 'trigger', label: 'Switched on by', base: () => 'track', direct: 'trigger', limits: each(JAMMERS, true),

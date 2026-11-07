@@ -2,7 +2,7 @@
 // time to break its link.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { FUSION, resetAllFigures } from '../src/sim/config/index.js';
+import { DRONES, FUSION, resetAllFigures } from '../src/sim/config/index.js';
 import { threatLibrary } from '../src/sim/network/threats.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { setUp } from './support/scenarios.js';
@@ -35,6 +35,15 @@ describe('the threat library', () => {
     expect(quad.jammable).toBe(true); // but it might not
     expect(unknown.jammable).toBe(true);
     expect(unknown.model).toBeUndefined();
+  });
+
+  it('judges an unnamed track by the drones the enemy sends, not the whole catalogue', () => {
+    const mix = threatLibrary(['fpv', 'fw']), quad = mix({ airframe: 'Multirotor' });
+    expect(quad.breakable).toBe(true); // no fibre-optic drones are coming, so any quadcopter has a link to break
+    expect(quad.harm).toBe(DRONES.fpv.damage);
+    expect(mix({ airframe: 'Unknown' }).harm).toBe((DRONES.fpv.damage + DRONES.fw.damage) / 2);
+    expect(mix({ model: 'KVN', airframe: 'Multirotor' }).jammable).toBe(false); // a drone a camera names is still known by its own figures
+    expect(threatLibrary(['nonsense'])({ airframe: 'Unknown' }).harm).toBe(believe({ airframe: 'Unknown' }).harm); // nothing known: everything
   });
 });
 

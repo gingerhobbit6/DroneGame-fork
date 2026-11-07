@@ -4,16 +4,20 @@ import * as S from '../sapient.js';
 import { FUSION, DRONES } from '../config/index.js';
 import { canFire } from '../magazine.js';
 import { DETECT_PX, IDENTIFY_PX, zoomMax } from '../camera-model.js';
-import { inArcOf } from '../sensor-model.js';
+import { coverArc, inArcOf } from '../sensor-model.js';
 import { bandGhz } from '../rf-model.js';
 import { antennaHeight, reachOnPath, typicalAltitude } from '../site-range.js';
 import { terrainState } from '../terrain.js';
 import { canFollow, hears } from '../jamming.js';
+import { burnTime, hitChance, meetTime } from '../hit-chance.js';
 import { threatLibrary } from './threats.js';
 
 // s: a jammer on its own receiver that has heard nothing for this long stops to listen. It switches once a second, so a barrage, deaf to
 // the bands it fills, jams 3 s in every 4: an assumption.
 const LOOK = 2.5;
+// Pairing: an effector is in the running for a track with at least this share of the best chance any free one has at it. A beam's cost
+// is reckoned on a drone of this many hit points when the track has no model. Assumptions.
+const FAIR = 0.5, BEAM_HP = 20;
 
 // Would this effector ever take this airframe? Unknown tracks are offered, and the effector can reject them.
 const takesAirframe = (def, airframe) => !def.engages || !airframe || airframe === 'Unknown' || def.engages.some((t) => DRONES[t].airframe === airframe);
@@ -22,7 +26,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   const { ctx, mpu, T, nodes, tracker, fusion, send, deliver, distToTrack, siteDist } = core;
   const faces = (s, tr) => inArcOf(s.def, s.pos, { x: tr.est.east / mpu(), z: -tr.est.north / mpu() }); // a sector antenna only jams what it faces
   const { sendStatus } = registration;
-  let believe = threatLibrary(); // what the fusion node may believe about each track (threats.js), built again each pass
+  let believe = threatLibrary(ctx.expected?.()); // what the fusion node may believe about each track (threats.js), built again each pass
   // Seconds until a track arrives, for each point of harm it would do: the lower, the sooner it must be dealt with. By its speed, not how
   // fast it closes on the site: ranking by that lost the radar sooner (4 of 6 mixed runs let strikes through), as a velocity from
   // bearing-only sensors can point anywhere, and emitter-seeking drones go for systems further out.
@@ -60,8 +64,9 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   const reachesTrack = (j, tr, band) => distToTrack(j, tr) <= pathReach(j, tr.est.east, tr.est.north, heightOf(tr), band);
 
   // The jammers that could break this track's link: it is known to have one, on a band they jam, and they can follow it if reactive.
+  // Its control link, which it receives where it flies; its video is received by its operator, out of a site jammer's reach.
   function breakers(tr) {
-    const b = believe(tr), links = b.breakable && b.model ? [b.model.links.control, b.model.links.video].filter(Boolean) : [];
+    const b = believe(tr), links = b.breakable && b.model ? [b.model.links.control].filter(Boolean) : [];
     if (!links.length) return [];
     return [...nodes.values()].filter((j) => j.def.kind === 'jammer' && !j.offline && j.def.networked !== false && (!['receiver', 'manual'].includes(j.def.trigger) || j.mode === 'Jam')
       && links.some((band) => j.jamBands.has(band)) && canFollow(j.def, b.model));
@@ -81,7 +86,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   // Soft kill first: a drone known to have a link to break, whose way in passes through such a jammer's reach, is left to the jammer,
   // unless it has come close, or a jammer has had it for FUSION.softKillWait seconds and it still flies.
   function leaveToJammer(tr) {
-    const js = breakers(tr), b = believe(tr), band = (j) => [b.model.links.control, b.model.links.video].find((x) => x && j.jamBands.has(x));
+    const js = breakers(tr), b = believe(tr), band = (j) => [b.model.links.control].find((x) => x && j.jamBands.has(x));
     if (!js.length || siteDist(tr) < FUSION.critZone || jammingFails(tr.model)) return false;
     if (js.some((j) => j.mode === 'Jam' && faces(j, tr) && reachesTrack(j, tr, band(j)))) tr.jamSince ??= T();
     if (tr.jamSince != null && T() - tr.jamSince > FUSION.softKillWait) { record(tr, 'failed'); return false; }
@@ -141,9 +146,18 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   // Is the track between this effector's minimum range (a missile's, to arm and turn onto it) and its reach?
   const inEnvelope = (s, tr) => { const r = distToTrack(s, tr); return r <= s.def.range && r >= (s.def.minRange ?? 0); };
 
+  // Can a round from this launcher meet the track within its reach, flying at where the track will be? A slow interceptor drone cannot
+  // chase down a faster drone going past or away. A track with no velocity yet is given the benefit of the doubt.
+  function canMeet(s, tr) {
+    if (s.def.fire !== 'guided' || !tr.vel) return true;
+    const m = mpu(), p = [tr.est.east - s.pos.x * m, tr.est.north + s.pos.z * m, tr.flat ? 0 : tr.est.up - s.pos.y * m];
+    return meetTime(p, tr.flat ? [tr.vel[0], tr.vel[1], 0] : tr.vel, s.def.missileSpeed) * s.def.missileSpeed <= s.def.range;
+  }
+
   // Should the fusion node offer this track to this effector? Keeps expensive rounds for the targets that need them.
   function eligible(s, tr) {
     const def = s.def;
+    if (!canMeet(s, tr)) return false; // its rounds could not catch it
     if (s.denied.has(tr.id) || authority().isPending(s, tr)) return false;
     if (T() < (s.rejected.get(tr.id) ?? 0) || T() < (tr.emptyUntil ?? 0)) return false;
     if (!takesAirframe(def, tr.airframe)) return false; // already known to be beyond this effector
@@ -215,6 +229,12 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
       return;
     }
     if (s.offline) return; // a jammer we have lost contact with can't be switched
+    // A jammer on a pan-and-tilt head with a sector antenna is turned onto the most urgent drone it could jam.
+    // shortcut: it turns at once, without a SAPIENT task of its own; send it one if the delay on the turn ever matters.
+    if (s.def.slews && coverArc(s.def) < 360) {
+      const m = mpu(), aim = live.filter((tr) => distToTrack(s, tr) <= s.def.range && [...believe(tr).bands].some((b) => s.jamBands.has(b))).sort((a, b) => urgency(a) - urgency(b))[0];
+      if (aim) s.slewTo = Math.round(((Math.atan2(aim.est.east - s.pos.x * m, aim.est.north + s.pos.z * m) * 180) / Math.PI + 360) % 360);
+    }
     // only for a drone it could do something to, on a band it jams, as far as the fusion node knows (threats.js)
     const want = live.some((tr) => distToTrack(s, tr) <= s.def.range && faces(s, tr) && [...believe(tr).bands].some((b) => s.jamBands.has(b))) ? 'Jam' : 'Standby';
     if (s.mode !== want && s.modePending !== want) {
@@ -228,9 +248,10 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
 
   function tasking() {
     const live = confirmedTracks();
-    believe = threatLibrary();
+    believe = threatLibrary(ctx.expected?.());
     reachMemo = new Map();
     cueCameras(live);
+    const free = [];
     for (const s of nodes.values()) {
       if (s.def.networked === false) continue; // its crew works it by hand (crew.js)
       if (s.def.kind === 'jammer') { switchJammer(s, live); continue; }
@@ -260,22 +281,53 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
           completeTask(s, 'TASK_STATUS_COMPLETED', ['target is leaving']);
         }
       }
-      // best target: the most urgent track this effector can reach, for the harm it would do and how soon it arrives (skipping one it just rejected)
+      if (!s.task) { free.push(s); continue; } // paired below
+      // an engaged effector: the most urgent track it can reach, for the harm it would do and how soon it arrives (skipping one it just rejected)
       let best = null, bd = Infinity;
       for (const tr of live) {
-        if (!inEnvelope(s, tr) || leaving(tr)) continue;
-        if (!eligible(s, tr) || ctx.roundsCover(s, tr.drone)) continue;
+        if (!takes(s, tr)) continue;
         const dd = urgency(tr);
         if (dd < bd) { bd = dd; best = tr; }
       }
-      if (!best || (s.task && s.task.trackId === best.id)) continue;
-      if (s.task) {
-        const cur = tracker.tracks.get(s.task.trackId);
-        if (cur && !ctx.roundsCover(s, cur.drone) && bd > urgency(cur) * (1 - FUSION.retaskGain)) continue;
-        sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${cur ? cur.short : 'task'}`, 'Re-tasked to a more urgent threat');
-        completeTask(s, 'TASK_STATUS_COMPLETED', ['re-tasked']);
-      }
+      if (!best || s.task.trackId === best.id) continue;
+      const cur = tracker.tracks.get(s.task.trackId);
+      if (cur && !ctx.roundsCover(s, cur.drone) && bd > urgency(cur) * (1 - FUSION.retaskGain)) continue;
+      sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${cur ? cur.short : 'task'}`, 'Re-tasked to a more urgent threat');
+      completeTask(s, 'TASK_STATUS_COMPLETED', ['re-tasked']);
       assign(s, best);
+    }
+    pair(free, live);
+  }
+
+  const takes = (s, tr) => inEnvelope(s, tr) && !leaving(tr) && eligible(s, tr) && !ctx.roundsCover(s, tr.drone);
+  // What a kill would cost this effector, as far as the fusion node can tell: a round's price over its chance, with the track's evasion
+  // unknown, or a beam's price per second over the seconds a typical drone takes to burn.
+  function costPerKill(s, tr) {
+    const def = s.def, rangeM = distToTrack(s, tr);
+    if (def.fire === 'beam') return (def.shotCost ?? 0) * burnTime(def, { hp: believe(tr).model?.hp ?? BEAM_HP, evade: 1 }, rangeM);
+    return (def.shotCost ?? 0) / Math.max(hitChance(def, { speed: tr.speed ?? 0, evade: 1 }, rangeM, tr.estErr ?? 0), 0.01);
+  }
+  const chanceOf = (s, tr) => (s.def.fire === 'beam' ? 1 : hitChance(s.def, { speed: tr.speed ?? 0, evade: 1 }, distToTrack(s, tr), tr.estErr ?? 0));
+  // Free effectors are paired with tracks, most urgent first. Each track goes to the free effector with the lowest cost per kill among
+  // those with at least FAIR of the best chance at it, so a gun or laser takes a quadcopter before a missile does. A track already being
+  // engaged is left to that engagement, unless it is inside the critical zone, where every effector that can takes it on.
+  function pair(free, live) {
+    const tracks = live.filter((tr) => !leaving(tr)).sort((a, b) => urgency(a) - urgency(b));
+    const engaged = new Set([...nodes.values()].filter((s) => s.task).map((s) => s.task.trackId));
+    for (let made = true; made && free.length;) {
+      made = false;
+      for (const tr of tracks) {
+        if (engaged.has(tr.id) && siteDist(tr) >= FUSION.critZone) continue;
+        const can = free.filter((s) => takes(s, tr));
+        if (!can.length) continue;
+        const top = Math.max(...can.map((s) => chanceOf(s, tr)));
+        const pick = can.filter((s) => chanceOf(s, tr) >= top * FAIR).sort((a, b) => costPerKill(a, tr) - costPerKill(b, tr))[0];
+        free.splice(free.indexOf(pick), 1);
+        assign(pick, tr);
+        engaged.add(tr.id);
+        made = true;
+        if (!free.length) break;
+      }
     }
   }
 

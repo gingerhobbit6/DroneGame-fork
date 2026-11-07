@@ -68,7 +68,8 @@ describe('a drone whose links are jammed', () => {
   });
 
   it('is only blinded if it flies itself and loses just its video', () => {
-    const d = flying(jammerOn(), 'spotter', 1500); // its control link is on 900 MHz, which this jammer leaves alone
+    const s = jammerOn(), d = flying(s, 'spotter', 1500); // its control link is on 900 MHz, which this jammer leaves alone
+    d.launch = eastOf(s, 'spotter', 500).pos; // its operator, who receives the video, within the jammer's reach
     sim.run(600);
     expect(d.dead).toBe(false);
     expect(d.videoJammed).toBe(true);
@@ -112,5 +113,14 @@ describe('a reactive jammer', () => {
     expect(canFollow(reactive, DRONES.molniya2)).toBe(false); // the soft-kill wait asks this too (tasking.js breakers)
     expect(canFollow({ technique: 'reactive', library: 'commercial' }, DRONES.fpv)).toBe(false); // a library that does not know its link
     expect(canFollow(barrage, DRONES.molniya2)).toBe(true);
+  });
+});
+
+describe('a video link', () => {
+  it('is jammed where its operator receives it, not where the drone flies', () => {
+    const s = jammerOn(), near = eastOf(s, 'fpv7inch', 800);
+    expect(jamming(s, near, sim.structures)).toMatchObject({ control: true, video: false }); // its operator is 5 km beyond the jammer
+    near.launch = eastOf(s, 'fpv7inch', 300).pos;
+    expect(jamming(s, near, sim.structures)).toMatchObject({ video: true }); // an operator close to the jammer loses the picture
   });
 });

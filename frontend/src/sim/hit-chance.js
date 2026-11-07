@@ -13,6 +13,18 @@ const DODGE_SPEED = 3;    // a round up to this many times its target's speed fe
 const MIN_LEAD = 0.1;     // a round slower than its target can still meet it head on
 const BEAM_FULL = 0.25;   // a beam is at full strength out to this share of its range, because the spot has not yet spread
 
+// Seconds until a round flying straight at `speed` meets a target `p` away moving at `v` (both [east, north, up], in metres and m/s),
+// or Infinity if it never can: a round slower than its target only catches one coming its way. Solves |p + v t| = speed t.
+export function meetTime(p, v, speed) {
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const a = dot(v, v) - speed * speed, b = 2 * dot(p, v), c = dot(p, p);
+  if (Math.abs(a) < 1e-9) return b < 0 ? -c / b : Infinity;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return Infinity;
+  const ts = [(-b - Math.sqrt(disc)) / (2 * a), (-b + Math.sqrt(disc)) / (2 * a)].filter((t) => t > 0);
+  return ts.length ? Math.min(...ts) : Infinity;
+}
+
 // Evasion spoils a shot and a beam's dwell alike. 1 is no manoeuvre.
 export const evasionFactor = (evade) => 0.5 + 0.5 * evade;
 // What evasion leaves of a round's chance: a missile many times faster than a drone barely notices it turn.
