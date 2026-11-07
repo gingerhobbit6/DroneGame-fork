@@ -12,6 +12,7 @@ import { CHANNELS, IDENTIFY_PX, RECOGNISE_PX, hasZoom } from '../sim/camera-mode
 import { LIBRARIES, covers, libraryKnows } from '../sim/rf-model.js';
 import { terrainState } from '../sim/terrain.js';
 import { fmtTime, hex, useGame, useTick } from './hooks.js';
+import { view } from '../render/view.js';
 import { stateWord } from './dock/NetworkSide.jsx';
 import { SiteRange } from './SiteRange.jsx';
 import { UnitEditor } from './UnitEditor.jsx';
@@ -253,6 +254,7 @@ function UnitCard({ s, game }) {
     <div id="unit-panel" className="panel" role="region" aria-label={`Selected system: ${s.short}`}>
       <div className="up-head" style={{ borderLeftColor: hex(def.color) }}>
         <b>{s.short} · {s.custom?.name || def.name}</b>
+        {!frame && <button id="unit-eye" className="up-eye" aria-pressed={view.eye === s} title="Watch from the top of its mast: what it engages or tracks, and the drones and rounds coming in" onClick={() => game.lookFrom(view.eye === s ? null : s)}>{view.eye === s ? 'Map view' : 'View from here'}</button>}
         <button id="unit-close" aria-label="Close the Unit panel" title="Close (Esc)" onClick={() => game.select(null)}>×</button>
       </div>
       {frame && <div className="up-review">Reviewing {fmtTime(frame.t)}. Network and totals are hidden, because they are not recorded.</div>}

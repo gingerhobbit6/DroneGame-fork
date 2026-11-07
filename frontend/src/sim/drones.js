@@ -6,9 +6,9 @@ import { jamming } from './jamming.js';
 import { rand, gauss } from './rng.js';
 import { u, hdist, clamp, groundM, hereU, onMap } from './units.js';
 import { tally } from './economy.js';
-import { pickTarget, hitStructure } from './targeting.js';
+import { chooseAim, pickTarget, hitStructure } from './targeting.js';
 import { blastInAir, blastOnGround, blastOnSite } from './people.js';
-import { aimInZone, launchPoint } from './attack-area.js';
+import { launchPoint } from './attack-area.js';
 
 const _v = new Vector3();
 const SPOTTER_CLEARANCE = 30; // metres
@@ -34,7 +34,7 @@ export function spawnDrone(w, type, bearing, rolls = {}) {
   const agl = lo + (altFrac * bands.length - b) * (hi - lo);
   const y = hereU(sx, sz) + u(agl);
   const pos = new Vector3(sx, y, sz);
-  const aim = w.state.zone && def.role !== 'spotter' ? aimInZone(w.state.zone, rand) : null; // only a drawn area uses a random draw, so runs without one are unchanged
+  const aim = w.state.zone && def.role !== 'spotter' ? chooseAim(w, rand) : null; // only a drawn area uses a random draw, so runs without one are unchanged
   const uid = ++w.droneUid;
   const d = {
     uid, def, type, pos, launch: pos.clone(),

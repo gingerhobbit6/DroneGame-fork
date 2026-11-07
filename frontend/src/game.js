@@ -175,6 +175,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   // The system the Unit panel shows. It is view state, not a command, so it is not logged and cannot change a run.
   function select(s) { view.selected = s; bump(); }
+  function lookFrom(s) { view.eye = s ?? null; bump(); } // the ground view from this system's mast, or back to the map
   function getSelected() { // sold or destroyed systems drop out of the list
     if (view.selected && !sim.structures.includes(view.selected)) view.selected = null;
     return view.selected;
@@ -209,10 +210,8 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   }
 
   // Starting wave 1 rebuilds every system, with a new id and perhaps a new callsign. Only its position is sure to be the same.
-  sim.on('reset', () => {
-    const was = view.selected;
-    view.selected = was && sim.structures.find((s) => s.def.id === was.def.id && s.pos.x === was.pos.x && s.pos.z === was.pos.z) || null;
-  });
+  const rebuilt = (was) => was && sim.structures.find((s) => s.def.id === was.def.id && s.pos.x === was.pos.x && s.pos.z === was.pos.z) || null;
+  sim.on('reset', () => { view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); }); // the ground view stays on its system too
 
   // when the fusion node asks the operator to authorise an engagement, stop the clock so there is time to decide
   let pausedForApproval = false, simAcc = 0;
@@ -283,7 +282,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   return {
     packs, loadPack, ensureWorld, mapSource, cursor: () => placement?.cursor() ?? null,
     sim, commands, clock, setSpeed, reviewClock, subscribe, getTick, bump, attach, debug, api, saver, storage, pageClosing,
-    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, lastRefusal: () => refusal, select, getSelected, reveal,
+    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
     catalogue: tools.catalogue, openCatalogue: tools.openCatalogue, pickFromTray: tools.pickFromTray, startDrag: tools.startDrag, endDrag: tools.endDrag, dropAt,
     toast, onToast(fn) { toastListeners.add(fn); return () => toastListeners.delete(fn); },
     onFrame(fn) { frameListeners.add(fn); return () => frameListeners.delete(fn); },

@@ -77,7 +77,7 @@ export function createDroneViews(scene, sim, labels, camera) {
       }
       v.dropMat.color.setHex(tracked ? d.def.color : 0x667080);
       for (const r of v.rotors) r.rotation[r.userData.axis || 'y'] += real * 50;
-      const k = drawScale(d.def); // it shrinks to true size as the camera closes in
+      const k = drawScale(d.def, view.eye ? camera.position.distanceTo(d.pos) : view.zoom); // it shrinks to true size as the camera closes in; from a mast, by its own distance
       v.group.scale.setScalar(k);
       v.group.position.copy(d.pos);
       v.group.position.y = d.pos.y + Math.sin(performance.now() / 300 + v.phase) * 0.01 * d.def.size * k;

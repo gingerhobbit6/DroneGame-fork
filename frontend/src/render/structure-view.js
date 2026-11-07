@@ -96,6 +96,7 @@ export function createStructureViews(scene, sim, labels) {
       if (v.ringKey !== ringKey(s)) { makeRing(s, v); setModel(s, v); } // this unit was reconfigured
       if (v.unit !== unit) { v.model.scale.setScalar(unit * (s.def.modelScale || 1)); v.parts.raise(unit / TRUE_UNIT); v.unit = unit; } // true size up close
       const selected = s === view.selected;
+      v.model.visible = s !== view.eye; // watching from its mast, its own vehicle or tripod would fill the view
       v.ringObj.mesh.visible = view.rings || selected;
       v.ringObj.mesh.material.opacity = selected ? SELECTED_RING_OPACITY : ringOpacity(); // a real map loaded later needs its stronger rings
       v.label.classList.toggle('selected', selected);

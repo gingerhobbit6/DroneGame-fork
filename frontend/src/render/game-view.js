@@ -13,6 +13,7 @@ import { createDroneViews } from './drone-view.js';
 import { createBeliefViews } from './belief-view.js';
 import { createEffects } from './effects.js';
 import { createZoneView } from './zone-view.js';
+import { createEyeView } from './eye-view.js';
 import { createOsmMap } from './osm-map.js';
 import { createMapTexture } from './map-texture.js';
 import { FOV, view } from './view.js';
@@ -100,6 +101,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     else showOsm();
     siteRing.update(0, 0);
     buildRing.update(0, 0);
+    siteRing.mesh.position.y = buildRing.mesh.position.y = groundU(0, 0); // a draped ring's heights are from the ground at its centre
     siteRing.mesh.material.opacity = terrainState.data.geo ? 0.9 : 0.6; // a real map is bright, so these need more to show
     buildRing.mesh.material.opacity = terrainState.data.geo ? 0.9 : 0.4;
   }
@@ -171,7 +173,8 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const people = createPeopleViews(scene, sim, labels);
   const drones = createDroneViews(scene, sim, labels, camera);
   const beliefs = createBeliefViews(scene, sim.net, camera, labelLayer);
-  const effects = createEffects(scene, sim);
+  const effects = createEffects(scene, sim, camera);
+  const eyeView = createEyeView(camera, controls, sim, canvas);
   const zone = createZoneView(scene, sim);
   sim.on('terrain', zone.redraw);
 
@@ -207,7 +210,8 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     scene, camera, controls, labels, structures, update, showOsm, loadOsm: () => osmMap.load(), refreshMap, mapPreviews, viewFromAbove, centreOn,
     getWorldMesh: () => worldView && worldView.mesh,
     draw() {
-      controls.update(); view.zoom = camera.position.distanceTo(controls.target);
+      if (eyeView.update()) view.zoom = u(20); // from a mast, what is near is drawn true size
+      else { controls.update(); view.zoom = camera.position.distanceTo(controls.target); }
       // the haze starts beyond what the camera is looking at, so zoomed right out the map stays clear and only the horizon fades
       scene.fog.near = Math.max(fogBase[0], view.zoom * 1.25); scene.fog.far = scene.fog.near + fogBase[1] - fogBase[0];
       renderer.render(scene, camera);

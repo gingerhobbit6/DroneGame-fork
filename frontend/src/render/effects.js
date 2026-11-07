@@ -2,12 +2,13 @@
 
 import * as THREE from 'three';
 import { drawnUnit } from './system-parts.js';
+import { view } from './view.js';
 
 const sphereGeo = new THREE.SphereGeometry(1, 16, 12);
 const missileGeo = new THREE.ConeGeometry(0.35, 1.8, 8).rotateX(Math.PI / 2);
 const _v = new THREE.Vector3();
 
-export function createEffects(scene, sim) {
+export function createEffects(scene, sim, camera) {
   const booms = [];
   const missiles = new Map(); // missile -> mesh
 
@@ -46,7 +47,7 @@ export function createEffects(scene, sim) {
         missiles.set(m, mesh);
       }
       mesh.visible = true;
-      mesh.scale.setScalar((m.def.kind === 'interceptor' ? 0.6 : 1) * drawnUnit()); // true size up close
+      mesh.scale.setScalar((m.def.kind === 'interceptor' ? 0.6 : 1) * drawnUnit(view.eye ? camera.position.distanceTo(m.pos) : undefined)); // true size up close; seen from a mast, sized by its own distance
       mesh.position.copy(m.pos);
       mesh.lookAt(_v.copy(m.pos).add(m.vel));
     }
