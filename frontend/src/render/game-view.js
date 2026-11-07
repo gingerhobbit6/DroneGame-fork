@@ -35,13 +35,13 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b1220);
   scene.fog = new THREE.Fog(0x0b1220, u(12000), u(30000));
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.02, 4000);
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.02, 8000); // 160 km: the far side of a 25 km ring, seen from right out
   camera.position.set(0, 300, 380);
   const controls = new OrbitControls(camera, canvas);
   controls.maxPolarAngle = Math.PI * 0.48;
   controls.minDistance = 0.25; // 5 m: close enough to see a small quadcopter or a person, drawn at true size up close
   controls.zoomToCursor = true; // so the camera can close in on a drone in the air, not only on the ground it looks at
-  controls.maxDistance = 1200;
+  controls.maxDistance = 3000; // 60 km out, so a 25 km NASAMS or Sky Sabre ring fits on screen at its true size
   controls.enableDamping = true;
   // Map-style, which suits a trackpad: drag slides the map over the ground, right-drag or Shift, Ctrl or Cmd with a drag turns
   // the view, and the wheel, a two-finger scroll or a pinch zooms. One finger pans a touch screen and two zoom and turn it.
@@ -56,13 +56,13 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const sun = new THREE.DirectionalLight(0xffffff, 1.1);
   sun.position.set(60, 120, 40);
   scene.add(sun);
-  let lit = 'day';
+  let lit = 'day', fogBase = LOOKS.day.fog.map(u);
   function light(name) {
     const look = LOOKS[name] ?? LOOKS.day;
     lit = name;
     scene.background.setHex(look.sky);
     scene.fog.color.setHex(look.sky);
-    [scene.fog.near, scene.fog.far] = look.fog.map(u);
+    fogBase = look.fog.map(u);
     sky.intensity = look.hemi;
     sun.intensity = look.sun; sun.color.setHex(look.sunColour);
   }
@@ -206,7 +206,12 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   return {
     scene, camera, controls, labels, structures, update, showOsm, loadOsm: () => osmMap.load(), refreshMap, mapPreviews, viewFromAbove, centreOn,
     getWorldMesh: () => worldView && worldView.mesh,
-    draw() { controls.update(); view.zoom = camera.position.distanceTo(controls.target); renderer.render(scene, camera); },
+    draw() {
+      controls.update(); view.zoom = camera.position.distanceTo(controls.target);
+      // the haze starts beyond what the camera is looking at, so zoomed right out the map stays clear and only the horizon fades
+      scene.fog.near = Math.max(fogBase[0], view.zoom * 1.25); scene.fog.far = scene.fog.near + fogBase[1] - fogBase[0];
+      renderer.render(scene, camera);
+    },
     start(frame) { renderer.setAnimationLoop(frame); },
     clear() { effects.clear(); beliefs.clear(); },
     // While rewinding, the live objects are hidden and the replay view is shown instead.

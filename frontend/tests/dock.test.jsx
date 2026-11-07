@@ -154,7 +154,7 @@ describe('plan tab', () => {
     openDock('plan');
     expect($('#cov-legend').textContent).toBe('');
     fireEvent.click($('#cov-on'));
-    expect($('#cov-legend').textContent).toContain('red: unseen');
+    expect($('#cov-legend').textContent).toMatch(/Not seen.*Seen by 1 sensor.*By 2 or more.*% of the build area seen/);
     fireEvent.change($('#cov-threat'), { target: { value: 'fw' } });
     expect($('#cov-threat').value).toBe('fw');
   });

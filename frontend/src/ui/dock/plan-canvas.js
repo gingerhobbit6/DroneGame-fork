@@ -23,6 +23,9 @@ function traceRange(g, n, X, Y, k) {
   g.closePath();
 }
 
+// Not seen, seen by one sensor, seen by two or more: the coverage map's three colours, which the key in PlanTab.jsx matches.
+export const COVER_FILL = ['rgba(229,57,53,0.32)', 'rgba(255,193,7,0.32)', 'rgba(102,187,106,0.45)'];
+
 export function createPlanCanvas(cv, sim) {
   const { net, drones } = sim;
   const g = cv.getContext('2d');
@@ -30,7 +33,8 @@ export function createPlanCanvas(cv, sim) {
   const lastTx = new Map();
   const onMessage = (e) => { lastTx.set(e.from, performance.now()); };
   bus.listeners.add(onMessage);
-  const onWheel = (e) => { e.preventDefault(); viewR = Math.min(14000, Math.max(800, viewR * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); };
+  const onWheel = (e) => { e.preventDefault(); viewR = Math.min(30000, Math.max(800, viewR * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); }; // 30 km: room for a 25 km NASAMS ring
+  const ringStep = () => (viewR > 10000 ? 5000 : 1000); // km rings: every 1 km close in, every 5 km zoomed out
   cv.addEventListener('wheel', onWheel, { passive: false });
 
   // coverage: the drone type to map, or null for none
@@ -51,13 +55,13 @@ export function createPlanCanvas(cv, sim) {
       const c = coverageGrid(sim, coverage);
       for (let j = 0; j < c.n; j++) for (let i = 0; i < c.n; i++) {
         const cnt = c.counts[j * c.n + i];
-        g.fillStyle = cnt === 0 ? 'rgba(229,57,53,0.22)' : cnt === 1 ? 'rgba(102,187,106,0.30)' : cnt === 2 ? 'rgba(129,212,250,0.42)' : 'rgba(255,255,255,0.55)';
+        g.fillStyle = COVER_FILL[Math.min(cnt, 2)];
         // z is south, so the cell at scene z maps to plan y = -north
         g.fillRect(X(-c.half + i * c.cell), Y(c.half - j * c.cell), c.cell * k + 1, c.cell * k + 1);
       }
     }
     g.lineWidth = 1; g.font = '10px system-ui'; g.fillStyle = '#5f7391'; g.strokeStyle = '#1c2b46';
-    for (let r = 1000; r <= viewR * 1.5; r += 1000) {
+    for (let r = ringStep(); r <= viewR * 1.5; r += ringStep()) {
       g.beginPath(); g.arc(w / 2, h / 2, r * k, 0, Math.PI * 2); g.stroke();
       g.fillText(r / 1000 + ' km', w / 2 + r * k + 2, h / 2 - 2);
     }
@@ -72,7 +76,7 @@ export function createPlanCanvas(cv, sim) {
     }
 
     const nodes = [...net.nodes.values()].filter((n) => (n.def.role === 'sensor' || n.def.role === 'effector') && n.def.id !== 'perimeter');
-    for (const n of nodes) { // coverage
+    if (!coverage) for (const n of nodes) { // each node's range
       const col = hex(n.def.color);
       traceRange(g, n, X, Y, k);
       if (n.def.role === 'sensor') { g.fillStyle = col + '14'; g.fill(); }
@@ -80,7 +84,7 @@ export function createPlanCanvas(cv, sim) {
       g.stroke(); g.setLineDash([]);
     }
     const now = performance.now();
-    for (const n of nodes) { // links to fusion
+    if (!coverage) for (const n of nodes) { // links to fusion
       const live = now - (lastTx.get(n.nodeId) || 0) < 300;
       g.strokeStyle = live ? '#ffffffcc' : '#ffffff22'; g.lineWidth = live ? 1.5 : 1;
       g.beginPath(); g.moveTo(X(n.pos.x * mpu()), Y(-n.pos.z * mpu())); g.lineTo(w / 2, h / 2); g.stroke();
@@ -92,7 +96,7 @@ export function createPlanCanvas(cv, sim) {
       const x = X(n.pos.x * mpu()), y = Y(-n.pos.z * mpu());
       g.fillStyle = hex(n.def.color);
       if (n.def.role === 'sensor') { g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.fill(); } else g.fillRect(x - 5, y - 5, 10, 10);
-      g.fillStyle = '#dbe4f0'; g.fillText(n.short + (n.def.kind === 'jammer' && n.mode === 'Jam' ? ' [JAM]' : ''), x + 8, y + 3);
+      if (!coverage) { g.fillStyle = '#dbe4f0'; g.fillText(n.short + (n.def.kind === 'jammer' && n.mode === 'Jam' ? ' [JAM]' : ''), x + 8, y + 3); }
       if (n.def.fov && n.point) { // camera: its current view
         const view = n.view ?? n.def.fov, a = (n.point.az * Math.PI) / 180, half = (view / 2 * Math.PI) / 180, len = (n.def.range * n.def.fov) / view; // zoomed in on a cue, it reaches further
         g.fillStyle = hex(n.def.color) + '33'; g.beginPath(); g.moveTo(x, y);

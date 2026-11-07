@@ -210,7 +210,7 @@ export function drapedRing(radiusU, thicknessU, color, opacity, segs = 160, lift
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setIndex(index);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, fog: false })); // a 25 km ring lies deep in the fog
   mesh.frustumCulled = false;
   function update(cx, cz) {
     const y0 = groundU(cx, cz);
