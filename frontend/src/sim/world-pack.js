@@ -7,7 +7,7 @@ import { hashSeed, mulberry32 } from './rng.js';
 import { gridRef } from './grids.js';
 
 const ID = /^pack:([0-9a-f]{32}):(\d{6}):(\d{7}):real$/;
-const CELL = 20, MAX_N = 3001, WATER = 4;
+const CELL = 20, MAX_N = 4001, WATER = 4; // packs up to 80 km across
 const MAX_BUILDINGS = 500000;
 
 export const parseWorldId = (world) => {
