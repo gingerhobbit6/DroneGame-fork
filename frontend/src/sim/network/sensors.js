@@ -42,13 +42,14 @@ export function createSensors(core, feed) {
     return daz <= half && del <= half;
   }
 
-  const bandOn = (s, d) => heardBand(s.def, d.def, deafAt(s, nodes.values())); // the band a detector hears this drone on now, not through your own jamming, or null
+  // the band a detector hears this drone on now, not through your own jamming (deaf: the bands it cannot hear), or null
+  const bandOn = (s, d, deaf = deafAt(s, nodes.values())) => heardBand(s.def, d.def, deaf);
 
-  // How far this sensor reaches along the real path to this drone. A radio detector works it out on the band it hears it on.
-  function reachTo(s, d) {
-    const m = mpu(), band = s.def.kind === 'rf' && bandOn(s, d);
+  // How far this sensor reaches along the real path to this drone, from its open-field reach. A radio detector works it out on the band it hears it on.
+  function reachTo(s, d, open, deaf) {
+    const m = mpu(), band = s.def.kind === 'rf' && bandOn(s, d, deaf);
     if (band === null) return 0;
-    return reachOnPath(s.def, d.def, terrainState.data, { x: s.pos.x * m, y: antennaM(s), z: s.pos.z * m }, { x: d.pos.x * m, y: d.pos.y * m, z: d.pos.z * m }, band && bandGhz(band));
+    return reachOnPath(s.def, d.def, terrainState.data, { x: s.pos.x * m, y: antennaM(s), z: s.pos.z * m }, { x: d.pos.x * m, y: d.pos.y * m, z: d.pos.z * m }, band && bandGhz(band), open);
   }
 
   // The chance that this sensor detects this drone on one scan. It depends on:
@@ -56,14 +57,17 @@ export function createSensors(core, feed) {
   //    looks (radar cross-section for radar, physical size for the camera, link power for RF)
   //  - ground clutter hiding low flyers from radar, and what the real path costs it (site-range.js)
   //  - for a camera, whether it is pointing at the target (it has a narrow field of view and has to be cued)
-  // `pointing: false` ignores the camera's aim, for coverage maps (assume it has been cued).
-  function pd(s, d, { pointing = true } = {}) {
+  // `pointing: false` ignores the camera's aim, for coverage maps (assume it has been cued). A scan passes the open-field reach and
+  // deafness it worked out once, and measure reuses the reach along the path that pd found (pathReach), if it got that far.
+  let pathReach;
+  function pd(s, d, { pointing = true, open = reachFor(s.def, d.def), deaf } = {}) {
     const def = s.def;
     const r = rel(s, d);
+    pathReach = undefined;
     if (def.senses === 'perimeter') return r.hr < def.range ? 0.98 : 0;
     const zoom = pointing ? zoomOf(s) : 1; // coverage maps assume a camera's search view
-    const open = reachFor(def, d.def) * zoom;
-    if (!open || r.rng > open * SENSING.rangeCap) return 0;
+    const far = open * zoom;
+    if (!far || r.rng > far * SENSING.rangeCap) return 0;
     const b = bearingOf(r);
     if (!inCover(def, b.az, b.el)) return 0; // outside a radar's arc, or above or below its beam
     const T3 = terrainState.data, m = mpu();
@@ -72,7 +76,7 @@ export function createSensors(core, feed) {
     const p = inClutter(def, T3, dxm, dzm, dym - T3.groundAt(dxm, dzm), r.hr, speed) ? SENSING.clutterPenalty : 1; // lost in clutter
     const blind = blindSpeed(def);
     if (blind && d.vel && Math.abs((d.vel.x * r.east - d.vel.z * r.north + d.vel.y * r.up) * m) < blind * r.rng) return 0; // too slow, or crossing, for its clutter filter
-    const reach = reachTo(s, d) * zoom;
+    const reach = (pathReach = reachTo(s, d, open, deaf)) * zoom;
     if (!reach) return 0;
     if (pointing && def.fov && !inView(s, r)) return 0;
     return p / (1 + Math.pow(r.rng / (reach * SENSING.pdEdge), SENSING.pdSlope));
@@ -125,13 +129,13 @@ export function createSensors(core, feed) {
   const heardFrom = (s, d) => { const now = rel(s, d); return d.vel ? rel(s, { pos: heardAt(d.pos, d.vel, now.rng) }) : now; };
 
   // Build one detection (a real drone `d`, or a false alarm when d is null), send the SAPIENT DetectionReport, and return
-  // what the fusion node's tracker needs.
-  function measure(s, d) {
+  // what the fusion node's tracker needs. pathed: the reach along the path to d, if pd found it; deaf: the bands it cannot hear.
+  function measure(s, d, pathed = d ? reachTo(s, d) : s.def.range, deaf) {
     const def = s.def, n = def.sapient.noise || {};
     const r = d ? (def.kind === 'acoustic' ? heardFrom(s, d) : rel(s, d)) : falseGeometry(s);
     if (!r) return null;
     const b = bearingOf(r);
-    const reach = (d ? reachTo(s, d) : def.range) * zoomOf(s), k = errorScale(def, r.rng, reach); // a weak signal gives a worse measurement, and the sensor knows it
+    const reach = pathed * zoomOf(s), k = errorScale(def, r.rng, reach); // a weak signal gives a worse measurement, and the sensor knows it
     const errAz = n.az * k, errEl = n.el * k, errRange = n.range * k;
     const azM = (b.az + gauss() * (errAz || 0) + 360) % 360;
     const elM = b.el + gauss() * (errEl || 0);
@@ -162,7 +166,7 @@ export function createSensors(core, feed) {
       classification: classification(s, d, r.rng, reach),
     };
     if (def.sapient.signal) { // the band it heard the drone on, or for a false alarm any band it covers
-      const bands = covers(def), band = d ? bandOn(s, d) : bands[Math.floor(rand() * bands.length)];
+      const bands = covers(def), band = d ? bandOn(s, d, deaf) : bands[Math.floor(rand() * bands.length)];
       report.signal = [{
         amplitude: round(-45 - 20 * Math.log10(Math.max(r.rng, 100) / 100) + gauss() * 2, 1),
         centre_frequency: Math.round(bandGhz(band) * 1e9),
@@ -193,9 +197,11 @@ export function createSensors(core, feed) {
     s.scanId = (s.scanId || 0) + 1;
     const found = [];
     const c = ctx.siteCentre(), m = mpu();
+    const opens = new Map(), deaf = deafAt(s, nodes.values()); // the same for every drone of a type in this scan
     for (const d of ctx.drones) {
-      const p = pd(s, d);
-      if (p > 0 && rand() < p) { found.push(measure(s, d)); logSeen(d, s.def.id, T(), rel(s, d).rng, Math.hypot(d.pos.x - c.x, d.pos.z - c.z) * m); }
+      if (!opens.has(d.def)) opens.set(d.def, reachFor(s.def, d.def));
+      const p = pd(s, d, { open: opens.get(d.def), deaf });
+      if (p > 0 && rand() < p) { found.push(measure(s, d, pathReach, deaf)); logSeen(d, s.def.id, T(), rel(s, d).rng, Math.hypot(d.pos.x - c.x, d.pos.z - c.z) * m); }
     }
     if (s.def.falseAlarm && rand() < s.def.falseAlarm) { const f = measure(s, null); if (f) { found.push(f); ctx.onFalseAlarm?.(s.def.id); } }
     s.detections = (s.detections || 0) + found.length; // false alarms included: the sensor cannot tell them apart

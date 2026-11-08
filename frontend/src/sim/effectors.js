@@ -1,11 +1,12 @@
 // Effectors act only on tasks from the fusion node. Each one is looked up by how it fires: act(w, system, target, dt).
 
 import { Vector3 } from 'three';
-import { WORLD, TERRAIN, SYSTEM_UNIT_M } from './config/index.js';
+import { WORLD, SYSTEM_UNIT_M } from './config/index.js';
 import { beamFactor, evasionFactor, hitChance, layTime } from './hit-chance.js';
 import { rand } from './rng.js';
 import { antennaHeight, flies } from './site-range.js';
 import { terrainState } from './terrain.js';
+import { clearSight } from './world.js';
 import { u, hereU, hdist } from './units.js';
 import { affordable, spend, tally } from './economy.js';
 import { damageDrone } from './drones.js';
@@ -25,7 +26,7 @@ export function opticalLos(s, d) {
   if (flies(s.def)) return true;
   const m = WORLD.metresPerUnit;
   const r = terrainState.data.los(s.pos.x * m, s.pos.y * m + antennaHeight(s.def), s.pos.z * m, d.pos.x * m, d.pos.y * m, d.pos.z * m);
-  return r.clear && r.canopy <= TERRAIN.opticalCanopyTol;
+  return clearSight(r);
 }
 
 const aimAt = (s, t) => { s.aim = Math.atan2(t.pos.x - s.pos.x, t.pos.z - s.pos.z); };

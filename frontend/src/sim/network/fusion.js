@@ -44,7 +44,9 @@ export function createFusion(core, { raiseAlert }) {
     const m = mpu();
     let best = null, bd = FUSION.acquireRadius;
     for (const d of ctx.drones) {
-      const dist = Math.hypot(tr.est.east - d.pos.x * m, tr.est.north + d.pos.z * m, tr.flat ? 0 : tr.est.up - d.pos.y * m); // no measured height: compare across the ground
+      const dx = tr.est.east - d.pos.x * m, dz = tr.est.north + d.pos.z * m;
+      if (Math.abs(dx) >= bd || Math.abs(dz) >= bd) continue; // hypot is never below either side, so it could not be nearer
+      const dist = Math.hypot(dx, dz, tr.flat ? 0 : tr.est.up - d.pos.y * m); // no measured height: compare across the ground
       if (dist < bd) { bd = dist; best = d; }
     }
     return best;

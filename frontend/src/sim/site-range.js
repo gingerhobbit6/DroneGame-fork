@@ -5,6 +5,7 @@ import { SENSING, TERRAIN } from './config/index.js';
 import { earthBulge, freeSpaceLoss, fresnelRadius, pathLoss, reachFactor } from './propagation.js';
 import { coverKey, inCover } from './sensor-model.js';
 import { bandGhz, heardBand } from './rf-model.js';
+import { clearSight } from './world.js';
 
 // How much ground clutter hides low flyers from radar, by ground cover (open, forest, built, power-line corridor):
 // the radar's low-flyer range is multiplied by this.
@@ -49,9 +50,9 @@ function pathGhz(def, droneDef, ghz) {
   return band ? bandGhz(band) : REFERENCE_RF_GHZ;
 }
 
-// How far this system reaches along the path from a to b ({ x, y, z } in metres). ghz: the band, where the caller knows it.
-export function reachOnPath(def, droneDef, world, a, b, ghz) {
-  const open = reachFor(def, droneDef);
+// How far this system reaches along the path from a to b ({ x, y, z } in metres). ghz: the band, where the caller knows it; open: its
+// open-field reach, where the caller has worked it out.
+export function reachOnPath(def, droneDef, world, a, b, ghz, open = reachFor(def, droneDef)) {
   if (!open || !usesPath(def)) return open;
   if (isRadio(def)) return open * reachFactor(pathLoss(world, a, b, pathGhz(def, droneDef, ghz)).loss);
   const sight = world.los(a.x, a.y, a.z, b.x, b.y, b.z);
@@ -59,7 +60,7 @@ export function reachOnPath(def, droneDef, world, a, b, ghz) {
     const noisy = world.coverAt(a.x, a.z) === BUILT_UP;
     return open * (sight.clear ? 1 : ACOUSTIC.hillLoss) * (noisy ? ACOUSTIC.noiseLoss : 1);
   }
-  return sight.clear && sight.canopy <= TERRAIN.opticalCanopyTol ? open : 0; // a camera or laser needs a clear line
+  return clearSight(sight) ? open : 0; // a camera or laser needs a clear line
 }
 
 // How many times the quoted error applies at this range, given the reach on this path, so hills and trees worsen it too. A radar's signal falls

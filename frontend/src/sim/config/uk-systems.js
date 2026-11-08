@@ -11,7 +11,6 @@ export const UK_SYSTEMS = {
     sapient: {
       nodeType: 'NODE_TYPE_RADAR', subType: ['E-scan', 'C-UAS'], scan: 'SCAN_TYPE_SCANNING', interval: 1,
       noise: { az: 0.6, el: 1.2, range: 8 }, velocity: true,
-      status: { type: 'STATUS_TYPE_CLUTTER', value: 'Targets below 40 m masked beyond 500 m' },
     },
     ref: {
       class: 'British counter-UAS surveillance radar',
@@ -36,7 +35,6 @@ export const UK_SYSTEMS = {
     sapient: {
       nodeType: 'NODE_TYPE_RADAR', subType: ['Air defence', 'C-UAS'], scan: 'SCAN_TYPE_SCANNING', interval: 1,
       noise: { az: 0.3, el: 0.6, range: 5 }, velocity: true,
-      status: { type: 'STATUS_TYPE_CLUTTER', value: 'Targets below 30 m masked beyond 800 m' },
     },
     ref: {
       class: 'Mobile air-defence radar with a drone mode',

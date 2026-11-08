@@ -30,12 +30,12 @@ export function createCore(ctx) {
   const nameOf = (id) => names.get(id) || String(id).slice(0, 8);
 
   // ids are assigned in init(), from the seeded id stream
-  const fusion = { def: FUSION_DEF, nodeId: '', name: 'Site Fusion Node', short: 'FUSION', pos: { x: 0, y: 0, z: 0 }, mode: 'Fuse', statusT: 0 };
+  const fusion = { def: FUSION_DEF, nodeId: '', name: FUSION_DEF.name, short: FUSION_DEF.short, pos: { x: 0, y: 0, z: 0 }, mode: 'Fuse', statusT: 0 };
   const gui = { nodeId: '', name: 'C2 Operator GUI', short: 'C2-GUI' };
   const routeTo = (s) => (s === fusion ? gui.nodeId : fusion.nodeId);
   fusion.uplinks = new Set(); fusion.cellBand = 'B8'; // which networks the fusion node has terminals on
   const scheduled = [];     // things that happen when a message arrives: { at, fn }, sorted by time
-  const comms = createComms({ getTime: T, nodes, fusion, gui, getJammers: () => [...nodes.values()].filter((n) => n.def.kind === 'jammer') });
+  const comms = createComms({ getTime: T, nodes, fusion, gui });
 
   // Send a message: it is recorded and validated, then the comms model decides how long it takes or whether it is lost.
   const send = (msg, from, to) => {
