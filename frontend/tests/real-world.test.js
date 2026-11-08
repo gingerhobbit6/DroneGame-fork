@@ -146,6 +146,10 @@ describe('checking a pack', () => {
     ['an even size', { N: 800 }], ['a huge size', { N: 90001 }], ['another cell size', { cell: 10 }], ['a mismatched span', { half: 9000 }],
     ['an off-grid middle', { east: E + 1 }], ['no fingerprint', { gridsSha256: 'x' }], ['no fit', { lonFit: [1] }], ['an infinite fit', { latFit: [Infinity, 0, 0, 0, 0, 0] }],
   ])('refuses %s', (_, change) => { expect(() => parsePack({ ...header(), ...change }, parts.grids, parts.features)).toThrow(); });
+  it('takes a 70 km pack, as the builder now makes, and refuses one over 80 km', () => {
+    expect(() => parsePack({ ...header(), N: 3501, half: 35000 }, parts.grids, parts.features)).toThrow(/wrong length/); // past the size check
+    expect(() => parsePack({ ...header(), N: 4003, half: 40020 }, parts.grids, parts.features)).toThrow(/unexpected size/);
+  });
   it('refuses grids of the wrong length, and unreadable features', () => {
     expect(() => parsePack(header(), { ...parts.grids, bldg: new Uint8Array(3) }, parts.features)).toThrow(/wrong length/);
     expect(() => parsePack(header(), parts.grids, { lines: [] })).toThrow(/features/);

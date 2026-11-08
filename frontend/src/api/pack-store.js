@@ -4,7 +4,7 @@
 import { parsePack } from '../sim/world-pack.js';
 
 const MAGIC = 'SGMAP', VERSION = 1, HEAD = 10;
-const MAX_HEADER = 1 << 20, MAX_RAW = 64 * 1024 * 1024; // the largest grid a 60 km pack could need
+const MAX_HEADER = 1 << 20, MAX_RAW = 64 * 1024 * 1024; // the largest grid an 80 km pack could need: 4001 x 4001 heights of 4 bytes
 const DB = 'site-guard-packs', STORE = 'packs';
 
 async function gunzip(bytes, rawLength) {
