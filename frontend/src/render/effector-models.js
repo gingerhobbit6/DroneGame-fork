@@ -15,11 +15,11 @@ function pack(k, rows, cols, w, len, elev, y, { round = true, x0 = 0 } = {}) {
   }
 }
 
-// a small quadcopter interceptor sitting ready. A parked drone's propellers do not turn, so they merge into one mesh
-const disc = (k, d, x, y, z) => k.cyl('spin', d / 2, 0.01, x, y, z, { seg: 14 });
+// a small quadcopter interceptor sitting ready. A parked drone's propellers do not turn, so their still blades merge into one mesh
+const blades = (k, d, x, y, z) => k.box('dark', d, 0.012, d * 0.09, x, y, z, { rx: 0.3, ry: 0.6 });
 function miniQuad(k, x, y, z) {
   k.cyl('body', 0.1, 0.4, x, y + 0.1, z, { r2: 0.05, rx: PI / 2 });
-  for (const dx of [-0.22, 0.22]) for (const dz of [-0.2, 0.2]) { k.post('dark', 0.03, 0.06, x + dx, y + 0.1, z + dz); disc(k, 0.3, x + dx, y + 0.14, z + dz); }
+  for (const dx of [-0.22, 0.22]) for (const dz of [-0.2, 0.2]) { k.post('dark', 0.03, 0.06, x + dx, y + 0.1, z + dz); blades(k, 0.3, x + dx, y + 0.14, z + dz); }
 }
 
 export function interceptor(b, h, def) {
@@ -27,7 +27,7 @@ export function interceptor(b, h, def) {
     case 'interceptor_s': { // Fortem DroneHunter F700: a large hexacopter with a net gun, on its trailer
       const deck = trailer(b);
       h.box('body', 0.7, 0.35, 0.9, 0, 0.2, 0);
-      for (let i = 0; i < 6; i++) { const a = PI / 6 + (i * PI) / 3, x = Math.sin(a), z = Math.cos(a); h.strut('body', [0, 0.3, 0], [x, 0.35, z], 0.06); disc(h, 0.8, x, 0.42, z); }
+      for (let i = 0; i < 6; i++) { const a = PI / 6 + (i * PI) / 3, x = Math.sin(a), z = Math.cos(a); h.strut('body', [0, 0.3, 0], [x, 0.35, z], 0.06); blades(h, 0.8, x, 0.42, z); }
       h.cyl('dark', 0.12, 0.5, 0, 0.1, 0.5, { rx: PI / 2 });
       return { headY: deck };
     }

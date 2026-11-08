@@ -30,7 +30,7 @@ const LEGEND = [
   ['#d500f9', 'Fixed-wing strike drone: fast, high, flies itself with no radio link, partly jammable'],
   ['#5f7596', 'Real drones (sandbox) take the colour of their type'],
   ['#8a94a3', 'Grey ghost: real drone no sensor has (truth overlay)'],
-  ['#ffffff', 'Faint diamond: a fused track (tick Highlight tracks to colour it: white = unclassified, red = multirotor, magenta = fixed-wing)'],
+  ['#ff8080', 'Air track symbol: a fused track (yellow clover frame = unclassified, red peaked frame = named by a camera, with a rotor over a multirotor; dashed = tentative, dimmer = coasting). Faint unless Highlight tracks is ticked'],
 ];
 export function Legend() {
   return (

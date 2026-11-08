@@ -1,5 +1,5 @@
-// Draws the systems: models, range rings that follow the ground, laser beams and jammer pulses. Views are created and
-// removed to match the simulation's list each frame.
+// Draws the systems: models (or map symbols zoomed out, symbols.js), range rings that follow the ground, laser beams and
+// jammer pulses. Views are created and removed to match the simulation's list each frame.
 
 import * as THREE from 'three';
 import { DRONES, SYSTEM_UNIT_M, WORLD } from '../sim/config/index.js';
@@ -11,6 +11,8 @@ import { buildModel } from './models.js';
 import { TRUE_UNIT, drawnUnit } from './system-parts.js';
 import { drapedRing } from './terrain-view.js';
 import { hexCss } from './labels.js';
+import { SYMBOL_OVER, symbolScale, symbolSprite } from './symbols.js';
+import { wideLines } from './wide-lines.js';
 import { view } from './view.js';
 
 // A real map is bright and busy, so its rings are wider, stronger and darker than on generated ground, or they disappear.
@@ -26,9 +28,13 @@ const SELECTED_RING_OPACITY = 0.95; // a selected system's ring stands out over 
 const ringColour = (def) => (onRealMap() ? new THREE.Color(def.color).multiplyScalar(0.7) : def.color);
 const ringKey = (s) => `${s.def.range}|${s.def.mount}|${coverKey(s.def)}`; // a radar's facing follows what is defended
 const _m = new THREE.Vector3();
+// A laser's beam is drawn red, a white-hot core in a red glow, though a real one is infrared and unseen; an RF weapon's is a wide faint band.
+const LASER_CORE = new THREE.Color(0xffd2c8), LASER_GLOW = new THREE.Color(0xff2a14);
 const turn = (deg) => Math.PI - (deg * Math.PI) / 180; // a compass bearing as a turn of a head whose front is +z
 // Where a head points: a camera where it looks, fixed panels the way they face, a weapon where it aims.
 const headTurn = (s) => (s.point ? turn(s.point.az) : coverArc(s.def) < 360 ? turn(s.def.facing ?? 0) : s.aim);
+
+const beamParts = (v) => (v.beam ? [v.beam.glow, v.beam.core].filter(Boolean) : []);
 
 export function createStructureViews(scene, sim, labels) {
   const views = new Map(); // structure -> view
@@ -60,10 +66,13 @@ export function createStructureViews(scene, sim, labels) {
     scene.add(holder);
     const v = { holder, model: null, parts: null, ringObj: null, beam: null, pulse: null, pulseT: (views.size * 0.37) % 1, label: labels.make(s.short, hexCss(def.color), 'slabel') };
     setModel(s, v);
+    v.symbol = symbolSprite(`friend:${def.kind}`, 15);
+    v.symbol.position.y = 0.5; holder.add(v.symbol);
     makeRing(s, v);
     if (def.fire === 'beam') {
-      v.beam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: def.color }));
-      v.beam.frustumCulled = false; v.beam.visible = false; scene.add(v.beam);
+      const rf = !!def.rfBeam;
+      v.beam = { glow: wideLines(1, { width: rf ? 12 : 7, opacity: rf ? 0.25 : 0.55, name: 'beam' }), core: rf ? null : wideLines(1, { width: 2, name: 'beam core' }), colour: rf ? new THREE.Color(def.color) : LASER_GLOW };
+      for (const w of beamParts(v)) scene.add(w.lines);
     }
     if (def.fire === 'jam') {
       v.pulse = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64).rotateX(-Math.PI / 2),
@@ -79,12 +88,12 @@ export function createStructureViews(scene, sim, labels) {
     scene.remove(v.holder);
     // the model, ring and pulse all sit under the holder, and buildModel makes new geometry and materials for each system
     v.holder.traverse((o) => { if (o.geometry) { o.geometry.dispose(); o.material.dispose(); } });
-    if (v.beam) { scene.remove(v.beam); v.beam.geometry.dispose(); v.beam.material.dispose(); }
+    for (const w of beamParts(v)) { scene.remove(w.lines); w.dispose(); }
     views.delete(s);
   }
 
   function sync(real) {
-    const unit = drawnUnit();
+    const unit = drawnUnit(), symbols = !view.eye && unit / TRUE_UNIT > SYMBOL_OVER, px = symbolScale(); // never in the ground view
     const live = new Set(sim.structures);
     for (const [s, v] of views) if (!live.has(s)) dispose(s, v);
     for (const s of sim.structures) {
@@ -96,7 +105,9 @@ export function createStructureViews(scene, sim, labels) {
       if (v.ringKey !== ringKey(s)) { makeRing(s, v); setModel(s, v); } // this unit was reconfigured
       if (v.unit !== unit) { v.model.scale.setScalar(unit * (s.def.modelScale || 1)); v.parts.raise(unit / TRUE_UNIT); v.unit = unit; } // true size up close
       const selected = s === view.selected;
-      v.model.visible = s !== view.eye; // watching from its mast, its own vehicle or tripod would fill the view
+      v.model.visible = !symbols && s !== view.eye; // watching from its mast, its own vehicle or tripod would fill the view
+      v.symbol.visible = symbols;
+      v.symbol.scale.setScalar(px);
       v.ringObj.mesh.visible = view.rings || selected;
       v.ringObj.mesh.material.opacity = selected ? SELECTED_RING_OPACITY : ringOpacity(); // a real map loaded later needs its stronger rings
       v.label.classList.toggle('selected', selected);
@@ -113,12 +124,14 @@ export function createStructureViews(scene, sim, labels) {
         }
       }
       if (v.beam) {
-        const t = s.beamTarget;
-        v.beam.visible = !!t;
-        if (t) {
-          const p = v.beam.geometry.attributes.position, m = _m.set(s.pos.x, s.pos.y + (s.def.muzzleY || 2) * unit * (s.def.modelScale || 1), s.pos.z); // from the drawn muzzle
-          p.setXYZ(0, m.x, m.y, m.z); p.setXYZ(1, t.pos.x, t.pos.y, t.pos.z); p.needsUpdate = true;
+        const t = s.beamTarget, b = v.beam;
+        if (t) { // from the drawn muzzle, or from the symbol once zoomed out to symbols
+          _m.set(s.pos.x, s.pos.y + (symbols ? v.symbol.position.y : (s.def.muzzleY || 2) * unit * (s.def.modelScale || 1)), s.pos.z);
+          b.glow.set(0, _m, t.pos, b.colour);
+          b.core?.set(0, _m, t.pos, LASER_CORE);
+          b.glow.lines.material.opacity = (b.core ? 0.55 : 0.25) * (0.85 + 0.15 * Math.random()); // a slight shimmer
         }
+        for (const w of beamParts(v)) w.show(t ? 1 : 0);
       }
     }
   }
@@ -144,6 +157,6 @@ export function createStructureViews(scene, sim, labels) {
         labels.place(v.label, s.pos.x, s.pos.y + labelLift(s.def), s.pos.z, view.labels);
       }
     },
-    hideBeams() { for (const v of views.values()) if (v.beam) v.beam.visible = false; },
+    hideBeams() { for (const v of views.values()) for (const w of beamParts(v)) w.show(0); },
   };
 }

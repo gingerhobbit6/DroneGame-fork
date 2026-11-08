@@ -15,15 +15,15 @@ export function patria(k) {
   return { roof: 1.22, z: -0.6 };
 }
 
-// Toyota Hilux double cab: 5.33 m long, 1.86 m wide, 1.82 m tall, with its load bed behind the cab.
+// Toyota Hilux double cab: 5.33 m long, 1.86 m wide, 1.82 m tall, with its load bed behind the cab, in military olive.
 export function hilux(k) {
   for (const z of [0.78, -0.72]) for (const x of [-0.37, 0.37]) wheel(k, 0.17, 0.12, x, 0.17, z);
-  k.box('sand', 0.85, 0.28, 2.42, 0, 0.34, 0); // chassis and lower body
-  k.box('sand', 0.85, 0.15, 0.75, 0, 0.55, 0.85); // bonnet
-  k.box('sand', 0.82, 0.34, 0.95, 0, 0.66, 0.05); // double cab
+  k.box('drab', 0.85, 0.28, 2.42, 0, 0.34, 0); // chassis and lower body
+  k.box('drab', 0.85, 0.15, 0.75, 0, 0.55, 0.85); // bonnet
+  k.box('drab', 0.82, 0.34, 0.95, 0, 0.66, 0.05); // double cab
   k.box('dark', 0.78, 0.2, 0.04, 0, 0.7, 0.53, { rx: -0.4 }); // windscreen
-  for (const x of [-0.41, 0.41]) k.box('sand', 0.03, 0.14, 0.72, x, 0.55, -0.78); // bed sides
-  k.box('sand', 0.85, 0.14, 0.03, 0, 0.55, -1.2); // tailgate
+  for (const x of [-0.41, 0.41]) k.box('drab', 0.03, 0.14, 0.72, x, 0.55, -0.78); // bed sides
+  k.box('drab', 0.85, 0.14, 0.03, 0, 0.55, -1.2); // tailgate
   return { roof: 0.48, z: -0.75 };
 }
 

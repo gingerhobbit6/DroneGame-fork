@@ -7,6 +7,7 @@ import { WORLD, DRONES, STRUCTURES } from '../sim/config/index.js';
 import { view } from './view.js';
 import { drawScale } from './drone-models.js';
 import { labelLift } from './structure-view.js';
+import { SYMBOL_OVER, SYMBOL_PX, droneSymbol, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
 
 // deps: { scene, rec, droneTemplate, makeLabel, placeLabel, trackColour, getStructures, labelOf, hideLive, getLastSpeed, setPaused, resume }
 export function createReplay(deps) {
@@ -22,7 +23,6 @@ export function createReplay(deps) {
   const trackObjs = [];        // pool of { mesh, label }
   const missileObjs = [];
   const lineObjs = [];
-  const diamondGeo = new THREE.OctahedronGeometry(1, 0);
   const coneGeo = new THREE.ConeGeometry(0.35, 1.8, 8).rotateX(Math.PI / 2);
 
   function droneObj(d) {
@@ -32,9 +32,10 @@ export function createReplay(deps) {
     const g = new THREE.Group();
     const model = deps.droneTemplate(d.type, false).clone();
     const unseen = deps.droneTemplate(d.type, true).clone();
-    g.add(model, unseen);
+    const symbol = symbolSprite('hostile:uav', 16);
+    g.add(model, unseen, symbol);
     group.add(g);
-    o = { group: g, model, unseen, label: deps.makeLabel(def.label, '#' + def.color.toString(16).padStart(6, '0'), 'dlabel') };
+    o = { group: g, model, unseen, symbol, label: deps.makeLabel(def.label, '#' + def.color.toString(16).padStart(6, '0'), 'dlabel') };
     droneObjs.set(d.u, o);
     return o;
   }
@@ -47,8 +48,10 @@ export function createReplay(deps) {
       seen.add(d.u);
       const o = droneObj(d);
       o.group.visible = view.truth;
-      o.group.position.set(d.x, d.y, d.z); o.group.rotation.y = d.ry; o.group.scale.setScalar(drawScale(DRONES[d.type]));
-      o.model.visible = d.tracked; o.unseen.visible = !d.tracked;
+      const def = DRONES[d.type], k = drawScale(def), symbol = !view.eye && k * WORLD.metresPerUnit > SYMBOL_OVER; // as drone-view.js draws them live
+      o.group.position.set(d.x, d.y, d.z); o.group.rotation.y = d.ry; o.group.scale.setScalar(k);
+      o.model.visible = d.tracked && !symbol; o.unseen.visible = !d.tracked && !symbol; o.symbol.visible = symbol;
+      if (symbol) { setSymbol(o.symbol, droneSymbol(def, d.tracked)); o.symbol.material.opacity = d.tracked ? 1 : 0.6; o.symbol.scale.setScalar(symbolScale(SYMBOL_PX, k)); }
       deps.placeLabel(o.label, d.x, d.y + Math.max(DRONES[d.type].size * o.group.scale.y * 0.7, 0.004 * view.zoom), d.z, view.truth && view.labels);
       o.label.style.opacity = d.tracked ? '1' : '0.5';
     }
@@ -56,15 +59,15 @@ export function createReplay(deps) {
 
     f.tracks.forEach((tr, i) => {
       const o = pool(trackObjs, () => {
-        const mesh = new THREE.Mesh(diamondGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }));
-        mesh.renderOrder = 20; group.add(mesh);
+        const mesh = symbolSprite('unknown:uav', 20); group.add(mesh);
         return { mesh, label: deps.makeLabel('', '#ffffff', 'dlabel') };
       }, i);
       o.mesh.visible = true;
       o.mesh.position.set(tr.x, tr.y, tr.z);
-      o.mesh.scale.setScalar(Math.max(1.5, camera.position.distanceTo(o.mesh.position) * 0.008));
+      setSymbol(o.mesh, trackSymbol(tr)); // the same symbol the live track had
+      o.mesh.scale.setScalar(symbolScale(tr.status === 'tentative' ? SYMBOL_PX * 0.75 : SYMBOL_PX));
+      o.mesh.material.color.setScalar(tr.status === 'coasting' ? 0.55 : 1);
       const col = deps.trackColour(tr);
-      o.mesh.material.color.setHex(col);
       o.label.style.borderColor = '#' + col.toString(16).padStart(6, '0');
       const cls = tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV';
       o.label.textContent = tr.status === 'tentative' ? 'tentative' : `${tr.short} · ${cls}${tr.kill ? ' · kill reported' : ''}`;

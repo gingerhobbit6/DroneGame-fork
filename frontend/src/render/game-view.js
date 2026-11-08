@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { SITE, BUILD } from '../sim/config/index.js';
 import { terrainState } from '../sim/terrain.js';
 import { u } from '../sim/units.js';
@@ -16,6 +17,8 @@ import { createZoneView } from './zone-view.js';
 import { createEyeView } from './eye-view.js';
 import { createOsmMap } from './osm-map.js';
 import { createMapTexture } from './map-texture.js';
+import { setModelEnv } from './paint.js';
+import { sizeWideLines } from './wide-lines.js';
 import { FOV, view } from './view.js';
 
 const FLIGHT_SECONDS = 0.7;
@@ -27,12 +30,25 @@ const LOOKS = {
   rain: { sky: 0x2f3742, fog: [2500, 9000], hemi: 0.6, sun: 0.35, sunColour: 0xd0d8e0 },
 };
 
+// The sun casts shadows only within this camera distance (scene units), where models are drawn near true size: farther out
+// they are drawn far larger than life (drawnUnit, drawScale), so their shadows would mislead, and one map would spread too thin.
+export const SHADOW_ZOOM = u(300);
+const SUN_FROM = new THREE.Vector3(60, 120, 40).normalize();
+// Half the width of the ground the sun's shadows cover, about what is in view, or nothing when too far out to cast them.
+export const shadowReach = (zoom, eye) => (eye ? u(150) : zoom < SHADOW_ZOOM ? Math.max(zoom * 1.2, u(25)) : 0);
+
 // getMapSource(world): the pictures, roads and names for a real world. The simulation never sees them.
 const WHEEL_ZOOM = 2, PINCH_ZOOM = 8; // OrbitControls zoom speeds, against its default of 1
 
 export function createGameView(canvas, labelLayer, sim, getMapSource = () => null) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); // the camera goes from metres to kilometres away
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // A faint studio reflection on the models only: scene.environment stays unset, so the map keeps its true colours.
+  const pmrem = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment(renderer);
+  setModelEnv(pmrem.fromScene(room, 0.04).texture);
+  room.dispose(); pmrem.dispose();
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b1220);
   scene.fog = new THREE.Fog(0x0b1220, u(12000), u(30000));
@@ -55,8 +71,20 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const sky = new THREE.HemisphereLight(0xbcd4ff, 0x203020, 0.9);
   scene.add(sky);
   const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-  sun.position.set(60, 120, 40);
-  scene.add(sun);
+  sun.position.copy(SUN_FROM);
+  sun.shadow.mapSize.set(2048, 2048);
+  scene.add(sun, sun.target);
+  // The sun's shadow box follows what the camera looks at (from a mast, the camera itself), sized to the view.
+  function shade() {
+    const half = shadowReach(view.zoom, view.eye);
+    sun.castShadow = half > 0;
+    if (!half) return;
+    const at = view.eye ? camera.position : controls.target, c = sun.shadow.camera;
+    sun.target.position.copy(at);
+    sun.position.copy(at).addScaledVector(SUN_FROM, half * 4);
+    c.left = c.bottom = -half; c.right = c.top = half; c.near = half; c.far = half * 8;
+    c.updateProjectionMatrix();
+  }
   let lit = 'day', fogBase = LOOKS.day.fog.map(u);
   function light(name) {
     const look = LOOKS[name] ?? LOOKS.day;
@@ -96,6 +124,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     relief = makeHillshade(terrainState.data);
     terrainState.hillshade = relief;
     worldView = buildWorldView(scene, terrainState.data, siteMat);
+    for (const m of [worldView.mesh, ...worldView.scenery]) m.receiveShadow = true;
     ownMaterial = worldView.mesh.material;
     if (terrainState.data.geo) { worldView.mesh.material = map.material; refreshMap(); }
     else showOsm();
@@ -200,6 +229,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
 
   function resize() {
     renderer.setSize(innerWidth, innerHeight, false);
+    sizeWideLines(innerWidth, innerHeight); // beams and tracer are drawn so many pixels wide
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
   }
@@ -214,6 +244,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
       else { controls.update(); view.zoom = camera.position.distanceTo(controls.target); }
       // the haze starts beyond what the camera is looking at, so zoomed right out the map stays clear and only the horizon fades
       scene.fog.near = Math.max(fogBase[0], view.zoom * 1.25); scene.fog.far = scene.fog.near + fogBase[1] - fogBase[0];
+      shade();
       renderer.render(scene, camera);
     },
     start(frame) { renderer.setAnimationLoop(frame); },

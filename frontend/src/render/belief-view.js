@@ -3,13 +3,15 @@
 // tracker may start a track there, which can be a ghost if the rays came from different drones. With the truth overlay
 // on, a line joins each track to the real drone at its position; a ghost has none.
 //
-// A track's diamond is coloured by what the fusion node thinks it is: white = unclassified, red = multirotor,
-// magenta = fixed-wing. Grey = tentative (might be a false alarm); coasting tracks are drawn dimmer.
-// Tracks are drawn faint and grey so they do not crowd the view; "Highlight tracks" switches to the class colours.
+// A track is an APP-6 air track symbol (symbols.js) for what the fusion node thinks it is: a yellow unknown frame until a
+// camera names the airframe, then a red hostile frame with a UAV mark, under a rotor for a multirotor. A tentative track (it
+// might be a false alarm) has a dashed pending frame; coasting tracks are drawn dimmer. Tracks are drawn faint so they do not
+// crowd the view; "Highlight tracks" draws them solid and colours their error rings by class.
 
 import * as THREE from 'three';
 import { WORLD } from '../sim/config/index.js';
 import { u } from '../sim/units.js';
+import { SYMBOL_PX, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
 import { view } from './view.js';
 
 const CLASS_COLOUR = { Unknown: 0xffffff, Multirotor: 0xff5a3c, 'Fixed wing': 0xe040fb };
@@ -21,7 +23,6 @@ export const trackColour = (tr) => {
   return tr.status === 'coasting' ? c.multiplyScalar(0.55).getHex() : c.getHex();
 };
 
-const diamondGeo = new THREE.OctahedronGeometry(1, 0);
 const ringUnit = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 49 }, (_, i) => new THREE.Vector3(Math.cos((i / 48) * Math.PI * 2), 0, Math.sin((i / 48) * Math.PI * 2))));
 const _p = new THREE.Vector3();
 
@@ -31,22 +32,21 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
 
   function makeBelief() {
     const group = new THREE.Group();
-    const diamond = new THREE.Mesh(diamondGeo, new THREE.MeshBasicMaterial({ color: 0xffcc66, depthTest: false, transparent: true }));
-    diamond.renderOrder = 20;
+    const symbol = symbolSprite('unknown:uav', 20);
     const ring = new THREE.LineLoop(ringUnit, new THREE.LineBasicMaterial({ color: 0xffcc66, transparent: true, opacity: 0.7 }));
     const link = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x8a94a3, transparent: true, opacity: 0.6 }));
     link.frustumCulled = false;
-    group.add(diamond, ring);
+    group.add(symbol, ring);
     scene.add(group, link);
     const label = document.createElement('div');
     label.className = 'tlabel';
     labelLayer.appendChild(label);
-    return { group, diamond, ring, link, label, pos: new THREE.Vector3(), placed: false };
+    return { group, symbol, ring, link, label, pos: new THREE.Vector3(), placed: false };
   }
 
   function disposeBelief(b) {
     scene.remove(b.group, b.link);
-    b.diamond.material.dispose(); b.ring.material.dispose(); b.link.geometry.dispose(); b.link.material.dispose();
+    b.symbol.material.dispose(); b.symbol.geometry.dispose(); b.ring.material.dispose(); b.link.geometry.dispose(); b.link.material.dispose();
     b.label.remove();
   }
 
@@ -59,11 +59,11 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
       if (!b) { b = makeBelief(); beliefs.set(tr.id, b); }
       _p.set(tr.est.east / m, tr.est.up / m, -tr.est.north / m);
       if (!b.placed) { b.pos.copy(_p); b.placed = true; } else b.pos.lerp(_p, 0.5);
-      const colour = trackColour(tr);
-      b.diamond.material.color.setHex(colour); b.ring.material.color.setHex(colour);
-      b.diamond.material.opacity = trackHi ? 1 : 0.55; b.ring.material.opacity = trackHi ? 0.7 : 0.25; b.link.material.opacity = trackHi ? 0.6 : 0.2;
-      const size = Math.max(1.5, camera.position.distanceTo(b.pos) * (tr.status === 'tentative' ? 0.004 : trackHi ? 0.008 : 0.006));
-      b.diamond.scale.setScalar(size);
+      setSymbol(b.symbol, trackSymbol(tr));
+      b.symbol.material.color.setScalar(tr.status === 'coasting' ? 0.55 : 1);
+      b.ring.material.color.setHex(trackColour(tr));
+      b.symbol.material.opacity = trackHi ? 1 : 0.55; b.ring.material.opacity = trackHi ? 0.7 : 0.25; b.link.material.opacity = trackHi ? 0.6 : 0.2;
+      b.symbol.scale.setScalar(symbolScale(tr.status === 'tentative' ? SYMBOL_PX * 0.75 : SYMBOL_PX));
       b.group.position.copy(b.pos);
       b.group.visible = true;
       const errU = Math.max(u(tr.estErr || 0), 0.001);
@@ -78,7 +78,7 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
       b.label.style.display = show ? 'block' : 'none';
       b.label.style.opacity = trackHi ? (tr.status === 'tentative' ? '0.55' : '1') : (tr.status === 'tentative' ? '0.4' : '0.75');
       if (show) {
-        b.label.style.left = ((_p.x + 1) / 2) * innerWidth + 'px';
+        b.label.style.left = ((_p.x + 1) / 2) * innerWidth + 8 + 'px'; // clear of the symbol, wider than the diamond it replaced
         b.label.style.top = ((1 - _p.y) / 2) * innerHeight + 'px';
         const cls = tr.model ?? (tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV');
         const err = `±${Math.round(tr.estErr || 0)} m`;
