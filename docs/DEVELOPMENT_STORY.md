@@ -383,7 +383,7 @@ Alex then asked for the other gaps to be fixed. An unnamed track is now judged b
 
 Together these changed play little, and mostly for the better: over three seeds the mixed laydown lasted 13, 18 and 15 waves against 19, 12 and 17 before, the laser laydowns about the same, and five lasers with all-round radars 29, 29 and over 30 against 26, 29 and 26. In the reference runs the mixed laydown killed more drones and kept more of its budget, as cheaper effectors took the quadcopters.
 
-The map and statistics work and the realism rules were merged on 8 November. Both changed play, so the game version went to 0.19.0 and the reference digests were recorded again.
+The map and statistics work and the realism rules were merged on 8 November. Both changed play, so the game version went to 0.19.0 and the reference digests were recorded again. Four realism tests then failed, none from a fault: main's spawn draws one more random number, so a lost radio packet and a jammer's listening pause fell at new moments, and drones in a 54 km world take longer to arrive and to leave. The tests now switch off packet loss where pairing is under test, ask whether a jammer jammed rather than whether it is jamming at one instant, and run long enough for the larger world.
 
 ## Numbers at the end of Phase 8
 
