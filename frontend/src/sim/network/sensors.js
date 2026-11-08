@@ -10,7 +10,8 @@ import { IDENTIFY_PX, airframeConfidence, hasZoom, pixelsOn } from '../camera-mo
 import { LIBRARIES, bandGhz, covers, heardBand, libraryKnows } from '../rf-model.js';
 import { deafAt } from '../jamming.js';
 import { logSeen } from '../flight-log.js';
-import { RB_UNITS, rbDatum, round, clamp } from './core.js';
+import { RB_UNITS, rbDatum, round } from './core.js';
+import { clamp } from '../world.js';
 
 export { reachFor };
 

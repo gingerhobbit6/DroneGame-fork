@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
 import { createPackStore, decodePack } from '../src/api/pack-store.js';
 import { resetAllFigures } from '../src/sim/config/index.js';
+import { fieldsFor } from '../src/sim/unit-config.js';
 import { parseWorldId, worldId } from '../src/sim/world-pack.js';
 import { view } from '../src/render/view.js';
 import { tilesOver } from '../src/render/map-texture.js';
@@ -18,7 +19,7 @@ import { ControlPanel } from '../src/ui/ControlPanel.jsx';
 import { SavedTab } from '../src/ui/dock/SavedTab.jsx';
 import { ringZone } from '../src/zone.js';
 import { accuracyText, locateMe } from '../src/ui/locate.js';
-import { encodePack, CENTRE } from './support/fixture-pack.js';
+import { encodePack, CENTRE, pngHeader } from './support/fixture-pack.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 
 globalThis.Blob = NodeBlob; // jsdom's Blob has no stream(), which every browser's does
@@ -32,7 +33,7 @@ const NEAR = [51.3954, -1.6808], FAR = [56.8, -5.0]; // NEAR is about SU 223 663
 
 describe('reading a pack file', () => {
   it('reads a good one, with its pictures', async () => {
-    const data = new Uint8Array([1, 2, 3]);
+    const data = pngHeader(3, 4);
     const { pack, pictures } = await decodePack(await encodePack({ pictures: [{ layer: 'osmap', west: 1, top: 2, width: 3, height: 4, type: 'image/png', data }, { layer: 'evil', west: 1, top: 2, width: 3, height: 4, type: 'text/html', data }] }));
     expect(pack.header.name).toBe('Fixture');
     expect(pack.grids.ground.length).toBe(2801 * 2801);
@@ -53,7 +54,8 @@ describe('reading a pack file', () => {
   it('stops at the declared size, so a small file cannot expand without limit', async () => {
     await expect(damaged((h) => { h.sections[4].rawLength = 10; })).rejects.toThrow(/longer/); // the features, whose size is their own
     await expect(damaged((h) => { h.sections[4].rawLength += 5; })).rejects.toThrow(/shorter/);
-    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 40; for (const i of [1, 2, 3]) h.sections[i].rawLength = 2 ** 38; })).rejects.toThrow(/unreasonable/);
+    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 40; for (const i of [1, 2, 3]) h.sections[i].rawLength = 2 ** 38; })).rejects.toThrow(/damaged/); // not the grid the header gives
+    await expect(damaged((h) => { h.sections[4].rawLength = 33 * 1024 * 1024; })).rejects.toThrow(/unreasonable/); // more features than any real pack
     await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 26; })).rejects.toThrow(/damaged/); // grids that disagree are refused before any is unpacked
   });
   it('refuses sections outside the file, or missing', async () => {
@@ -71,7 +73,8 @@ describe('the pack store', () => {
     const store = createPackStore({ api, idb: null, fetchFile });
     const { packs } = await store.list();
     expect(packs[0].hash).toBe(pack.hash);
-    await store.load(packs[0]);
+    const [a, b] = await Promise.all([store.load(packs[0]), store.load(packs[0])]); // clicked while it was still loading
+    expect(a).toBe(b);
     await store.load(packs[0]);
     expect(fetchFile).toHaveBeenCalledTimes(1);
     expect(store.get(pack.hash).pack.header.name).toBe('Fixture');
@@ -483,8 +486,9 @@ describe('choosing a world', () => {
       fireEvent.submit($('#map-goto'));
       expect(v.centreOn).toHaveBeenCalledWith(25, -25);
       game.setTool('rf');
+      game.setLoadout('rf', fieldsFor('rf').find((f) => f.key === 'mount'), 12); // the settings chosen for it come too
       fireEvent.submit($('#map-goto'));
-      expect(game.sim.structures[0].pos).toMatchObject({ x: 25, z: -25 });
+      expect(game.sim.structures[0]).toMatchObject({ pos: { x: 25, z: -25 }, def: { mount: 12 } });
       await settle();
       expect($('#map-message').textContent).toContain('Placed at SU 225 665');
     }, 30000);

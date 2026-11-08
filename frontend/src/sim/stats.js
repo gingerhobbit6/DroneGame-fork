@@ -10,7 +10,7 @@ const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const per = (a, b) => (b ? a / b : null);
 const nameOf = (id) => STRUCTURES[id]?.name ?? (id === PERIMETER.id ? PERIMETER.name : id);
 const ended = (fs, end) => fs.filter((f) => f.end === end).length;
-export const firstSeen = (f) => Object.values(f.seen).reduce((a, s) => (!a || s.t < a.t ? s : a), null);
+const firstSeen = (f) => Object.values(f.seen).reduce((a, s) => (!a || s.t < a.t ? s : a), null);
 
 // Mean, standard deviation, least and most, or null for none.
 export function spread(xs) {

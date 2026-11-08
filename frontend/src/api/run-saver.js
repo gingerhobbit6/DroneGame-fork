@@ -12,10 +12,16 @@ export function createRunSaver({ api, storage, notify, onChange }) {
   const sending = new Set(); // ids this page is saving right now, so a flush does not send them too
   const say = (msg, loud = true) => { lastMessage = msg; if (loud) notify(msg); onChange(); };
 
+  // The Runs tab asks how many are waiting on every refresh, so the list is parsed again only when the stored text has changed.
+  let lastText, lastRead = [];
   function read() {
     try {
-      const kept = JSON.parse(storage.getItem(KEY));
-      return Array.isArray(kept) ? kept.filter((e) => e?.id && e.run) : [];
+      const text = storage.getItem(KEY);
+      if (text === lastText) return lastRead;
+      const kept = JSON.parse(text);
+      lastRead = Array.isArray(kept) ? kept.filter((e) => e?.id && e.run) : [];
+      lastText = text;
+      return lastRead;
     } catch { return []; }
   }
   function write(entries) {

@@ -14,6 +14,7 @@ import { u } from '../sim/units.js';
 import { SYMBOL_PX, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
 import { view } from './view.js';
 import { createTrail } from './trail.js';
+import { setStyle, setText } from './labels.js';
 
 const CLASS_COLOUR = { Unknown: 0xffffff, Multirotor: 0xff5a3c, 'Fixed wing': 0xe040fb };
 const CLASS_DIM = { Unknown: 0x9aa4b4, Multirotor: 0xa8938e, 'Fixed wing': 0x9d93aa };
@@ -27,7 +28,7 @@ export const trackColour = (tr) => {
 const ringUnit = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 49 }, (_, i) => new THREE.Vector3(Math.cos((i / 48) * Math.PI * 2), 0, Math.sin((i / 48) * Math.PI * 2))));
 const _p = new THREE.Vector3();
 
-export function createBeliefViews(scene, net, camera, labelLayer) {
+export function createBeliefViews(scene, net, labels) {
   const beliefs = new Map(); // track id -> markers
   const rayPool = [];
 
@@ -39,9 +40,7 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
     link.frustumCulled = false;
     group.add(symbol, ring);
     scene.add(group, link);
-    const label = document.createElement('div');
-    label.className = 'tlabel';
-    labelLayer.appendChild(label);
+    const label = labels.make('', '', 'tlabel');
     return { group, symbol, ring, link, label, trail: createTrail(scene, 0x9aa4b4), pos: new THREE.Vector3(), placed: false };
   }
 
@@ -78,16 +77,13 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
         const p = b.link.geometry.attributes.position;
         p.setXYZ(0, b.pos.x, b.pos.y, b.pos.z); p.setXYZ(1, tr.drone.pos.x, tr.drone.pos.y, tr.drone.pos.z); p.needsUpdate = true;
       }
-      _p.copy(b.pos).project(camera);
-      const show = _p.z < 1 && (trackHi || tr.status !== 'tentative'); // tentative labels only when highlighting
-      b.label.style.display = show ? 'block' : 'none';
-      b.label.style.opacity = trackHi ? (tr.status === 'tentative' ? '0.55' : '1') : (tr.status === 'tentative' ? '0.4' : '0.75');
+      const show = trackHi || tr.status !== 'tentative'; // tentative labels only when highlighting
+      labels.place(b.label, b.pos.x, b.pos.y, b.pos.z, show, 8); // clear of the symbol, wider than the diamond it replaced
+      setStyle(b.label, 'opacity', trackHi ? (tr.status === 'tentative' ? '0.55' : '1') : (tr.status === 'tentative' ? '0.4' : '0.75'));
       if (show) {
-        b.label.style.left = ((_p.x + 1) / 2) * innerWidth + 8 + 'px'; // clear of the symbol, wider than the diamond it replaced
-        b.label.style.top = ((1 - _p.y) / 2) * innerHeight + 'px';
         const cls = tr.model ?? (tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV');
         const err = `±${Math.round(tr.estErr || 0)} m`;
-        b.label.textContent = tr.status === 'tentative' ? `tentative ${err}` : `${tr.short} · ${cls} ${err}${tr.status === 'coasting' ? ' · coasting' : ''}`;
+        setText(b.label, tr.status === 'tentative' ? `tentative ${err}` : `${tr.short} · ${cls} ${err}${tr.status === 'coasting' ? ' · coasting' : ''}`);
       }
     }
     // bearing candidates: rays from the sensor, coloured by sensor type

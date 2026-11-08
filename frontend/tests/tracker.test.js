@@ -196,6 +196,20 @@ describe('bearing-only measurements', () => {
     expect(Math.abs(tr.pos[2] - 300)).toBeLessThan(60);
   });
 
+  it('fix on the candidate that crosses closest, and use it up', () => {
+    const tk = newTracker();
+    const cam = (from, node, up, scan) => {
+      const dx = 1000 - from[0], dy = 2000 - from[1];
+      return { node, from, az: Math.atan2(dx, dy), el: Math.atan2(up - from[2], Math.hypot(dx, dy)), range: null, sigAz: rad(0.5), sigEl: rad(0.5), sigRange: 0, t: 0, scan };
+    };
+    const off = cam([0, 0, 10], 'eo1', 380, 0); // an earlier look, 80 m high
+    tk.ingest(off, 0);
+    tk.ingest(cam([0, 0, 10], 'eo1', 300, 1), 0);
+    const tr = tk.ingest(cam([3000, 0, 10], 'eo2', 300, 0), 0);
+    expect(Math.abs(tr.pos[2] - 300)).toBeLessThan(5);
+    expect(tk.candidates.map((c) => c.el)).toEqual([off.el]); // the one used is gone, so it cannot start a second track
+  });
+
   it('update a track that already exists', () => {
     const tk = newTracker();
     let tr;

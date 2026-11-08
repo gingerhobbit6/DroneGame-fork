@@ -15,6 +15,7 @@ import { SITE_POS, u } from './units.js';
 import { DEFAULT_MIX } from './attack-mix.js';
 import { affordable, createLedger, resetLedger, tally } from './economy.js';
 import * as laydown from './laydown.js';
+import { designLocked } from './lock.js';
 import { siteIsFree } from './attack-area.js';
 import * as people from './people.js';
 import { setPatrol, updatePatrol } from './patrol.js';
@@ -255,7 +256,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     run(steps) { state.started = true; for (let i = 0; i < steps && !state.over; i++) step(); },
     canPlace: (x, z, def) => !laydown.placementProblem(w, x, z, def),
     canPlacePeople: (x, z, protection) => !people.peopleProblem(w, x, z, protection),
-    designLocked: () => laydown.designLocked(w),
+    designLocked: () => designLocked(w),
     unwired: () => laydown.unwired(w),
     spotterBonus: () => spotterBonus(w),
     report: () => deploymentReport(w),

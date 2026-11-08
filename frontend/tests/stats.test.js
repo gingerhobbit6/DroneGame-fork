@@ -16,6 +16,20 @@ describe('spread', () => {
   });
 });
 
+describe('the live figures', () => {
+  it('are kept within a sim-second, then worked out again', () => {
+    const sim = createSimulation(); // its own: it runs on, which would change the totals the tests below share
+    setUp(sim, { seed: '1', laydown: MIXED });
+    sim.commands.startWave();
+    sim.run(200);
+    const first = liveStats(sim);
+    expect(first).toEqual(runStats(sim));
+    expect(liveStats(sim)).toBe(first);
+    sim.run(20); // a sim-second
+    expect(liveStats(sim)).not.toBe(first);
+  }, 60000);
+});
+
 describe('after two waves against the mixed laydown', () => {
   let sim, all;
   beforeAll(() => {
@@ -32,14 +46,6 @@ describe('after two waves against the mixed laydown', () => {
     expect(all.drones.leaked).toBe(total(ledger.leaked));
     expect(all.drones.left).toBe(total(ledger.escaped));
     expect(all.drones.killed + all.drones.leaked + all.drones.struck + all.drones.left + all.drones.airborne).toBe(all.drones.launched);
-  });
-
-  it('keeps the live figures within a sim-second, then works them out again', () => {
-    const first = liveStats(sim);
-    expect(first).toEqual(runStats(sim));
-    expect(liveStats(sim)).toBe(first);
-    sim.run(20); // a sim-second
-    expect(liveStats(sim)).not.toBe(first);
   });
 
   it('splits the run into its waves, which add up to it', () => {

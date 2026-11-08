@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 import urllib.parse
 import urllib.request
 
@@ -22,7 +23,8 @@ def _fetch(item: dict, folder: str, say) -> None:
     if name != item["fileName"] or name.startswith("."):
         raise SystemExit(f"refusing an odd file name from OS: {name!r}")
     url = urllib.parse.urlsplit(str(item.get("url", "")))
-    if url.scheme != "https" or url.hostname != HOST or not isinstance(item.get("size"), int) or item["size"] <= 0:
+    md5 = item.get("md5")
+    if url.scheme != "https" or url.hostname != HOST or not isinstance(item.get("size"), int) or item["size"] <= 0 or not (isinstance(md5, str) and re.fullmatch(r"[0-9a-fA-F]{32}", md5)):
         raise SystemExit(f"refusing a download OS did not describe properly: {name}")
     os.makedirs(folder, exist_ok=True)
     target = os.path.join(folder, name)
@@ -38,7 +40,7 @@ def _fetch(item: dict, folder: str, say) -> None:
                 break
             out.write(chunk)
             digest.update(chunk)
-    if done != item["size"] or (item.get("md5") and digest.hexdigest().lower() != item["md5"].lower()):
+    if done != item["size"] or digest.hexdigest() != md5.lower():
         os.remove(part)
         raise SystemExit(f"{name} did not download correctly")
     os.replace(part, target)

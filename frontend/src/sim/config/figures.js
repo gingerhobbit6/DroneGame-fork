@@ -79,9 +79,14 @@ export const RESEARCHED = {
 const STORE = { structures: STRUCTURES, drones: DRONES, comms: COMMS, people: PEOPLE, patrol: PATROL };
 const KINDS = ['structures', 'drones', 'comms', 'people', 'patrol'];
 
+// Every figure is a size, a price, a time or a count, so never below 0, and a share is never above 1. 1e12 is the server's limit for
+// a shared set too. A typed figure, an imported file and a set another account saved all pass through here.
+const SHARE = new Set(['0–1', 'fraction']);
+const bounded = (key, v) => Math.min(Math.max(v, 0), SHARE.has(FIGURE_FIELDS[key]?.unit) ? 1 : 1e12);
+
 // Set one figure. kind is 'structures', 'drones', 'comms', 'people' or 'patrol'.
 export function setFigure(kind, id, key, value) {
-  STORE[kind][id][key] = value;
+  STORE[kind][id][key] = bounded(key, value);
   if (kind === 'structures' && key === 'published') applyRangeScale();
 }
 export function resetFigure(kind, id, key) {

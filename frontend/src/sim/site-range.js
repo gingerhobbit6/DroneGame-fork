@@ -22,7 +22,10 @@ export const BEARINGS = 90;      // directions a prediction looks in
 const STEPS = 32;                // points checked along each direction
 
 const isRadio = (def) => def.kind === 'radar' || def.kind === 'rf' || def.kind === 'jammer';
-export const usesPath = (def) => def.fire !== 'guided';
+// A weapon whose round or interceptor flies to the target. It is cued over the terrain, so it needs no sight line and reaches as far
+// anywhere, but its round must be able to catch what it is sent at. Every other system works along a clear path from where it stands.
+export const flies = (def) => def.fire === 'guided';
+export const usesPath = (def) => !flies(def);
 // A drone's usual height: the middle of its height band, or the average of the middles of its bands if it flies more than one.
 export const typicalAltitude = (droneDef) => { const bands = droneDef.altModes ?? [droneDef.alt]; return bands.reduce((sum, [lo, hi]) => sum + (lo + hi) / 2, 0) / bands.length; };
 export const antennaHeight = (def) => def.mount ?? (def.fire === 'beam' ? 4 : 0);

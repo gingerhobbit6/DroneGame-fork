@@ -9,16 +9,17 @@ export function PackPicker() {
   const { api } = useGame(), account = useAccount();
   const [packs, setPacks] = useState(null);
   const [failed, setFailed] = useState(false);
-  const signedIn = !!account?.user;
+  const who = account?.user?.username, covered = !!account?.covered;
   useEffect(() => {
-    if (!signedIn) return;
+    if (!who || covered) return undefined; // fetched again whenever the profile closes: packs may have been built or deleted there
     let live = true;
+    setPacks(null); setFailed(false); // never the last account's packs, or an old failure
     // the list holds summaries, so each pack's kit is fetched too; a profile has at most 50
     api.units.list().then((rows) => Promise.all(rows.map((p) => api.units.get(p.id))))
       .then((all) => { if (live) setPacks(all); }, () => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, [api, signedIn]);
-  if (!signedIn) return null;
+  }, [api, who, covered]);
+  if (!who) return null;
   const active = account.activeUnit;
   const choose = (id) => account.deploy(packs.find((p) => String(p.id) === id) ?? null);
   return (

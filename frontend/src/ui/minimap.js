@@ -32,9 +32,9 @@ export function createMinimap(sim, canvas, camera, controls) {
     const w = canvas.width, mpu = WORLD.metresPerUnit, data = terrainState.data;
     const px = (metres) => (metres / mm.span) * (w / 2);
     g.fillStyle = '#0a1120'; g.fillRect(0, 0, w, w);
-    if (terrainState.hillshade) {
+    if (view.hillshade) {
       const half = px(data.R);
-      g.globalAlpha = 0.85; g.drawImage(terrainState.hillshade, w / 2 - half, w / 2 - half, 2 * half, 2 * half); g.globalAlpha = 1;
+      g.globalAlpha = 0.85; g.drawImage(view.hillshade, w / 2 - half, w / 2 - half, 2 * half, 2 * half); g.globalAlpha = 1;
     }
     const [ox, oy] = mmXY(0, 0);
     const ring = (r, col, dash) => {

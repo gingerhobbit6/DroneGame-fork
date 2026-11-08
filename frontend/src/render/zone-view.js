@@ -56,7 +56,9 @@ export function createZoneView(scene, sim) {
   }
   const drawZone = () => outline(marks, view.zone, mat);
   const route = () => view.route || (sim.getPatrol() ? { points: sim.getPatrol().route, done: true, corridor: sim.getPatrol().width } : null);
-  const routeKey = () => JSON.stringify(route());
+  // What the route drawn was made from. Routes and patrols are replaced, never changed in place, so comparing them by identity is enough
+  // and nothing is stringified each frame.
+  const routeKey = () => { const p = sim.getPatrol(); return [view.route, p, p?.route, p?.width]; };
   const drawRoute = () => outline(routeMarks, route(), routeMat);
 
   function drawSpot() {
@@ -66,11 +68,12 @@ export function createZoneView(scene, sim) {
 
   return {
     sync() {
-      if (markSize() !== drawnSize) { drawnSize = markSize(); drawnZone = drawnRoute = null; } // rebuild both at the new size
+      const size = markSize();
+      if (size !== drawnSize) { drawnSize = size; drawnZone = drawnRoute = null; } // rebuild both at the new size
       if (view.zone !== drawnZone) { drawnZone = view.zone; drawZone(); }
       if (view.spot !== drawnSpot) { drawnSpot = view.spot; drawSpot(); }
       const key = routeKey();
-      if (key !== drawnRoute) { drawnRoute = key; drawRoute(); }
+      if (!drawnRoute || key.some((x, i) => x !== drawnRoute[i])) { drawnRoute = key; drawRoute(); }
       const f = sim.getPatrol()?.fix ?? null;
       if (f !== drawnFix) { drawnFix = f; fix.mesh.visible = !!f; if (f) { fix.update(f.x, f.z); fix.mesh.position.set(f.x, hereU(f.x, f.z), f.z); } }
     },

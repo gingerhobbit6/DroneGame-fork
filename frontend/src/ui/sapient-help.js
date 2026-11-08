@@ -1,7 +1,7 @@
 // Plain-English explanations of SAPIENT (BSI Flex 335 v2.0) fields and values, for the Learn tab and the "Explain" view
 // of the message inspector. The field and value names are the ones in the standard; the wording is mine.
 
-export const FIELD_HELP = {
+const FIELD_HELP = {
   timestamp: 'When the message was sent, in game time.',
   node_id: 'Who sent it: the unique ID of the sending node.',
   destination_id: 'Who it is for. Only set when a message is aimed at one node (a task, or an acknowledgement to it).',
@@ -61,7 +61,7 @@ export const FIELD_HELP = {
   status_level: 'How serious the status item is.', status_type: 'What kind of status item.', status_value: 'The detail.',
 };
 
-export const ENUM_HELP = {
+const ENUM_HELP = {
   TASK_STATUS_ACCEPTED: 'the node agreed to do it', TASK_STATUS_REJECTED: 'the node refused', TASK_STATUS_COMPLETED: 'the node finished it', TASK_STATUS_FAILED: 'the node could not do it',
   CONTROL_START: 'begin', CONTROL_STOP: 'stop', ALERT_ACK_STATUS_ACCEPTED: 'a person or system said yes', ALERT_ACK_STATUS_REJECTED: 'the answer was no', ALERT_ACK_STATUS_CANCELLED: 'it lapsed before anyone answered',
   ALERT_TYPE_INFORMATION: 'for your information', ALERT_TYPE_WARNING: 'needs attention', ALERT_TYPE_CRITICAL: 'urgent',

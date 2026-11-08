@@ -1,17 +1,17 @@
 // Simulated people: placing groups, and the casualties a blast causes. People never change the attack: they are not targets, and
 // every roll comes from a stream of its own, so a run with people plays out exactly as it does without them.
 
-import { BUILD, PEOPLE, PEOPLE_LIMITS, PEOPLE_ROLES, SITE, WORLD, casualtyRadii } from './config/index.js';
+import { PEOPLE, PEOPLE_LIMITS, PEOPLE_ROLES, SITE, WORLD, casualtyRadii } from './config/index.js';
 import { hashSeed, mulberry32 } from './rng.js';
 import { terrainState } from './terrain.js';
 import { clamp, hereU, u } from './units.js';
 import { reachProblem } from './attack-area.js';
+import { LAYDOWN_LOCKED, designLocked } from './lock.js';
 
 const SPACING = 1.5; // metres between people standing in a group
 const FLOOR_SPACE = 1.5; // square metres a person takes up in a bunker
 const WALL_INSET = 1; // metres people stay clear of a wall
 const UNMAPPED_ROOM = 16; // metres across, for a marked grid cell with no building outline
-const LOCKED = 'The laydown is locked once the first wave starts';
 
 // The side of the concrete block a bunker group is drawn inside, in metres.
 export const bunkerSide = (count) => Math.sqrt(count * FLOOR_SPACE) + 2 * WALL_INSET;
@@ -57,8 +57,9 @@ export function addGroup(w, x, z, count, protection, role = 'civilian') {
 
 // Why a group can't go here, or null if it can.
 export function peopleProblem(w, x, z, protection) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 'Choose a spot on the map';
   if (!Object.hasOwn(PEOPLE, protection)) return 'Choose a level of protection';
-  if (BUILD.lockAfterStart && w.state.wave > 0) return LOCKED;
+  if (designLocked(w)) return LAYDOWN_LOCKED;
   if (w.people.length >= PEOPLE_LIMITS.groups) return `No more than ${PEOPLE_LIMITS.groups} groups`;
   const far = reachProblem(w, x, z);
   if (far) return far;
@@ -83,7 +84,7 @@ export function placePeople(w, x, z, count, protection, role = 'civilian') {
 }
 
 export function removePeople(w, id) {
-  if (BUILD.lockAfterStart && w.state.wave > 0) { w.emit('toast', LOCKED); return; }
+  if (designLocked(w)) { w.emit('toast', LAYDOWN_LOCKED); return; }
   const at = w.people.findIndex((g) => g.id === id && !g.patrol); // the patrol's own group goes with the patrol
   if (at < 0) return;
   w.people.splice(at, 1);

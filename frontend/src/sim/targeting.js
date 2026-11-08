@@ -69,7 +69,7 @@ function plainAim(w, d) {
 
 // An anti-radar drone only hears what radiates: a radar, or a jammer that is on. It goes for the strongest, wherever it is within reach.
 // A jammer is louder for each band it jams, against the bands it jams as standard.
-export const radiates = (s) => (s.def.kind === 'radar' ? s.def.signature || 0 : s.def.kind === 'jammer' && s.mode === 'Jam' ? ((s.def.signature || 0) * s.jamBands.size) / STRUCTURES[s.def.id].bands.length : 0);
+export const emission = (s) => (s.def.kind === 'radar' ? s.def.signature || 0 : s.def.kind === 'jammer' && s.mode === 'Jam' ? ((s.def.signature || 0) * s.jamBands.size) / STRUCTURES[s.def.id].bands.length : 0);
 
 export function pickTarget(w, d) {
   if (!d.def.seeksEmitters) return plainAim(w, d);
@@ -80,7 +80,7 @@ export function pickTarget(w, d) {
   for (const s of w.structures) {
     const dist = hdist(s.pos, d.pos);
     if (dist > reach) continue;
-    const score = d.def.antiRadar ? radiates(s) : emitterScore(s) / (1 + dist / u(1500));
+    const score = d.def.antiRadar ? emission(s) : emitterScore(s) / (1 + dist / u(1500));
     if (score > bs) { bs = score; best = s; }
   }
   if (!best) return plainAim(w, d);

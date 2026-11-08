@@ -41,6 +41,16 @@ def parse_asc(text: str) -> tuple[dict, np.ndarray]:
     return head, np.array([line.split() for line in lines], dtype="float32")
 
 
+MAX_MEMBER = 100_000_000  # bytes: a Terrain 50 tile is well under 1 MB unpacked, so a member near this is not one
+
+
+def _read(archive: zipfile.ZipFile, name: str) -> bytes:
+    """zipfile stops at the declared size, so checking it bounds what a damaged or crafted archive can unpack."""
+    if archive.getinfo(name).file_size > MAX_MEMBER:
+        raise SystemExit(f"refusing an oversized Terrain 50 member: {name}")
+    return archive.read(name)
+
+
 def terrain50(data_root: str, window: Window) -> tuple[np.ndarray, np.ndarray]:
     """Heights at the window's posts, and which posts have no Terrain 50 tile at all, which OS only leaves out where there is no land."""
     west, top = window.west - 100, window.top + 100
@@ -53,9 +63,9 @@ def terrain50(data_root: str, window: Window) -> tuple[np.ndarray, np.ndarray]:
                 name = f"{square_letters(e, n).lower()}{e // 10_000 % 10}{n // 10_000 % 10}"
                 if name not in members:
                     continue
-                with zipfile.ZipFile(io.BytesIO(outer.read(members[name]))) as inner:
+                with zipfile.ZipFile(io.BytesIO(_read(outer, members[name]))) as inner:
                     asc = next(m for m in inner.namelist() if m.lower().endswith(".asc"))
-                    head, values = parse_asc(inner.read(asc).decode("ascii"))
+                    head, values = parse_asc(_read(inner, asc).decode("ascii"))
                 col0 = int(round((head["xllcorner"] - west) / 50))
                 row0 = int(round((top - (head["yllcorner"] + head["cellsize"] * head["nrows"])) / 50))
                 r0, r1 = max(row0, 0), min(row0 + values.shape[0], mosaic.shape[0])

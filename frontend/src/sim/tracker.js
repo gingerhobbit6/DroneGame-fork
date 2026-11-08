@@ -190,23 +190,26 @@ export function createTracker(newId) {
   }
 
   const beyond = (m, dist) => m.reach != null && dist > 1.5 * m.reach; // with room for the bearing error of a target near its limit
+  // The candidate bearing that crosses this one most closely makes the fix, and is used up so it cannot start a second track.
   function tryTriangulate(m) {
-    for (const c of cands) {
-      if (c.node === m.node || m.t - c.t > TRACKER.candidateLife * slackOf(c)) continue;
-      const x = triangulate(c, m);
-      if (!x || beyond(c, x.s) || beyond(m, x.t)) continue; // nearly parallel bearings cross far past where either sensor hears
-      const tol = 2.5 * (x.s * c.sigAz + x.t * m.sigAz) + 40;
-      if (x.miss > tol) continue;
-      const sig = Math.max(60, 0.04 * Math.max(x.s, x.t), x.miss);
-      let mid = x.mid;
-      let P = m3.I(sig * sig);
-      if (x.flat) { // no elevation from either sensor: altitude is a guess
-        mid = [mid[0], mid[1], (c.from[2] + m.from[2]) / 2 + 60];
-        P = [sig * sig, 0, 0, 0, sig * sig, 0, 0, 0, 150 * 150];
-      }
-      return { mid, P, other: c.node, flat: x.flat };
+    let x = null, c = null;
+    for (const cand of cands) {
+      if (cand.node === m.node || m.t - cand.t > TRACKER.candidateLife * slackOf(cand)) continue;
+      const cross = triangulate(cand, m);
+      if (!cross || beyond(cand, cross.s) || beyond(m, cross.t)) continue; // nearly parallel bearings cross far past where either sensor hears
+      if (cross.miss > 2.5 * (cross.s * cand.sigAz + cross.t * m.sigAz) + 40 || (x && cross.miss >= x.miss)) continue;
+      x = cross; c = cand;
     }
-    return null;
+    if (!x) return null;
+    cands.splice(cands.indexOf(c), 1);
+    const sig = Math.max(60, 0.04 * Math.max(x.s, x.t), x.miss);
+    let mid = x.mid;
+    let P = m3.I(sig * sig);
+    if (x.flat) { // no elevation from either sensor: altitude is a guess
+      mid = [mid[0], mid[1], (c.from[2] + m.from[2]) / 2 + 60];
+      P = [sig * sig, 0, 0, 0, sig * sig, 0, 0, 0, 150 * 150];
+    }
+    return { mid, P, other: c.node, flat: x.flat };
   }
 
   // Take in one measurement. Returns the track it updated or created, or null if it became a bearing candidate.

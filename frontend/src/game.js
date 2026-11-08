@@ -11,8 +11,6 @@ import { createGameView } from './render/game-view.js';
 import { hereU } from './sim/units.js';
 import { PLACING_PICK_PX, createPlacement, pickStructure, selectionFrom, slideToShow } from './render/placement.js';
 import { createReplay } from './render/replay-view.js';
-import { droneTemplate } from './render/models.js';
-import { trackColour } from './render/belief-view.js';
 import { view } from './render/view.js';
 import { createApi } from './api/client.js';
 import { createRunSaver } from './api/run-saver.js';
@@ -112,9 +110,13 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     if (fieldsFor(id).includes(field)) setSetting(loadoutFor(id), field, id, value);
     bump();
   }
-  // A deployed pack's lines: each system is placed with the settings its line holds, or the catalogue's.
+  // A deployed pack's lines: each system is placed with the settings its line holds, or the catalogue's. With no pack (null), the
+  // systems the last one set go back to the catalogue's settings, and its price.
+  let fromPack = [];
   function usePackLoadouts(lines) {
-    for (const l of lines) loadouts[l.id] = cleanSettings(l.id, l.settings);
+    for (const id of fromPack) delete loadouts[id];
+    fromPack = (lines ?? []).map((l) => l.id);
+    for (const l of lines ?? []) loadouts[l.id] = cleanSettings(l.id, l.settings);
     bump();
   }
   // With a pack's kit, a hotkey opens its kind's list of what the pack holds rather than picking a system to place.
@@ -136,6 +138,13 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   let patrolClick = null; // made on first use, once everything it calls exists
 
+  // The picked system, with the settings and vehicle chosen for it, however the spot was given. Returns why it was refused, or null.
+  function placeSystem(x, z) {
+    const tool = tools.get(), loadout = Object.keys(loadoutFor(tool)).length ? { ...loadoutFor(tool) } : undefined, vehicle = tools.vehicle();
+    refusal = vehicle ? commands.place(tool, x, z, loadout, vehicle) : loadout ? commands.place(tool, x, z, loadout) : commands.place(tool, x, z);
+    return refusal;
+  }
+
   function groundClick(x, z) {
     const tool = tools.get();
     if (!tool || state.over || !state.started) return;
@@ -156,9 +165,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       }
       return;
     }
-    const loadout = Object.keys(loadoutFor(tool)).length ? { ...loadoutFor(tool) } : undefined, vehicle = tools.vehicle();
-    refusal = vehicle ? commands.place(tool, x, z, loadout, vehicle) : loadout ? commands.place(tool, x, z, loadout) : commands.place(tool, x, z);
-    if (refusal) { toast(refusal); return; }
+    if (placeSystem(x, z)) { toast(refusal); return; }
     const esc = tools.dragging() ? '' : ', or press Esc to stop placing'; // a drag puts the last tool back itself
     toast(`${placedSummary()}${selectHinted ? '' : `. Click a system for details${esc}`}`);
     selectHinted = true;
@@ -202,7 +209,6 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   // Starting wave 1 rebuilds every system, with a new id and perhaps a new callsign. Only its position is sure to be the same.
   const rebuilt = (was) => was && sim.structures.find((s) => s.def.id === was.def.id && s.pos.x === was.pos.x && s.pos.z === was.pos.z) || null;
-  sim.on('reset', () => { view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); }); // the ground view stays on its system too
 
   // when the fusion node asks the operator to authorise an engagement, stop the clock so there is time to decide
   let pausedForApproval = false, simAcc = 0;
@@ -223,7 +229,10 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       pausedForApproval = false;
     },
   };
+  // One handler, in this order: the selection and ground view move to the rebuilt systems before the views are cleared, and the replay
+  // is left (which can set the speed) before the speed is set for the new run.
   sim.on('reset', ({ kept, begin, loading }) => {
+    view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); // the ground view stays on its system too
     if (replay) replay.reset();
     if (gameView) gameView.clear();
     simAcc = 0; pausedForApproval = false;
@@ -262,7 +271,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       getTool: tools.get, defFor: (id) => unitDef(id, onVehicle(id, loadoutFor(id), tools.vehicle())), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
     });
     replay = createReplay({
-      scene: gameView.scene, rec: sim.rec, droneTemplate, makeLabel: gameView.labels.make, placeLabel: gameView.labels.place, trackColour,
+      scene: gameView.scene, rec: sim.rec, labels: gameView.labels,
       getStructures: () => sim.structures, labelOf: gameView.structures.labelOf, hideLive: gameView.hideLive,
       getLastSpeed: () => clock.lastSpeed, ...reviewClock,
     });
@@ -273,7 +282,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   return {
     packs, loadPack, ensureWorld, mapSource, cursor: () => placement?.cursor() ?? null,
     sim, commands, clock, setSpeed, reviewClock, subscribe, getTick, bump, attach, debug, api, saver, storage, pageClosing,
-    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
+    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, placeSystem, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
     catalogue: tools.catalogue, openCatalogue: tools.openCatalogue, pickFromTray: tools.pickFromTray, startDrag: tools.startDrag, endDrag: tools.endDrag, dropAt,
     toast, onToast(fn) { toastListeners.add(fn); return () => toastListeners.delete(fn); },
     onFrame(fn) { frameListeners.add(fn); return () => frameListeners.delete(fn); },
@@ -298,8 +307,9 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (key === 'planView' && gameView) gameView.viewFromAbove(value);
       if (['baseMap', 'mapRoads', 'mapGrid', 'mapContours'].includes(key) && gameView) {
         view.mapLoading = true;
+        const world = sim.state.terrainSeed;
         gameView.refreshMap().then((live) => {
-          if (live?.stale) return;
+          if (live?.stale) { if (sim.state.terrainSeed !== world) { view.mapLoading = false; bump(); } return; } // a newer paint has it, unless the world changed
           view.mapLoading = false;
           bump();
           if (live?.total && live.failed === live.total) { view.baseMap = 'os'; toast('The live map could not load: it needs an internet connection'); gameView.refreshMap().catch(() => {}); bump(); }

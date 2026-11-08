@@ -33,4 +33,5 @@ export const view = {
   coverageOn: false, // the plan map shows sensor coverage
   coverageThreat: null, // for this drone type, or the first one
   threat: null, // the drone type the wizard plans against, or null for every type
+  hillshade: null, // the picture of the ground the minimap and plan map draw under everything, kept by game-view.js
 };

@@ -107,7 +107,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   function showOsm() { // the demo picture on generated ground, and on the 2D maps
     if (terrainState.data.geo) return; // a real world has its own map
     worldView.mesh.material = view.osm ? osmMap.material : ownMaterial;
-    terrainState.hillshade = view.osm ? osmMap.canvas : relief;
+    view.hillshade = view.osm ? osmMap.canvas : relief;
   }
   // Paint the chosen picture onto a real world. Resolves with how a live map's tiles went.
   function refreshMap() {
@@ -115,14 +115,14 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     if (!source) return Promise.resolve(null);
     if (['satellite', 'hybrid'].includes(view.baseMap) && !source.pictures.some((p) => p.layer === 'satellite')) view.baseMap = 'os'; // the last world had it, this one doesn't
     return map.paint(data, source, { baseMap: view.baseMap, roads: view.mapRoads, grid: view.mapGrid, contours: view.mapContours }).then((result) => {
-      if (terrainState.data === data && !result.stale) terrainState.hillshade = map.small;
+      if (terrainState.data === data && !result.stale) view.hillshade = map.small;
       return result;
     });
   }
   function loadWorld() {
     if (worldView) { worldView.mesh.material = ownMaterial; worldView.dispose(); }
     relief = makeHillshade(terrainState.data);
-    terrainState.hillshade = relief;
+    view.hillshade = relief;
     worldView = buildWorldView(scene, terrainState.data, siteMat);
     for (const m of [worldView.mesh, ...worldView.scenery]) m.receiveShadow = true;
     ownMaterial = worldView.mesh.material;
@@ -190,6 +190,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     const data = terrainState.data, source = data.geo && getMapSource(world);
     const found = source ? map.previews(data, source, ids) : Promise.resolve({ generated: relief.toDataURL('image/jpeg', 0.8) });
     previews = { world, found };
+    found.catch(() => { if (previews.found === found) previews = { world: null }; }); // a failure is not kept: the next look tries again
     return found;
   }
 
@@ -201,7 +202,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const structures = createStructureViews(scene, sim, labels);
   const people = createPeopleViews(scene, sim, labels);
   const drones = createDroneViews(scene, sim, labels, camera);
-  const beliefs = createBeliefViews(scene, sim.net, camera, labelLayer);
+  const beliefs = createBeliefViews(scene, sim.net, labels);
   const effects = createEffects(scene, sim, camera);
   const eyeView = createEyeView(camera, controls, sim, canvas);
   const zone = createZoneView(scene, sim);

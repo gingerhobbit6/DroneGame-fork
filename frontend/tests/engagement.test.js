@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
 import { STRUCTURES, TERRAIN } from '../src/sim/config/index.js';
 import { terrainState } from '../src/sim/terrain.js';
-import { MIXED, setUp } from './support/scenarios.js';
+import { MIXED, play, setUp } from './support/scenarios.js';
 
 const sim = createSimulation();
 const m = 20;
@@ -69,6 +69,28 @@ describe('engagement authority', () => {
     }
     expect(heldOn).toBeGreaterThan(0);
     sim.commands.setAuthority('auto');
+  }, 120000);
+});
+
+describe('kill reports', () => {
+  it('still come from an engagement given up while its round was in the air', () => {
+    // A launcher re-tasked to a more urgent drone, or one that has just fired its last round, used to report nothing when the round it
+    // had already fired killed its old target: 11 kill reports for 73 kills in this run. Now most kills are reported.
+    setUp(sim, { seed: '7', laydown: MIXED });
+    let reported = 0;
+    const listen = (e) => { if (e.type === 'alert' && e.msg.alert.description.startsWith('Kill reported')) reported++; };
+    sim.bus.listeners.add(listen);
+    try { play(sim, 6); } finally { sim.bus.listeners.delete(listen); }
+    expect(sim.state.kills).toBeGreaterThan(40);
+    expect(reported).toBeGreaterThan(sim.state.kills * 0.4);
+  }, 120000);
+
+  it('leave no node remembering tracks that have gone', () => {
+    setUp(sim, { seed: '7', laydown: MIXED });
+    play(sim, 6);
+    // a track that dropped since the last tasking pass may still be remembered; dozens were, before
+    const gone = sim.structures.flatMap((s) => [s.lookedAt, s.rejected, s.denied].flatMap((seen) => [...(seen?.keys() ?? [])])).filter((id) => !sim.net.tracks.has(id));
+    expect(gone.length).toBeLessThan(5);
   }, 120000);
 });
 

@@ -123,6 +123,15 @@ describe('comms', () => {
     sim.state.sandbox = false;
   });
 
+  it('a node that leaves is not reported restored by its goodbye', () => {
+    setUp(sim, { seed: '1', laydown: [['rf', 800, 0]] });
+    const s = sim.structures[0];
+    s.offline = true; // contact had been lost
+    sim.commands.sell(s.pos.x, s.pos.z);
+    sim.run(100);
+    expect(sim.bus.entries.some((e) => e.type === 'alert' && /Contact restored/.test(e.msg.alert.description))).toBe(false);
+  });
+
   it('queues messages and drops them when the link is saturated', () => {
     setUp(sim, { seed: '1', laydown: [['rf', 800, 0]] });
     const s = sim.structures[0], cap = COMMS.queueLimit, capacity = COMMS.starlink.capacity;
@@ -197,6 +206,17 @@ describe('figures from the Sources tab', () => {
     expect(exportFigures().waves).toEqual({ fpvGap: 5 });
     resetAllFigures();
     expect(WORLD.rangeScale).toBe(1);
+  });
+
+  it('holds every figure at 0 or more, and a share at 1 or less', () => {
+    resetAllFigures();
+    importFigures({ structures: { radar: { published: -500 }, interceptor: { pk: 3 } }, drones: { fpv: { hp: 1e30 } } });
+    expect(STRUCTURES.radar.published).toBe(0);
+    expect(STRUCTURES.interceptor.pk).toBe(1);
+    expect(DRONES.fpv.hp).toBe(1e12);
+    setFigure('drones', 'fpv', 'jamResist', -0.2);
+    expect(DRONES.fpv.jamResist).toBe(0);
+    resetAllFigures();
   });
 });
 

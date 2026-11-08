@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { createGame } from '../src/game.js';
-import { DRONES } from '../src/sim/config/index.js';
+import { DRONES, STRUCTURES } from '../src/sim/config/index.js';
 import { u } from '../src/sim/units.js';
 import { createStructureViews } from '../src/render/structure-view.js';
 import { createDroneViews } from '../src/render/drone-view.js';
@@ -88,7 +88,7 @@ describe('map symbols', () => {
     const tr = (id) => ({ id, short: `T${id}`, status: 'confirmed', airframe: 'Unknown', estErr: 20, est: { east: 100 * id, north: 0, up: 50 } });
     const net = { tracks: new Map([[1, tr(1)], [2, tr(2)]]), bearingCandidates: () => [] };
     const scene = new THREE.Scene();
-    const beliefs = createBeliefViews(scene, net, camera, document.createElement('div'));
+    const beliefs = createBeliefViews(scene, net, createLabels(document.createElement('div'), camera));
     beliefs.update();
     const [a, b] = scene.children.filter((o) => sprite(o)).map(sprite);
     expect(a.userData.symbol).toBe('unknown:uav');
@@ -114,5 +114,8 @@ describe('map symbols', () => {
     expect(texts).toEqual(['RAD', 'RF', 'EO', 'ACU', 'EW', 'GUN', 'LSR']);
     expect(calls.filter(([k]) => k === 'stroke')).toHaveLength(13);
     expect(calls.filter(([k]) => k === 'setLineDash')).toHaveLength(1); // only the pending frame is dashed
+    calls.length = 0;
+    for (const def of Object.values(STRUCTURES)) symbolSprite(`friend:${def.kind}`, 0); // every kind in the catalogue, not just these
+    expect(calls.filter(([k, text]) => k === 'fillText' && text === '?')).toEqual([]);
   });
 });

@@ -238,3 +238,13 @@ describe('figures', () => {
     expect(exportFigures().patrol).toEqual({ foot: { walkSpeed: 2 } });
   });
 });
+
+describe('a strike on a patrol', () => {
+  it('plans its descent over its distance to the patrol, not to the station', () => {
+    expect(sim.commands.setPatrol(ROUTE)).toBeNull();
+    const c = sim.state.zoneCentre;
+    expect(Math.hypot(c.x, c.z)).toBeGreaterThan(u(100)); // the patrol starts well away from the station
+    const d = sim.spawnDrone('fpv', 0, { jitter: 0, altFrac: 0.5, dist: 0.5 });
+    expect(d.h0).toBeCloseTo(Math.hypot(d.launch.x - c.x, d.launch.z - c.z), 6);
+  });
+});

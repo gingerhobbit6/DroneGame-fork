@@ -4,12 +4,12 @@
 import * as THREE from 'three';
 import { WORLD, TERRAIN, COMMS } from '../sim/config/index.js';
 import { terrainState } from '../sim/terrain.js';
+import { clamp } from '../sim/world.js';
 import { mulberry32, hashSeed } from '../sim/rng.js';
 
 const MPU = () => WORLD.metresPerUnit;
 const UP = new THREE.Vector3(0, 1, 0);
 const u = (m) => m / MPU();
-const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
 
 // ground height in scene units at a scene-unit position
 export const groundU = (xu, zu) => terrainState.data.groundAt(xu * MPU(), zu * MPU()) / MPU();

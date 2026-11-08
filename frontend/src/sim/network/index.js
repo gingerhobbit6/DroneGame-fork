@@ -29,7 +29,7 @@ export function createNetwork(ctx) {
   const sensors = createSensors(core, fused.feed);
   let authority = null;
   const tasks = createTasking(core, alerts, registration, () => authority, fused.confirmedTracks);
-  authority = createAuthority(core, alerts, (s, tr) => tasks.assign(s, tr, true));
+  authority = createAuthority(core, alerts, tasks.approve);
   let fusionT = 0;
 
   function update(dt) {
@@ -88,7 +88,7 @@ export function createNetwork(ctx) {
     registration.register(fusion);
     const p = { def: PERIMETER, pos: { x: 0, y: 0, z: 0 } };
     p.nodeId = S.uuid(); p.short = PERIMETER.short + '-01'; p.name = PERIMETER.name;
-    p.mode = 'Detect'; p.reportT = 0; p.objIds = new Map(); p.task = null;
+    p.mode = 'Detect'; p.reportT = 0; p.objIds = new WeakMap(); p.task = null;
     names.set(p.nodeId, p.name);
     registration.register(p);
   }

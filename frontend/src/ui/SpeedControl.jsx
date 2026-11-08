@@ -5,7 +5,7 @@ import { WORLD } from '../sim/config/index.js';
 import { useGame, useTick } from './hooks.js';
 import './speed-control.css';
 
-export const SPEEDS = [1, 2, 3, 4, 5, 10];
+const SPEEDS = [1, 2, 3, 4, 5, 10];
 const ICON = { pause: 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z', play: 'M8 5.5v13l10.5-6.5z' };
 
 export function SpeedControl() {

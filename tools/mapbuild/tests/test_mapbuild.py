@@ -516,8 +516,8 @@ def test_an_os_download_comes_only_from_os_and_never_runs_past_its_size(tmp_path
             return b"x" * 1000  # a reply that never ends
 
     monkeypatch.setattr(download.urllib.request, "urlopen", lambda *a, **k: Endless())
-    good = {"fileName": "t50.zip", "size": 2500, "url": "https://api.os.uk/downloads/v1/products/Terrain50/downloads?area=GB"}
-    for bad in ({"url": "http://api.os.uk/x"}, {"url": "https://example.com/x"}, {"size": "2500"}):
+    good = {"fileName": "t50.zip", "size": 2500, "md5": "0" * 32, "url": "https://api.os.uk/downloads/v1/products/Terrain50/downloads?area=GB"}
+    for bad in ({"url": "http://api.os.uk/x"}, {"url": "https://example.com/x"}, {"size": "2500"}, {"md5": None}, {"md5": "not a checksum"}):
         with pytest.raises(SystemExit, match="did not describe"):
             download._fetch({**good, **bad}, str(tmp_path), lambda _: None)
     with pytest.raises(SystemExit, match="did not download"):

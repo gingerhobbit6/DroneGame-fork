@@ -9,7 +9,7 @@ import { bunkerSide } from '../sim/people.js';
 import { hashSeed, mulberry32 } from '../sim/rng.js';
 import { clamp, hdist, u } from '../sim/units.js';
 import { groundU } from './terrain-view.js';
-import { hexCss } from './labels.js';
+import { hexCss, setText } from './labels.js';
 import { view } from './view.js';
 import { civilianParts, soldierParts } from './figures.js';
 import { REST, STEP, idleTurn, partMatrices, placeParts, pose } from './poses.js';
@@ -183,7 +183,7 @@ export function createPeopleViews(scene, sim, labels) {
   function label(g, down) {
     let tag = tags.get(g);
     if (!tag) { tag = labels.make('', hexCss(PEOPLE[g.protection].color), 'slabel'); tags.set(g, tag); }
-    tag.textContent = `${g.count} ${PEOPLE[g.protection].short}${down ? ` · ${down} hurt` : ''}`;
+    setText(tag, `${g.count} ${PEOPLE[g.protection].short}${down ? ` · ${down} hurt` : ''}`);
     labels.place(tag, g.x, g.y + u(LABEL_LIFT), g.z, view.labels);
   }
 

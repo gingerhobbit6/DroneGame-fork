@@ -8,7 +8,7 @@ import { fromOperator, jamReaches } from '../src/sim/jamming.js';
 import { JAM_BANDS } from '../src/sim/rf-model.js';
 import { predictRange, BEARINGS } from '../src/sim/site-range.js';
 import { createSimulation } from '../src/sim/simulation.js';
-import { radiates } from '../src/sim/targeting.js';
+import { emission } from '../src/sim/targeting.js';
 import { terrainState } from '../src/sim/terrain.js';
 import { u } from '../src/sim/units.js';
 import { unitCost, unitDef } from '../src/sim/unit-config.js';
@@ -96,10 +96,10 @@ describe('the bands jammed', () => {
   it('make it louder, each against the bands it jams as standard', () => {
     const jammer = sim.addStructure('jammer', u(300), u(300));
     jammer.mode = 'Jam';
-    const standard = radiates(jammer);
+    const standard = emission(jammer);
     sim.commands.toggleJamBand(jammer, 'gnss', true);
-    expect(radiates(jammer)).toBeCloseTo(standard * 1.5);
+    expect(emission(jammer)).toBeCloseTo(standard * 1.5);
     jammer.mode = 'Standby';
-    expect(radiates(jammer)).toBe(0);
+    expect(emission(jammer)).toBe(0);
   });
 });
