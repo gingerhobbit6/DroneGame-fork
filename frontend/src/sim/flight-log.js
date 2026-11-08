@@ -26,7 +26,7 @@ export function logShot(w, d, def) {
   return e;
 }
 
-// end: 'killed', 'leaked' (reached the site), 'struck' (hit one of your systems) or 'left'. by: the system that downed it, at src.
+// end: 'killed', 'leaked' (reached the site), 'struck' (hit one of your systems), 'missed' (came down where a patrol had been) or 'left'. by: the system that downed it, at src.
 export function logEnd(w, d, end, by = null, src = null) {
   const f = d.log;
   if (!f || f.end) return;

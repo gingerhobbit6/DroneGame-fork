@@ -74,7 +74,7 @@ describe('the patrol column with a deployment pack', () => {
   });
 
   it('counts vehicles parked on the map, and marks one beyond the pack', () => {
-    expect(game.commands.place('jammer', 60, 60, undefined, 'hilux')).toBeNull();
+    expect(game.commands.place('jammer', 20, 13, undefined, 'hilux')).toBeNull();
     withPack([{ id: 'hilux', count: 1 }, { id: 'patria', count: 2 }]);
     expect(options('Vehicle 1')).toEqual(['Patria 6x6', 'Toyota Hilux (beyond your pack)']);
     expect(document.body.textContent).toContain("The column takes your pack's vehicles: 1 Toyota Hilux, 2 Patria 6x6, less any parked on the map.");

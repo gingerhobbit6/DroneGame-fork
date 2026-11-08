@@ -139,7 +139,8 @@ describe('one reach rule for systems, people and patrols', () => {
     expect(sim.commands.setPatrol(route)).toBeNull();
     expect(sim.siteIsFree()).toBe(true);
     const [[x, z]] = route;
-    expect(near((px, pz) => sim.commands.place('rf', px, pz), x, z + 30)).toBe(true);
+    expect(near((px, pz) => sim.commands.place('rf', px, pz), x, z + 3)).toBe(true); // inside its 200 m corridor
+    expect(sim.commands.place('rf', x, z + 30)).toMatch(/inside its corridor/);
     expect(routeProblem(square(1370, 0, 10))).toMatch(/off the map/);
   });
   it('will not have an area and a patrol at once, whichever comes first', () => {

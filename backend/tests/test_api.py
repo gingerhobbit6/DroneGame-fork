@@ -134,6 +134,22 @@ class TestLaydowns:
     def test_a_bad_patrol_column_is_refused(self, client, column):
         assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": column})).status_code == 422
 
+    def test_a_patrol_plan_and_side_offsets_are_kept(self, client):
+        column = [{"vehicle": "hilux", "system": "gun_hmg", "gap": 40, "side": -20}]
+        plan = {"width": 250, "formation": "wedge"}
+        made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": column, "patrolPlan": plan}))
+        assert made.status_code == 201
+        spec = client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]
+        assert (spec["patrolColumn"], spec["patrolPlan"]) == (column, plan)
+
+    @pytest.mark.parametrize("plan", [{"width": 10, "formation": "file"}, {"width": 2000, "formation": "file"}, {"width": 200, "formation": "blob"}, {"width": 200}, {"width": 200, "formation": "file", "speed": 9}])
+    def test_a_bad_patrol_plan_is_refused(self, client, plan):
+        assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolPlan": plan})).status_code == 422
+
+    def test_a_vehicle_too_far_to_the_side_is_refused(self, client):
+        column = [{"vehicle": "hilux", "system": "gun_hmg", "gap": 0, "side": 101}]
+        assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": column})).status_code == 422
+
     @pytest.mark.parametrize("route", [[[0, 0]], [[i, i] for i in range(33)], [[0, 0], [1351, 0]], [[0, 0], ["a", 0]], "here"])
     def test_a_bad_patrol_route_is_refused(self, client, route):
         assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": route})).status_code == 422

@@ -9,7 +9,7 @@ import { removeStructure } from './laydown.js';
 import { removeDrone, spotterBonus } from './drones.js';
 import { blastOnGround } from './people.js';
 import { logEnd } from './flight-log.js';
-import { patrolAim } from './patrol.js';
+import { patrolAim } from './hunt.js';
 import { aimInZone, inZone } from './attack-area.js';
 import { terrainState } from './terrain.js';
 
@@ -62,7 +62,7 @@ function emitterScore(s) {
 
 const SITE_AIM = { x: 0, z: 0, structure: null };
 function plainAim(w, d) {
-  if (w.patrol) return patrolAim(w); // a patrol takes the place of the station and any drawn area
+  if (w.patrol) return patrolAim(w, d); // a patrol takes the place of the station and any drawn area
   if (d.aim?.structure && !w.structures.includes(d.aim.structure)) d.aim = { ...d.aim, structure: null }; // gone: it strikes where it stood
   return d.aim || SITE_AIM;
 }

@@ -5,7 +5,7 @@ import { fmtTime, useGame, useTick } from './hooks.js';
 import { Movable } from './Movable.jsx';
 import { pounds } from '../sim/economy.js';
 
-const MARKER = { kill: '#66bb6a', leak: '#ff5252', spotter: '#ffd600', lost: '#ff9100', casualty: '#e040fb', empty: '#ffcf66' };
+const MARKER = { kill: '#66bb6a', leak: '#ff5252', spotter: '#ffd600', lost: '#ff9100', casualty: '#e040fb', miss: '#90a4ae', patrol: '#40c4ff', empty: '#ffcf66' };
 
 function Markers({ rec, n }) {
   // only needs redrawing when the history or the events change; a full history keeps its length but drops its oldest frames

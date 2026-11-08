@@ -1,14 +1,23 @@
 // A foot patrol and the vehicles that escort it. Every number here is a labelled assumption, not a real unit's figures, and each
 // can be changed in the Sources tab. See docs/PATROL_MODE.md.
 //
-// walkSpeed: how fast the group walks its route (m/s). escortGap: how far ahead the sensor vehicle and behind the weapon vehicle
-// keep, along the route (m). groupSize: how many people walk in the patrol.
+// walkSpeed: how fast the group walks its route (m/s). escortGap: how far apart a new vehicle keeps from the last, along the route (m).
+// groupSize: how many soldiers walk in the patrol. spacing: metres between soldiers in the formation. endDelay: seconds the patrol
+// waits at the end of its route before it walks back.
 export const PATROL = {
   foot: {
-    name: 'Foot patrol', walkSpeed: 1.4, escortGap: 40, groupSize: 12,
-    // the column a new patrol gets: gap is metres along the route, ahead of the people or (negative) behind
-    column: [{ vehicle: 'hilux', system: 'radar_a800', gap: 40 }, { vehicle: 'patria', system: 'missile_rr', gap: -40 }],
-    desc: 'Soldiers walking a looped route, escorted by vehicles carrying sensors and weapons. The patrol halts while a weapon is engaging.',
+    name: 'Foot patrol', walkSpeed: 1.4, escortGap: 40, groupSize: 12, spacing: 5, endDelay: 60,
+    // the column a new patrol gets: gap is metres along the route, ahead of the lead soldier or (negative) behind; side is metres to
+    // the right of the way it faces, or (negative) to the left
+    column: [{ vehicle: 'hilux', system: 'radar_a800', gap: 40, side: 0 }, { vehicle: 'patria', system: 'missile_rr', gap: -40, side: 0 }],
+    desc: 'Soldiers walking a route to its end and back, escorted by vehicles carrying sensors and weapons. The patrol halts while a weapon is engaging.',
+  },
+  // How the enemy finds a patrol (sim/hunt.js). sightRange: how far a spotter's camera picks out the patrol, with a clear line of sight
+  // (m). strikeSight: how far a strike drone with a video link sees it for itself (m). holdRadius: how far from the corridor's middle
+  // a strike with no fix circles, waiting for one (m). holdTime: how long it can wait before it must turn for home (s).
+  enemy: {
+    name: 'Enemy search', sightRange: 3500, strikeSight: 500, holdRadius: 400, holdTime: 600,
+    desc: 'Strikes home on the last fix a spotter passed them, which goes stale when the spotter is jammed, shot down or loses sight. A drone with a camera sees the patrol for itself when close.',
   },
 };
 
@@ -31,3 +40,4 @@ export const MOUNTS = {
 };
 export const MAX_ESCORTS = 6; // MAX_ESCORTS in backend/app/schemas.py
 export const MAX_ESCORT_GAP = 200; // metres
+export const MAX_ESCORT_SIDE = 100; // metres: MAX_ESCORT_SIDE in backend/app/schemas.py

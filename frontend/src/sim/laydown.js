@@ -12,7 +12,8 @@ import { ENV, cleanConditions } from './conditions.js';
 import { buyTerminal, money } from './economy.js';
 import { capturePeople, clearPeople, restorePeople } from './people.js';
 import { fillMagazine } from './magazine.js';
-import { setPatrol } from './patrol.js';
+import { DEFAULT_PLAN, planOf, setPatrol } from './patrol.js';
+import { inCorridor } from './route.js';
 import { cleanCallsign, cleanName, cleanSettings, fieldsFor, setSetting, unitCost, unitDef } from './unit-config.js';
 
 // saved holds a unit's settings and custom names, and reserved the callsigns other saved units will need.
@@ -45,6 +46,7 @@ export function placementProblem(w, x, z, def, cost = def.cost) {
   if (!siteIsFree(w) && r < u(BUILD.minDist)) return `Too close to the station (minimum ${BUILD.minDist} m)`;
   const far = reachProblem(w, x, z);
   if (far) return far;
+  if (w.patrol && !inCorridor(w.patrol, x, z)) return 'With a patrol, systems stand inside its corridor';
   if (terrainState.data.onBuilding(xm, zm)) return 'There is a building here';
   if (terrainState.data.coverAt(xm, zm) === 4) return 'You cannot build in water';
   if (terrainState.data.slope(xm, zm) > 0.4) return 'The ground is too steep';
@@ -111,7 +113,7 @@ export function captureLaydown(w) {
     ...(w.state.zone ? { zone: w.state.zone } : {}),
     ...(isDefaultMix(w.state.attack) ? {} : { attack: w.state.attack }),
     ...(w.state.conditions === 'day' ? {} : { conditions: w.state.conditions }),
-    ...(w.patrol ? { patrol: w.patrol.route, patrolColumn: w.patrol.column } : {}),
+    ...(w.patrol ? { patrol: w.patrol.route, patrolColumn: w.patrol.column, patrolPlan: planOf(w.patrol) } : {}),
   };
 }
 
@@ -141,7 +143,7 @@ export function restoreLaydown(w, spec) {
   applyZone(w, cleanZone(spec.zone));
   w.state.attack = cleanMix(spec.attack);
   applyConditions(w, spec.conditions);
-  const refused = spec.patrol && setPatrol(w, spec.patrol, spec.patrolColumn ?? PATROL.foot.column); // a saved route comes from outside the game, so it is checked again
+  const refused = spec.patrol && setPatrol(w, spec.patrol, spec.patrolColumn ?? PATROL.foot.column, spec.patrolPlan ?? DEFAULT_PLAN); // a saved route comes from outside the game, so it is checked again
   if (refused) w.emit('toast', `The saved patrol was left out: ${refused}`);
 }
 

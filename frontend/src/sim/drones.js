@@ -1,7 +1,7 @@
 // The enemy: launching drones, how they fly and get jammed, and what happens when they are destroyed or get through.
 
 import { Vector3 } from 'three';
-import { WORLD, SITE, DRONES, ADAPT } from './config/index.js';
+import { WORLD, SITE, DRONES, ADAPT, PATROL } from './config/index.js';
 import { jamming } from './jamming.js';
 import { rand, gauss } from './rng.js';
 import { u, hdist, clamp, groundM, hereU, onMap } from './units.js';
@@ -10,6 +10,7 @@ import { chooseAim, pickTarget, hitStructure } from './targeting.js';
 import { blastInAir, blastOnGround, blastOnSite } from './people.js';
 import { launchDistance, launchPoint } from './attack-area.js';
 import { logEnd, logLaunch } from './flight-log.js';
+import { patrolThere, spotterGoal } from './hunt.js';
 
 const _v = new Vector3();
 const SPOTTER_CLEARANCE = 30; // metres
@@ -87,6 +88,14 @@ export const spotterBonus = (w) => w.drones.reduce((sum, d) => sum + (d.mode ===
 // onPatrol: the patrol's spot, when that is what it reached. It lands among the people there, as a strike on a system lands on it.
 function impact(w, d, onPatrol) {
   const { state, ledger, net } = w;
+  if (onPatrol && !patrolThere(w, onPatrol.x, onPatrol.z)) { // it came down where the fix said the patrol was
+    w.rec.event('miss', `${d.def.name} struck where the patrol had been`, d.uid);
+    logEnd(w, d, 'missed'); // not airborne, and none of leaked, struck or left
+    blastOnGround(w, d, onPatrol.x, onPatrol.z);
+    w.emit('explosion', { pos: d.pos, r: u(60), color: 0xff9100 });
+    removeDrone(w, d);
+    return;
+  }
   w.rec.event('leak', `${d.def.name} hit the ${onPatrol ? 'patrol' : 'site'}`, d.uid);
   if (onPatrol) blastOnGround(w, d, onPatrol.x, onPatrol.z); else blastOnSite(w, d);
   state.leaks++; tally(ledger.leaked, d.type);
@@ -109,11 +118,12 @@ function leave(w, d, spd) {
 }
 
 // Spotter: flies out to its standoff radius, orbits for loiterTime, then leaves. Returns false if it was removed.
+// Over a patrol it must search for the patrol first (hunt.js), and circles the last fix it took.
 function moveSpotter(w, d, spd, dt) {
-  const r = u(d.def.loiterDist), c = w.state.zoneCentre;
+  const goal = w.patrol && spotterGoal(w, d, spd), r = u(d.def.loiterDist), c = goal ? goal.c : w.state.zoneCentre;
   d.pos.y = Math.max(d.pos.y, hereU(d.pos.x, d.pos.z) + u(SPOTTER_CLEARANCE)); // it holds one height, which real mountains can reach
   if (d.mode === 'approach') {
-    if (hdist(d.pos, c) <= r) {
+    if ((!goal || goal.found) && hdist(d.pos, c) <= r) {
       d.mode = 'orbit'; d.angle = Math.atan2(d.pos.z - c.z, d.pos.x - c.x); d.orbitT = 0;
       w.rec.event('spotter', `${d.def.name} on station`, d.uid);
       w.emit('toast', `${d.def.name} on station: strikes +${Math.round(d.def.spotBonus * 100)}% damage`);
@@ -130,14 +140,26 @@ function moveSpotter(w, d, spd, dt) {
   return true;
 }
 
+// A strike with no fix on a patrol flies to the corridor's middle and circles there until it has one, or until it must turn for home.
+function holdOff(w, d, tgt, hrem, spd, dt) {
+  d.holdT = (d.holdT || 0) + dt;
+  if (d.holdT > PATROL.enemy.holdTime) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); w.rec.event('escaped', `${d.def.name} gave up waiting for a fix`, d.uid); removeDrone(w, d); return false; }
+  let dx = (tgt.x - d.pos.x) / hrem, dz = (tgt.z - d.pos.z) / hrem;
+  if (hrem < u(PATROL.enemy.holdRadius)) [dx, dz] = [-dz, dx]; // round, not in
+  d.pos.x += dx * spd; d.pos.z += dz * spd;
+  d.pos.y = Math.max(d.pos.y, hereU(d.pos.x, d.pos.z) + u(d.def.minAgl || 30));
+  return true;
+}
+
 // Strike: fly at the target, hugging the terrain. Returns false if it was removed.
-function moveStrike(w, d, spd) {
+function moveStrike(w, d, spd, dt) {
   // GNSS drift can turn it away for good. Only a drifted drone is held to the circle: one from off the map can start at a corner, further out.
   if (!onMap(d.pos.x, d.pos.z) || (d.nav && hdist(d.pos, w.state.zoneCentre) > u(WORLD.radius))) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); w.rec.event('escaped', `${d.def.name} left the area`, d.uid); removeDrone(w, d); return false; }
   if (d.mode === 'home') return leave(w, d, spd);
   const tgt = pickTarget(w, d);
   const hrem = Math.hypot(tgt.x - d.pos.x, tgt.z - d.pos.z);
   d.toGo = hrem * WORLD.metresPerUnit; // for its own homing, next step
+  if (tgt.hold) return holdOff(w, d, tgt, hrem, spd, dt);
   if (tgt.structure || d.aim || tgt.patrol ? hrem < u(30) : hrem < u(SITE.radius)) { if (tgt.structure) hitStructure(w, d, tgt.structure); else impact(w, d, tgt.patrol && tgt); return false; }
   // height above ground: a fixed-wing drone holds its cruise height until it can reach the target diving at SITE.diveAngle, then dives;
   // a multirotor eases down over its whole run, as an operator brings it in low. Never below the type's minimum until within 400 m,
@@ -217,7 +239,7 @@ export function updateDrones(w, dt) {
 
     const px = d.pos.x, py = d.pos.y, pz = d.pos.z;
     const spd = u(d.def.speed) * slow * dt;
-    if (!(d.def.role === 'spotter' ? moveSpotter(w, d, spd, dt) : moveStrike(w, d, spd))) continue;
+    if (!(d.def.role === 'spotter' ? moveSpotter(w, d, spd, dt) : moveStrike(w, d, spd, dt))) continue;
     const dx = d.pos.x - px, dz = d.pos.z - pz;
     if (dt > 0) d.vel.set(dx, d.pos.y - py, dz).divideScalar(dt);
     if (dx || dz) d.heading = Math.atan2(dx, dz);
