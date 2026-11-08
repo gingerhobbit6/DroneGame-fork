@@ -22,7 +22,8 @@ export function addStructure(w, id, x, z, saved = {}, reserved) {
   const y = hereU(x, z);
   const s = { def, health: def.health || 30, pos: new Vector3(x, y, z), cd: 0, aim: 0, beamTarget: null };
   // unless it is told otherwise, it faces away from what is defended, so it follows a drawn area or a walking patrol
-  Object.defineProperty(def, 'facing', { get: () => def.settings.facing ?? outwardFrom(w.state.zoneCentre, s.pos) });
+  // a jammer on a pan-and-tilt head faces where the fusion node last turned it (s.slewTo, tasking.js)
+  Object.defineProperty(def, 'facing', { get: () => s.slewTo ?? def.settings.facing ?? outwardFrom(w.state.zoneCentre, s.pos) });
   const name = cleanName(saved.name), callsign = cleanCallsign(saved.callsign);
   if (name || callsign) s.custom = { name, callsign };
   fillMagazine(s);

@@ -8,6 +8,9 @@ export const DRONES = {
   // evade: 1 = no manoeuvrability, lower = harder to hit. It lowers a shot's hit chance and slows a laser's burn.
   // adapt: how strongly this type gets better at evading/resisting each wave (see ADAPT).
   // sound: how much further it is heard than a small FPV, an assumption. A piston-engined fixed-wing drone is far louder than a quadcopter.
+  // lostLink: what it does once a jammer has cut its control link: 'crash' (flown by hand, the default) or 'home' (it flies itself and turns
+  // for home, or drifts down with its satellite navigation jammed too). terminal: metres from its target inside which a homing module
+  // flies it, out of a jammer's reach. hops: its link hops frequency faster than a reactive jammer can follow (drones.js, jamming.js).
   // rfEmitter: has an active radio link an RF detector can hear, on the bands of its control and video links. airframe is what a camera classifies it as.
   // protocol: the family of its radio link, which an RF detector's classifier library may know (rf-model.js).
   // cost: what one drone costs the attacker in dollars, with the evidence in costRef.
@@ -19,6 +22,7 @@ export const DRONES = {
     links: { control: 'control900', video: 'video58', gnss: true }, // radio dependencies, for jamming
     color: 0xffd600, alt: [400, 500], jamResist: 0.75, adapt: 0.5, rfEmitter: true, protocol: 'tactical', airframe: 'Fixed wing',
     loiterDist: 2500, loiterTime: 60, // orbit radius (m) and seconds on station before it leaves
+    lostLink: 'home', // an autopilot flies its route, so a lost link turns it for home and lost video only blinds it: an assumption, as usual for military drones
     spotBonus: 0.5,                   // each spotter on station adds this to strike damage
     bank: 0.35,                       // bank angle (radians) while orbiting
     cost: 100000, rcs: 0.15, size: 3.0, rfPower: 2.5, sound: 3, // rcs (m^2), size (m) and link power relative to a small FPV: assumptions

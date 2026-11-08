@@ -13,6 +13,8 @@ import { logEnd, logLaunch } from './flight-log.js';
 
 const _v = new Vector3();
 const SPOTTER_CLEARANCE = 30; // metres
+// A spoofer drags a drone's course round by up to `turn` radians (120°, so it spirals away rather than in) at `rate` rad/s: ASSUMPTIONS.
+const SPOOF = { turn: 2.1, rate: 0.15 };
 
 // In the sandbox the enemy adapts to the level chosen there instead of to the wave number.
 const effWave = ({ state }) => (state.sandbox ? state.sbLevel : state.wave);
@@ -59,11 +61,11 @@ export function removeDrone(w, d) {
 }
 
 // `by` is the id of whatever did the damage ('laser', 'interceptor', 'missile', ...), for the cost ledger. src: the system that
-// did it, if known, for the statistics.
-function recordKill(w, d, by, src) {
-  blastInAir(w, d);
+// did it, if known, for the statistics. A drone landed whole does not go off.
+function recordKill(w, d, by, src = null, text = `${d.def.name} destroyed by ${by}`, blast = true) {
+  if (blast) blastInAir(w, d);
   logEnd(w, d, 'killed', src?.def.id ?? by, src);
-  w.rec.event('kill', `${d.def.name} destroyed by ${by}`, d.uid);
+  w.rec.event('kill', text, d.uid);
   w.state.kills++;
   tally(w.ledger.killed, d.type);
   w.ledger.killedBy[by] = w.ledger.killedBy[by] || {};
@@ -97,6 +99,15 @@ function impact(w, d, onPatrol) {
   if (state.health <= 0 && !state.sandbox) { state.over = true; w.emit('gameOver'); }
 }
 
+// Flies away from what is defended until it is off the map. Returns false once it has gone.
+function leave(w, d, spd) {
+  const c = w.state.zoneCentre;
+  _v.set(d.pos.x - c.x, 0, d.pos.z - c.z).normalize().multiplyScalar(spd);
+  d.pos.add(_v);
+  if (hdist(d.pos, c) > u(WORLD.spawnDist) || !onMap(d.pos.x, d.pos.z)) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); removeDrone(w, d); return false; }
+  return true;
+}
+
 // Spotter: flies out to its standoff radius, orbits for loiterTime, then leaves. Returns false if it was removed.
 function moveSpotter(w, d, spd, dt) {
   const r = u(d.def.loiterDist), c = w.state.zoneCentre;
@@ -115,11 +126,7 @@ function moveSpotter(w, d, spd, dt) {
     d.pos.set(c.x + Math.cos(d.angle) * r, d.pos.y, c.z + Math.sin(d.angle) * r);
     d.orbitT += dt;
     if (d.orbitT >= d.def.loiterTime) d.mode = 'egress';
-  } else {
-    _v.set(d.pos.x - c.x, 0, d.pos.z - c.z).normalize().multiplyScalar(spd);
-    d.pos.add(_v);
-    if (hdist(d.pos, c) > u(WORLD.spawnDist) || !onMap(d.pos.x, d.pos.z)) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); removeDrone(w, d); return false; }
-  }
+  } else return leave(w, d, spd);
   return true;
 }
 
@@ -127,8 +134,10 @@ function moveSpotter(w, d, spd, dt) {
 function moveStrike(w, d, spd) {
   // GNSS drift can turn it away for good. Only a drifted drone is held to the circle: one from off the map can start at a corner, further out.
   if (!onMap(d.pos.x, d.pos.z) || (d.nav && hdist(d.pos, w.state.zoneCentre) > u(WORLD.radius))) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); w.rec.event('escaped', `${d.def.name} left the area`, d.uid); removeDrone(w, d); return false; }
+  if (d.mode === 'home') return leave(w, d, spd);
   const tgt = pickTarget(w, d);
   const hrem = Math.hypot(tgt.x - d.pos.x, tgt.z - d.pos.z);
+  d.toGo = hrem * WORLD.metresPerUnit; // for its own homing, next step
   if (tgt.structure || d.aim || tgt.patrol ? hrem < u(30) : hrem < u(SITE.radius)) { if (tgt.structure) hitStructure(w, d, tgt.structure); else impact(w, d, tgt.patrol && tgt); return false; }
   // height above ground: a fixed-wing drone holds its cruise height until it can reach the target diving at SITE.diveAngle, then dives;
   // a multirotor eases down over its whole run, as an operator brings it in low. Never below the type's minimum until within 400 m,
@@ -145,12 +154,18 @@ function moveStrike(w, d, spd) {
   return true;
 }
 
-// Jamming. Each jammer that is on jams the links it reaches (jamming.js), and what that does depends on what the drone relies on: a
-// jammed control link slows it and eventually crashes it, a jammed video link does the same more slowly (it is flying blind), and
-// jammed GNSS makes a navigating drone drift off course (and the drift stays). A reactive jammer breaks a link sooner.
-// Returns the speed multiplier, or null if the drone crashed.
+// Jamming. Each jammer that is on jams the links it reaches (jamming.js), and what that does depends on what the drone relies on and
+// how it is flown (lostLink). Jammed GNSS makes a navigating drone drift off course, and the drift stays; anti-jam antennas
+// (jamResist) cut the drift. A jammed control link slows it until, after the jammer's killTime, the link is lost:
+//  - 'crash', the default: flown by hand, it comes down, as a first-person-view drone's flight controller drops it on losing its link
+//  - 'home': it flies itself, so it gives up and turns for home, as DJI drones do on losing their controller; with its satellite
+//    navigation jammed too it cannot find home and drifts down
+// A jammed video link brings down a drone flown by hand, more slowly, as it is flying blind; one that flies itself is only blinded.
+// Within `terminal` metres of its target a drone with a homing module flies on by itself, so jamming no longer touches it.
+// A reactive jammer breaks a link sooner. Returns the speed multiplier, or null if the drone came down.
 function applyJamming(w, d, dt) {
-  let ctrl = false, vid = false, gnss = false, killTime = Infinity, ctrlSlow = 1, rate = 1, src = null;
+  if (d.toGo <= (d.def.terminal ?? 0)) { d.videoJammed = false; return 1; }
+  let ctrl = false, vid = false, gnss = false, spoof = false, takeover = false, killTime = Infinity, ctrlSlow = 1, rate = 1, src = null;
   for (const s of w.structures) {
     if (s.def.kind !== 'jammer' || s.mode !== 'Jam') continue;
     const j = jamming(s, d, w.structures);
@@ -158,24 +173,38 @@ function applyJamming(w, d, dt) {
     if (j.control) { ctrl = true; ctrlSlow = Math.min(ctrlSlow, s.def.slow); }
     if (j.video) vid = true;
     if (j.gnss) gnss = true;
+    if (j.spoof) spoof = true;
+    if (j.takeover) takeover = true;
     if (s.def.killTime < killTime) { killTime = s.def.killTime; src = s; } // the quickest one gets the credit
     rate = Math.max(rate, j.rate);
   }
-  const eff = 1 - d.jamResist;
+  const eff = 1 - d.jamResist, flown = d.def.lostLink !== 'home';
+  if (takeover) { // taken over: once in, the jammer lands it
+    d.takeT = (d.takeT ?? 0) + dt * eff;
+    if (d.takeT >= killTime) { recordKill(w, d, 'jammer', src, `${d.def.name} taken over and landed`, false); removeDrone(w, d); return null; }
+  }
+  if (spoof) { const pull = SPOOF.turn - d.nav; d.nav += Math.sign(pull) * Math.min(Math.abs(pull), SPOOF.rate * eff * dt); } // anti-jam antennas resist it too
   let slow = 1;
-  const jamRate = ctrl ? 1 : vid ? 0.5 : 0;
-  if (jamRate && eff > 0) {
+  const jamRate = ctrl ? 1 : vid && flown ? 0.5 : 0;
+  if (jamRate && eff > 0 && d.mode !== 'home' && d.mode !== 'egress') { // nothing more to do to one already leaving
     slow = 1 - (1 - (ctrl ? ctrlSlow : 0.7)) * eff;
     d.jamT += dt * eff * jamRate * rate;
     if (d.jamT >= killTime) {
-      recordKill(w, d, 'jammer', src);
-      w.emit('explosion', { pos: d.pos, r: u(80), color: 0xba68c8 });
-      removeDrone(w, d);
-      return null;
+      if (!flown && !gnss) { // it knows where home is
+        d.mode = d.def.role === 'spotter' ? 'egress' : 'home';
+        tally(w.ledger.turned, d.type);
+        w.rec.event('jammed', `${d.def.name} lost its link and turned for home`, d.uid);
+        w.emit('toast', `${d.def.name} lost its link and turned for home`);
+      } else {
+        recordKill(w, d, 'jammer', src);
+        w.emit('explosion', { pos: d.pos, r: u(80), color: 0xba68c8 });
+        removeDrone(w, d);
+        return null;
+      }
     }
   } else d.jamT = Math.max(0, d.jamT - dt * 0.5);
   d.videoJammed = vid;
-  if (gnss) d.nav += gauss() * 0.08 * Math.sqrt(dt);
+  if (gnss) d.nav += gauss() * 0.08 * eff * Math.sqrt(dt);
   return slow;
 }
 

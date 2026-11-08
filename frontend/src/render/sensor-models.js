@@ -1,27 +1,41 @@
 // Models of the sensors and jammers, after the real products' photos. Each takes the kit for what stands still, the kit for
 // the head, which the view turns (or spins), and the kit for the mast or legs, and returns stand()'s riser (system-parts.js).
 
+import * as THREE from 'three';
 import { SYSTEM_UNIT_M } from '../sim/config/index.js';
 import { soldierFigure } from './figures.js';
 import { stand } from './system-parts.js';
 
 const { PI } = Math;
 
+// A flat antenna facing +z, tilted by rx, turned by ry and set at x, y, z: its face, a dark frame round it and the box behind.
+function panel(h, w, ht, x, y, z, { rx = 0, ry = 0 } = {}) {
+  const part = (key, pw, ph, d, px, py, pz) => h.geo(key, new THREE.BoxGeometry(pw, ph, d).translate(px, py, pz).rotateX(rx).rotateY(ry), x, y, z);
+  part('body', w, ht, 0.08, 0, 0, 0);
+  for (const side of [-1, 1]) { part('dark', w + 0.06, 0.04, 0.11, 0, (side * ht) / 2, 0); part('dark', 0.04, ht, 0.11, (side * w) / 2, 0, 0); }
+  part('body', w * 0.6, ht * 0.6, ht * 0.25, 0, 0, -0.04 - ht * 0.125);
+}
+
 // A radar with no arc turns all round, so its one panel spins. Fixed panels sit side by side, each turned by the panel arc and
 // centred on the way it faces (+z here; a turn clockwise seen from above is towards -x).
 export function radar(b, h, def, r) {
   const at = stand(b, r, def);
   h.cyl('metal', 0.16, 0.3, 0, 0.15, 0);
+  if (def.id === 'radar_giraffe') { // Saab Giraffe 1X: a rounded radome turning on top of its mast
+    h.post('metal', 0.08, 0.5, 0, 0.5, 0);
+    h.geo('body', new THREE.SphereGeometry(1, 16, 10).scale(0.75, 0.62, 0.3), 0, 1.3, 0);
+    h.box('dark', 0.5, 0.4, 0.25, 0, 1.3, -0.3);
+    return { ...at, spin: true };
+  }
   if (def.arc == null) {
-    h.box('body', 2.2, 1.0, 0.16, 0, 0.8, 0);
-    h.box('dark', 0.8, 0.5, 0.4, 0, 0.6, -0.3);
+    panel(h, 2.2, 1.0, 0, 0.8, 0);
     return { ...at, spin: true };
   }
   const n = def.panels ?? 1, arc = (def.arc * PI) / 180, w = def.size === 'L' ? 1.2 : def.size === 'S' ? 0.6 : 0.9;
   const out = n > 1 ? (w / 2) / Math.tan(arc / 2) + 0.05 : 0.1; // how far each panel sits from the mast
   for (let i = 0; i < n; i++) {
     const a = (i - (n - 1) / 2) * arc;
-    h.box('body', w, w * 0.8, 0.12, -Math.sin(a) * out, 0.3 + w * 0.4, Math.cos(a) * out, { ry: -a });
+    panel(h, w, w * 0.8, -Math.sin(a) * out, 0.3 + w * 0.4, Math.cos(a) * out, { ry: -a });
   }
   return at;
 }
@@ -100,18 +114,22 @@ export function jammer(b, h, def, r) {
   switch (def.id) {
     case 'jammer': case 'jammer_s': // a portable jammer on a tripod: its electronics box with two panel antennas angled apart
       h.box('dark', 0.4, 0.3, 0.3, 0, 0.15, 0);
-      for (const a of [-0.35, 0.35]) h.box('body', 0.4, 0.55, 0.06, Math.sin(a) * 0.15, 0.6, 0.15 + Math.cos(a) * 0.05, { ry: a });
+      for (const a of [-0.35, 0.35]) panel(h, 0.36, 0.5, Math.sin(a) * 0.15, 0.6, 0.15 + Math.cos(a) * 0.05, { ry: a });
       break;
     case 'jammer_auds': // AUDS: a pan-and-tilt head carrying a large directional antenna
       h.box('dark', 0.5, 0.4, 0.4, 0, 0.2, 0);
-      h.box('body', 1.2, 0.9, 0.2, 0, 0.75, 0.2, { rx: -0.15 });
+      panel(h, 1.2, 0.9, 0, 0.75, 0.2, { rx: -0.15 });
       break;
     case 'jammer_jupiter': case 'jammer_sf': // vehicle jammers: a box of electronics under a cluster of whip antennas
       h.box('body', 0.8, 0.3, 0.8, 0, 0.15, 0);
       whips([[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3], [0, 0]], 0.9, 0.3);
       break;
-    default: // a fixed-site jammer: six sector antennas round the mast top, with whips above
-      for (let i = 0; i < 6; i++) { const a = (i * PI) / 3; h.box('body', 0.35, 1.0, 0.08, Math.sin(a) * 0.35, 0.5, Math.cos(a) * 0.35, { ry: a }); }
+    default: // a fixed-site jammer: six sector antennas round the mast top, each on its bracket, with whips above
+      for (let i = 0; i < 6; i++) {
+        const a = (i * PI) / 3, sx = Math.sin(a), cz = Math.cos(a);
+        h.cyl('body', 0.1, 1.0, sx * 0.4, 0.5, cz * 0.4, { seg: 8 });
+        for (const y of [0.2, 0.8]) h.strut('metal', [0, y, 0], [sx * 0.33, y, cz * 0.33], 0.04);
+      }
       whips([[-0.1, 0], [0.1, 0]], 0.6, 1.0);
   }
   return at;

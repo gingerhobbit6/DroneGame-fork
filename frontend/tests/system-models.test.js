@@ -25,7 +25,7 @@ describe('system models', () => {
   });
 
   it('draws one panel per fixed radar panel', () => {
-    const panels = (n) => buildModel({ ...STRUCTURES.radar_a400, panels: n }).parts.head.children.find((m) => m.material.emissiveIntensity > 0).geometry.attributes.position.count;
+    const panels = (n) => buildModel({ ...STRUCTURES.radar_a400, panels: n }).parts.head.children.find((m) => m.material.name === 'body').geometry.attributes.position.count;
     expect(panels(4)).toBe(panels(1) * 4);
   });
 

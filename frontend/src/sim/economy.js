@@ -8,6 +8,7 @@ const freshLedger = () => ({
   consumables: 0,            // spent on shots (interceptors, missiles, laser), including rounds bought in a resupply and not yet fired
   shots: {},                 // effector id -> { n, cost }: only what has been fired
   launched: {}, killed: {}, leaked: {}, escaped: {},   // drone type -> count
+  turned: {},                // drone type -> count jammed into turning for home, which then also left (escaped)
   killedBy: {},              // effector id (or 'jammer') -> { drone type -> count }
   terminals: { starlink: 0, cellular: 0 }, // network terminals bought (counted in capex)
   lost: {}, lostValue: 0,    // systems the enemy destroyed (id -> count) and what they were worth

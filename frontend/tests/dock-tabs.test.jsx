@@ -77,11 +77,11 @@ describe('learn tab', () => {
 
   it('follows a track through its messages', () => {
     running(MIXED, 0);
-    const tracked = () => [...game.sim.net.tracks.values()].some((t) => t.short);
-    for (let n = 0; n < 20000 && !tracked(); n += 200) game.sim.run(200); // drones start 13 km out, so play until one is tracked
+    const named = () => [...game.sim.net.tracks.values()].find((t) => t.short);
+    for (let n = 0; n < 40000 && !named(); n += 100) game.sim.run(100); // drones start 12 to 26 km out: play until one is tracked, before the defence clears the sky
     openDock('learn');
     refresh();
-    const tr = [...game.sim.net.tracks.values()].find((t) => t.short);
+    const tr = named();
     expect(tr).toBeTruthy();
     expect(followMessages(tr).length).toBeGreaterThan(0);
     fireEvent.change($('#follow'), { target: { value: tr.id } });

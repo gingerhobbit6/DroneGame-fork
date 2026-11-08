@@ -21,7 +21,7 @@ describe('engagements', () => {
   it('only ever happen near a real drone', () => {
     start(MIXED);
     const seen = new Set();
-    for (let n = 0; n < 12000 && !sim.state.over; n++) {
+    for (let n = 0; n < 40000 && !sim.state.over && seen.size <= 10; n++) {
       sim.step();
       if (!sim.state.waveActive) sim.commands.startWave();
       for (const s of sim.structures) {

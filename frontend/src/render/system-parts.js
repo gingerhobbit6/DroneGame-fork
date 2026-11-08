@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { STRUCT_SCALE, SYSTEM_UNIT_M, WORLD } from '../sim/config/index.js';
 import { clamp } from '../sim/units.js';
+import { modelMat, paintOf, vehiclePaintOf } from './paint.js';
 import { VIEW_HEIGHT, view } from './view.js';
 
 const { PI } = Math;
@@ -14,13 +15,16 @@ export const TRUE_UNIT = SYSTEM_UNIT_M / WORLD.metresPerUnit;
 export const drawnUnit = (zoom = view.zoom) => clamp((WORLD.systemOnScreen * VIEW_HEIGHT * zoom) / 3, TRUE_UNIT, STRUCT_SCALE);
 export const MAX_K = STRUCT_SCALE / TRUE_UNIT; // the most a system is drawn larger than life
 
+// body is the product's own paint and drab its vehicle's, cases' and boxes' (paint.js), matt; glass is a laser's dark window, which glints.
 export function systemMats(def) {
-  const std = (color, e = 0) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.3, emissive: color, emissiveIntensity: e, flatShading: true, side: THREE.DoubleSide });
-  return {
-    body: std(def.color, 0.3), metal: std(0x6b7480), dark: std(0x2a2f36), drab: std(0x5a6346), sand: std(0xb5a27f), glass: std(0xffffff, 0.6),
+  const mats = {
+    body: modelMat(paintOf(def), 0.55), metal: modelMat(0x7b828a, 0.4, 0.7), dark: modelMat(0x2a2d31, 0.75, 0.1),
+    drab: modelMat(vehiclePaintOf(def), 0.85, 0.05), glass: modelMat(0x1d2830, 0.08, 0.8, 1),
     figure: new THREE.MeshLambertMaterial({ vertexColors: true }), // a person, coloured by figures.js
     spin: new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide }),
   };
+  for (const [key, m] of Object.entries(mats)) m.name = key;
+  return mats;
 }
 
 // A tripod's legs and a fixed mast are built one unit tall in the riser kit r, which buildModel stretches: true height close

@@ -68,12 +68,13 @@ describe('reactive jamming', () => {
     const s = jammerWith({ receiver: 'hobby', technique: 'reactive' });
     for (const b of ['control900', 'gnss']) sim.commands.toggleJamBand(s, b, true);
     s.mode = 'Jam';
-    expect(jamming(s, eastOf(s, 'fpv', 500), sim.structures)).toEqual({ control: true, video: true, gnss: false, rate: REACTIVE_RATE });
+    // video: false throughout, as it is received by the operator 5 km further out, beyond this jammer
+    expect(jamming(s, eastOf(s, 'fpv', 500), sim.structures)).toEqual({ control: true, video: false, gnss: false, rate: REACTIVE_RATE });
     expect(jamming(s, eastOf(s, 'spotter', 500), sim.structures)).toBeNull(); // a tactical link
     sim.commands.configureUnit(s, 'receiver', 'tactical');
-    expect(jamming(s, eastOf(s, 'spotter', 500), sim.structures)).toEqual({ control: true, video: true, gnss: false, rate: REACTIVE_RATE });
+    expect(jamming(s, eastOf(s, 'spotter', 500), sim.structures)).toEqual({ control: true, video: false, gnss: false, rate: REACTIVE_RATE });
     sim.commands.configureUnit(s, 'technique', 'barrage');
-    expect(jamming(s, eastOf(s, 'spotter', 500), sim.structures)).toEqual({ control: true, video: true, gnss: true, rate: 1 });
+    expect(jamming(s, eastOf(s, 'spotter', 500), sim.structures)).toEqual({ control: true, video: false, gnss: true, rate: 1 });
     sim.commands.configureUnit(s, 'technique', 'reactive');
     sim.commands.configureUnit(s, 'receiver', 'off');
     expect(jamming(s, eastOf(s, 'fpv', 500), sim.structures)).toBeNull(); // nothing to hear the link with

@@ -3,13 +3,17 @@
 // wearable detector to warn it of drones with a radio link nearby. Guns with a radar of their own stay networked.
 // Costs are placeholders where no price is published; each `ref` says where the numbers come from.
 
-// How far a crew picks out a drone by eye in daylight: eyeBase metres, plus eyePerMetre for each metre of its span, up to eyeMax (a
-// quadcopter at about 115 m, a Shahed at 200 m), less in poor light though never below nightFloor of that (with night sights). A
-// wearable detector warns of a drone with a radio link within alertRange metres, so the crew is ready, and a jammer can be pointed
-// down its bearing. reaction: seconds from seeing a drone to firing or jamming, unless warned in time. ASSUMPTIONS.
-export const CREW = { eyeBase: 100, eyePerMetre: 40, eyeMax: 200, nightFloor: 0.5, alertRange: 400, reaction: 3 };
+// How far a crew picks out a drone by eye in daylight: where its span fills eyeAngle degrees, as half of the observers in field trials
+// saw a Phantom 4 at 245 m and a Mavic Air at 307 m, both at 0.065°. So a quadcopter at about 300 m and a Shahed at about 2.2 km, up to
+// eyeMax, less in poor light though never below nightFloor of that (with night sights). eyeMax is an ASSUMPTION for haze.
+// A crew hears a drone earRange metres off for each unit of its loudness (`sound`), as far as the small microphone node hears a small
+// first-person-view drone, half that in rain: an ASSUMPTION. A wearable detector warns of a drone with a radio link within alertRange
+// metres. Warned either way, the crew is ready, and a jammer can be pointed down the drone's bearing. reaction: seconds from seeing a
+// drone to firing or jamming, unless warned in time. ASSUMPTIONS apart from the angle.
+export const CREW = { eyeAngle: 0.065, eyeMax: 3000, nightFloor: 0.5, earRange: 300, alertRange: 400, reaction: 3 };
 
 const MG_SOURCES = [
+  { label: 'MDPI Applied Sciences: seeing a Mavic Air and a Phantom 4 by eye', url: 'https://www.mdpi.com/2076-3417/10/16/5501' },
   { label: 'British Army: general purpose machine gun', url: 'https://www.army.mod.uk/learn-and-explore/equipment/small-arms-and-support-weapons/general-purpose-machine-gun' },
   { label: 'British Army: heavy machine gun', url: 'https://www.army.mod.uk/learn-and-explore/equipment/small-arms-and-support-weapons/heavy-machine-gun' },
   { label: 'Ukrainian News: Shahed hit rates and mobile fire groups', url: 'https://ukranews.com/en/news/1015783-since-beginning-of-year-russians-launched-over-2-000-shaheds-across-ukraine-what-is-hit-percentage' },
@@ -23,24 +27,24 @@ const handheld = { role: 'effector', kind: 'jammer', model: 'jammer', fire: 'jam
 export const CREW_SYSTEMS = {
   gun_s: {
     ...crewGun, product: 'L7A2 general purpose machine gun on a vehicle pintle', size: 'S', name: 'Small gun', short: 'GPM', cost: 20000, shotCost: 25, color: 0xffcc80, published: 600,
-    pk: 0.08, damage: 40, cooldown: 1.5, missileSpeed: 840, magazine: 8, storage: 32, reloadTime: 20,
+    pk: 0.08, rangeLoss: 0.75, damage: 40, cooldown: 1.5, missileSpeed: 840, magazine: 8, storage: 32, reloadTime: 20,
     desc: 'A 7.62 mm machine gun on a pickup, fired by its gunner at drones in sight. Not networked: nothing cues it. Cheap and short-ranged.',
     ref: {
       class: 'Crew-served 7.62 mm machine gun', analogues: ['L7A2 GPMG', 'FN MAG'],
       published: 'The British Army gives 800 m in the light role and 1,800 m on a tripod, at 750 rounds a minute, from 100-round belts. No figure is published for air targets. Mobile fire groups in Ukraine down many Shaheds with machine guns, but they are poor above about 2 km up.',
-      basis: 'Hit chance 0.08 a burst, a 25-round burst a shot and game range 600 m, below the ground figures, are ASSUMPTIONS.',
+      basis: 'Hit chance 0.08 a burst, a 25-round burst a shot and game range 600 m, below the ground figures, are ASSUMPTIONS. Its chance falls to a quarter of that at its limit (rangeLoss), as a gun’s spread grows with distance and its rounds have no airburst to make up for it: an ASSUMPTION.',
       confidence: 'Army figures for ground fire; air performance is an assumption', sources: MG_SOURCES,
       cost: { capex: 'No price used. Game price $20,000 for the gun and its mount, and $25 a burst, are placeholders.', confidence: 'ASSUMPTION: tune this yourself', sources: [] },
     },
   },
   gun_50: {
     ...crewGun, product: 'L111A1 heavy machine gun (12.7 mm) on a vehicle pintle', variantOf: 'gun_s', size: 'S', name: 'Crewed .50 cal', short: 'L11', cost: 40000, shotCost: 150, color: 0xffb74d, published: 1000,
-    pk: 0.12, damage: 60, cooldown: 1.5, missileSpeed: 890, magazine: 6, storage: 24, reloadTime: 25,
+    pk: 0.12, rangeLoss: 0.75, damage: 60, cooldown: 1.5, missileSpeed: 890, magazine: 6, storage: 24, reloadTime: 25,
     desc: 'A .50 cal on a pickup or a Land Rover, fired by its gunner. Not networked. It outranges the GPMG, and a hit does more.',
     ref: {
       class: 'Crew-served 12.7 mm machine gun', analogues: ['L111A1 (Browning M2)'],
       published: 'The British Army gives 2,000 m against ground targets, at 485 to 635 rounds a minute, from 50-round belts. Heavy machine guns are reported as the most effective guns of Ukraine’s mobile fire groups, which were credited with up to 80% of Shahed kills at one point and about 20 to 40% in later estimates.',
-      basis: 'Hit chance 0.12 a burst, a 20-round burst a shot and game range 1 km are ASSUMPTIONS.',
+      basis: 'Hit chance 0.12 a burst, a 20-round burst a shot and game range 1 km are ASSUMPTIONS. Its chance falls to a quarter of that at its limit (rangeLoss), as a gun’s spread grows with distance and its rounds have no airburst to make up for it: an ASSUMPTION.',
       confidence: 'Army figures for ground fire; air performance is an assumption', sources: MG_SOURCES,
       cost: { capex: 'Game price $40,000 for the gun and its mount, and $150 a burst, are placeholders.', confidence: 'ASSUMPTION: tune this yourself', sources: [] },
     },

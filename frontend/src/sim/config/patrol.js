@@ -13,9 +13,10 @@ export const PATROL = {
 };
 
 // The vehicles a patrol can bring, from their published sizes. carries: the heaviest class of system it takes (MOUNTS). mast: how
-// high its system's antenna or sensor stands, in metres, an ASSUMPTION from photos of vehicle-mounted kit.
+// high its system's antenna or sensor stands, in metres, an ASSUMPTION from photos of vehicle-mounted kit. armour: a strike does
+// 1 / armour of its damage to a system on it, as armour keeps out the blast and fragments that wreck a soft vehicle: an ASSUMPTION.
 export const PATROL_VEHICLES = {
-  patria: { name: 'Patria 6x6', carries: 3, mast: 3.5, desc: 'Armoured six-wheeler, 7.5 by 2.9 m, over 100 km/h on roads. Carries anything that rides in a patrol.' },
+  patria: { name: 'Patria 6x6', carries: 3, mast: 3.5, armour: 2, desc: 'Armoured six-wheeler, 7.5 by 2.9 m, over 100 km/h on roads. Carries anything that rides in a patrol.' },
   hilux: { name: 'Toyota Hilux', carries: 2, mast: 3, desc: 'Double-cab pickup, 5.3 by 1.9 m, its system on the load bed. Carries light and medium systems.' },
   mule: { name: 'Mule UGV', carries: 1, mast: 2, desc: 'A tracked uncrewed carrier in the Milrem THeMIS class, 2.5 by 2.0 m, 20 km/h, up to 1,200 kg. Carries light systems.' },
 };

@@ -1,6 +1,6 @@
 // Low-poly models of each drone type, built in metres from its published span (`size`) and the outline in press photos: the
 // shapes are approximate, never measured. The nose points along +z. Parts are merged into one mesh per material (the body
-// in the drone's colour and the dark details), plus one mesh per propeller, named 'rotor', so the view can spin it.
+// in the drone's paint and the dark details), plus one group per propeller, named 'rotor', so the view can spin it.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -43,10 +43,11 @@ export function kit() {
       const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1, len = Math.hypot(dx, dy, dz);
       put(key, new THREE.BoxGeometry(w, h, len).rotateX(-Math.asin(dy / len)).rotateY(Math.atan2(dx, dz)), (x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
     },
-    // a spinning propeller, drawn as the faint disc it makes, turning about y (lifting) or z (pushing or pulling)
-    prop(len, x, y, z, axis = 'y') {
-      const g = new THREE.CylinderGeometry(len / 2, len / 2, len * 0.01, 16);
-      props.push({ g: axis === 'y' ? g : g.rotateX(Math.PI / 2), x, y, z, axis });
+    // a propeller turning about y (lifting) or z (pushing or pulling): its pitched blades and the faint disc they blur into
+    prop(len, x, y, z, axis = 'y', count = 2) {
+      const turn = (g) => (axis === 'y' ? g : g.rotateX(Math.PI / 2));
+      const blades = Array.from({ length: count }, (_, i) => new THREE.BoxGeometry(len / 2, len * 0.012, len * 0.08).rotateX(0.3).translate(len / 4, 0, 0).rotateY((i * 2 * Math.PI) / count));
+      props.push({ blades: turn(mergeGeometries(blades)), disc: turn(new THREE.CircleGeometry(len / 2, 16).rotateX(-Math.PI / 2)), x, y, z, axis });
     },
     finish(mats) {
       const g = new THREE.Group();
@@ -56,8 +57,9 @@ export function kit() {
         g.add(new THREE.Mesh(merged, mats[key]));
       }
       for (const p of props) {
-        const m = new THREE.Mesh(p.g, mats.spin);
-        m.position.set(p.x, p.y, p.z); m.name = 'rotor'; m.userData.axis = p.axis; g.add(m);
+        const r = new THREE.Group();
+        r.add(new THREE.Mesh(p.blades, mats.dark), new THREE.Mesh(p.disc, mats.spin));
+        r.position.set(p.x, p.y, p.z); r.name = 'rotor'; r.userData.axis = p.axis; g.add(r);
       }
       return g;
     },
@@ -156,8 +158,8 @@ function flyingWing(k, s) {
   k.prop(s * 0.12, 0, 0, -s * 0.12, 'z');
 }
 
-const lift = (k, s, motors, propLen, motorH = 0.05) => {
-  for (const [x, y, z] of motors) { k.post('dark', s * 0.035, s * motorH, x, y, z); k.prop(propLen, x, y + s * motorH, z); }
+const lift = (k, s, motors, propLen, motorH = 0.05, blades = 2) => {
+  for (const [x, y, z] of motors) { k.post('dark', s * 0.035, s * motorH, x, y, z); k.prop(propLen, x, y + s * motorH, z, 'y', blades); }
 };
 
 // Mavic, Mini and EVO: a compact body with folding arms (the back pair lower), a camera under the nose, and a small
@@ -204,7 +206,7 @@ function hexa(k, s) {
 function fpvQuad(k, s, _, def) {
   for (const a of [Math.PI / 4, -Math.PI / 4]) k.box('dark', s * 0.06, s * 0.015, s, 0, 0, 0, { ry: a });
   const d = s * 0.354, motors = [[d, 0, d], [-d, 0, d], [d, 0, -d], [-d, 0, -d]];
-  lift(k, s, motors, s * 0.56, 0.06);
+  lift(k, s, motors, s * 0.56, 0.06, 3); // small FPV propellers have three blades
   k.box('body', s * 0.14, s * 0.09, s * 0.28, 0, s * 0.06, -s * 0.02); // battery
   k.box('dark', s * 0.07, s * 0.07, s * 0.06, 0, s * 0.03, s * 0.17, { rx: -0.4 }); // camera
   k.lathe('body', [[-s * 0.25, s * 0.05], [s * 0.15, s * 0.06], [s * 0.3, 0]], { y: -s * 0.07, seg: 8 });

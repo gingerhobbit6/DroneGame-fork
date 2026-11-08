@@ -115,14 +115,14 @@ export const EFFECTORS = {
     product: 'Raytheon Coyote Block 2', size: 'M', name: 'Missile', short: 'MSL', cost: 1000000, shotCost: 200000, color: 0xff4081, role: 'effector', kind: 'missile', published: 10000, muzzleY: 2.2, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
     engagePolicy: 'fixed-wing', // the fusion node keeps this for fixed-wing tracks (or anything that gets close), to save the expensive rounds
-    pk: 0.98, damage: 70, splash: 40, fuze: 30, cooldown: 4, missileSpeed: 150, magazine: 4, storage: 8, reloadTime: 60,
+    pk: 0.98, damage: 70, splash: 40, fuze: 30, cooldown: 4, missileSpeed: 150, magazine: 4, storage: 8, reloadTime: 60, minRange: 300,
     desc: 'High-end guided missile that can hit the fixed-wing drones. Each round is expensive, so the fusion node saves it for fixed-wing tracks.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Guided'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Guided counter-UAS interceptor missile',
       analogues: ['Raytheon Coyote Block 2'],
       published: 'Range 10–15 km reported; speed figures conflict (about 100–160 m/s).',
-      basis: 'Game range 10 km is the low end of the reported band; speed is 150 m/s. Splash radius and fuze are assumptions. The magazine of 4 follows the four-round FS-LIDS launcher; storage and reload time are ASSUMPTIONS. Hit chance 0.98 is set by its class, as no rate was found for it: 2 points below NASAMS, the one missile with a published rate (94% in Ukraine). The US Army reports 170 and later about 600 kills, but no rate.',
+      basis: 'Game range 10 km is the low end of the reported band; speed is 150 m/s. Splash radius and fuze are assumptions. The magazine of 4 follows the four-round FS-LIDS launcher; storage and reload time are ASSUMPTIONS. Hit chance 0.98 is set by its class, as no rate was found for it: 2 points below NASAMS, the one missile with a published rate (94% in Ukraine). The US Army reports 170 and later about 600 kills, but no rate. Its 300 m minimum range is an ASSUMPTION, the published Starstreak figure: a missile needs that far to arm and turn onto its target, so a drone closer than that is left to something else.',
       confidence: 'Secondary reporting; no manufacturer numbers',
       sources: [
         { label: 'TWZ: Coyote kills', url: 'https://www.twz.com/air/army-coyote-drone-hunting-drones-have-scored-170-combat-kills' },
@@ -217,14 +217,14 @@ export const EFFECTORS = {
   missile_s: {
     product: 'Frankenburg Mark I', size: 'S', name: 'Small missile', short: 'MSS', model: 'missile', modelScale: 0.7, cost: 100000, shotCost: 45000, color: 0xff80ab, role: 'effector', kind: 'missile', published: 2000, muzzleY: 2.2, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
-    pk: 0.98, damage: 50, splash: 15, fuze: 15, cooldown: 2, missileSpeed: 200, magazine: 4, storage: 12, reloadTime: 30,
+    pk: 0.98, damage: 50, splash: 15, fuze: 15, cooldown: 2, missileSpeed: 200, magazine: 4, storage: 12, reloadTime: 30, minRange: 300,
     desc: 'Very short-range guided micro-missile, made to be cheap enough to fire at small drones. It will take any drone it can reach.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Guided'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Ultra-short-range guided micro-missile',
       analogues: ['Frankenburg Mark I'],
       published: 'Range around 2 km, length around 65 cm. Reported at about 40,000 euros or francs a missile; the source gives both.',
-      basis: 'Game range is the reported 2 km. Speed, damage, launch rate, magazine, storage and reload time are ASSUMPTIONS: no source read gave them. Hit chance 0.98 is set by its class, as no rate was found for it: 2 points below NASAMS, the one missile with a published rate (94% in Ukraine).',
+      basis: 'Game range is the reported 2 km. Speed, damage, launch rate, magazine, storage and reload time are ASSUMPTIONS: no source read gave them. Hit chance 0.98 is set by its class, as no rate was found for it: 2 points below NASAMS, the one missile with a published rate (94% in Ukraine). Its 300 m minimum range is an ASSUMPTION, the published Starstreak figure: a missile needs that far to arm and turn onto its target, so a drone closer than that is left to something else.',
       confidence: 'Press reports; no manufacturer datasheet read',
       sources: [{ label: 'Blue News: a 65 cm missile', url: 'https://www.bluewin.ch/en/news/international/a-65-centimetre-missile-is-now-supposed-to-stop-putin-li.2959490' }],
       cost: {
@@ -238,16 +238,16 @@ export const EFFECTORS = {
     product: 'NASAMS with AIM-120 AMRAAM', size: 'L', name: 'Large missile', short: 'MLL', model: 'missile', modelScale: 1.4, cost: 5000000, shotCost: 1169000, color: 0xc51162, role: 'effector', kind: 'missile', published: 25000, muzzleY: 2.2, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
     engagePolicy: 'fixed-wing',
-    pk: 1, damage: 100, splash: 40, fuze: 30, cooldown: 5, missileSpeed: 400, magazine: 6, storage: 12, reloadTime: 600,
+    pk: 1, damage: 100, splash: 40, fuze: 30, cooldown: 5, missileSpeed: 400, magazine: 6, storage: 12, reloadTime: 600, minRange: 1000,
     desc: 'Medium-range air-defence missile that reaches across the whole map. Each round costs over a million dollars, so the fusion node saves it for fixed-wing tracks.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Guided'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Medium-range surface-to-air missile launcher',
       analogues: ['NASAMS', 'AIM-120 AMRAAM'],
       published: 'Wikipedia gives a horizontal range of up to 25 km for the standard AMRAAM in its text, and 40 km for NASAMS 2 in its summary. A launcher holds six missiles.',
-      basis: 'Game range is the lower 25 km figure, and the magazine the six-round launcher. Speed is held at 400 m/s, below the real missile, so it cannot jump past a target in one simulation step. Storage, reload time and damage are ASSUMPTIONS. Hit chance 1.0 makes about 92% of its rounds kill a Shahed in play, close to the 94% the Norwegian Air Force gave for NASAMS in Ukraine over about 900 targets, most of them cruise missiles. What the 94% counts is not stated.',
+      basis: 'Game range is the lower 25 km figure, and the magazine the six-round launcher. Speed is held at 400 m/s, below the real missile, so it cannot jump past a target in one simulation step. Storage, reload time and damage are ASSUMPTIONS. Hit chance 1.0 makes about 92% of its rounds kill a Shahed in play, close to the 94% the Norwegian Air Force gave for NASAMS in Ukraine over about 900 targets, most of them cruise missiles. What the 94% counts is not stated. Its 1 km minimum range is an ASSUMPTION, the bound reported for CAMM, the other missile of its class.',
       confidence: 'Secondary reporting; the sources conflict on range',
-      sources: [{ label: 'Wikipedia: NASAMS', url: 'https://en.wikipedia.org/wiki/NASAMS' }, { label: 'Militarnyi: NASAMS 94% effective', url: 'https://militarnyi.com/en/news/nasams-air-defense-system-destroys-900-targets-in-ukraine-with-94-efficiency/' }],
+      sources: [{ label: 'Wikipedia: CAMM, under 1 km minimum', url: 'https://en.wikipedia.org/wiki/CAMM_(missile_family)' }, { label: 'Wikipedia: NASAMS', url: 'https://en.wikipedia.org/wiki/NASAMS' }, { label: 'Militarnyi: NASAMS 94% effective', url: 'https://militarnyi.com/en/news/nasams-air-defense-system-destroys-900-targets-in-ukraine-with-94-efficiency/' }],
       cost: {
         capex: 'Per shot $1.169 million, the FY2026 figure from a US Air Force budget, as reported. Game price $5 million is a placeholder for one launcher alone, so that it fits the budget at all: a whole battery costs far more.',
         confidence: 'Budget figure for the round, read second-hand; launcher is an ASSUMPTION',
@@ -305,14 +305,14 @@ export const EFFECTORS = {
   gun_hmg: {
     product: '12.7 mm machine gun on a remote weapon station', size: 'M', name: 'Heavy machine gun', short: 'HMG', model: 'gun', cost: 250000, shotCost: 150, color: 0xffab40, role: 'effector', kind: 'gun', published: 1200, muzzleY: 1.2, fire: 'guided', mobile: 'vehicle',
     health: 30, signature: 0.1, emits: [],
-    pk: 0.2, damage: 60, splash: 0, fuze: 3, cooldown: 1.5, missileSpeed: 850, magazine: 20, storage: 60, reloadTime: 60,
+    pk: 0.2, rangeLoss: 0.75, damage: 60, splash: 0, fuze: 3, cooldown: 1.5, missileSpeed: 850, magazine: 20, storage: 60, reloadTime: 60,
     desc: 'A heavy machine gun on a remote weapon station, here on a Hilux: the mobile fire groups that down many Shaheds over Ukraine. Cheap to fire and short-ranged, and its gunner needs to see the drone.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Gun'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Heavy machine gun on a remote weapon station',
       analogues: ['Kongsberg Protector RS4 with M2 .50', 'mobile fire groups with 12.7 mm guns'],
       published: 'Ukrainian officials credited mobile fire groups with machine guns with up to 80% of Shahed kills at one point, later about 40%, with experts at about 20%. Machine guns stop being effective above about 2 km. Kongsberg says its Protector stations can be counter-UAS enabled, and Poland is buying 12.7 mm guns for counter-UAS. No hit rate or rounds per kill was found.',
-      basis: 'Game range 1.2 km is an ASSUMPTION within the 2 km reported limit. One shot is a 20-round burst. Hit chance 0.2 a burst (with no airburst, a burst must hit) and the rest are ASSUMPTIONS.',
+      basis: 'Game range 1.2 km is an ASSUMPTION within the 2 km reported limit. One shot is a 20-round burst. Hit chance 0.2 a burst (with no airburst, a burst must hit) and the rest are ASSUMPTIONS. Its chance falls to a quarter of that at its limit (rangeLoss), as a gun’s spread grows with distance and its rounds have no airburst to make up for it: an ASSUMPTION.',
       confidence: 'Reported share of kills; performance is an assumption',
       sources: [
         { label: 'Ukraine’s Arms Monitor: stopping Shaheds', url: 'https://ukrainesarmsmonitor.substack.com/p/stopping-shaheds-ukraines-solutions' },

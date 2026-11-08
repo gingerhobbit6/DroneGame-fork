@@ -9,8 +9,10 @@ import { DRAG_TYPE } from '../drag.js';
 import { useGame } from './hooks.js';
 
 const km = (m) => `${(m / 1000).toFixed(1)} km`;
-// A sensor's range is against a small drone: the second figure shows how much further it sees a large one.
-export const reachText = (def) => (def.role === 'sensor' ? `${km(def.range)} small drone · ${km(reachFor(def, DRONES.spotter))} large` : km(def.range));
+// A sensor's range is against a small drone: the second figure shows how much further it sees a large one. A missile cannot engage
+// anything closer than its minimum range.
+export const reachText = (def) => (def.role === 'sensor' ? `${km(def.range)} small drone · ${km(reachFor(def, DRONES.spotter))} large`
+  : def.minRange ? `${km(def.minRange)} to ${km(def.range)}` : km(def.range));
 
 // Starts a drag of `item` ({ system } or { people }), so the map can place it where it is let go.
 export function dragProps(game, item, enabled = true) {

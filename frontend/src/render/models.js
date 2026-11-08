@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { DRONES } from '../sim/config/index.js';
 import { buildDrone, kit } from './drone-models.js';
 import { MAX_K, systemMats } from './system-parts.js';
+import { modelMat, paintOf } from './paint.js';
 import { radar, rf, camera, acoustic, jammer } from './sensor-models.js';
 import { interceptor, missile, laser } from './effector-models.js';
 import { gun } from './gun-models.js';
@@ -31,11 +32,22 @@ export function buildModel(def) {
     r.scale.y = m; h.position.y = rise.y0 + m;
   };
   raise(MAX_K);
+  g.add(foot(g, def.color));
+  g.traverse((o) => { if (o.isMesh) o.castShadow = !o.material.transparent; }); // a see-through part would cast a solid shadow
   return { group: g, parts: { head: h, spin: spin ? h : null, raise } };
 }
 
-const rotorMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide });
-const darkMat = new THREE.MeshStandardMaterial({ color: 0x333840, roughness: 0.7, flatShading: true, side: THREE.DoubleSide });
+// A thin ring in the system's map colour round the foot of its model, so its kind still shows now the model wears real paint.
+function foot(g, color) {
+  const box = new THREE.Box3().setFromObject(g), r = Math.max(0.5, Math.hypot(Math.max(-box.min.x, box.max.x), Math.max(-box.min.z, box.max.z))) + 0.1;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.1, r, 48).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+  ring.position.y = 0.04; ring.name = 'foot';
+  return ring;
+}
+
+const rotorMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide });
+let darkMat = null; // made with the first drone, after game-view.js has made the models' reflection
 const unseenMat = new THREE.MeshBasicMaterial({ color: 0x8a94a3, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
 
 // One shared model per drone type, plus a grey copy for drones that no sensor has (shown when the truth overlay is on).
@@ -44,8 +56,10 @@ export function droneTemplate(type, unseen) {
   const key = type + (unseen ? ':unseen' : '');
   if (droneTemplates[key]) return droneTemplates[key];
   const def = DRONES[type];
-  const body = unseen ? unseenMat : new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.4, roughness: 0.5, flatShading: true, side: THREE.DoubleSide });
+  darkMat ??= modelMat(0x26282c, 0.6, 0.2); // carbon frames, motors and blades
+  const body = unseen ? unseenMat : modelMat(paintOf(def), 0.5);
   const g = buildDrone(def, unseen ? { body, dark: body, spin: body } : { body, dark: darkMat, spin: rotorMat });
+  if (!unseen) g.traverse((o) => { if (o.isMesh) o.castShadow = !o.material.transparent; });
   droneTemplates[key] = g;
   return g;
 }

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CREW, DRONES, STRUCTURES, TOOLBAR, resetAllFigures } from '../src/sim/config/index.js';
 import { ENV } from '../src/sim/conditions.js';
 import { createSimulation } from '../src/sim/simulation.js';
-import { sightRange } from '../src/sim/crew.js';
+import { hearingRange, sightRange } from '../src/sim/crew.js';
 import { jamReaches } from '../src/sim/jamming.js';
 import { hereU, u } from '../src/sim/units.js';
 import { setUp } from './support/scenarios.js';
@@ -41,12 +41,32 @@ describe('a crew off the network', () => {
     expect(gun.uplink).toBeFalsy();
   });
 
-  it('sees a drone 100 to 200 m off by eye, the bigger the further, and less at night', () => {
+  it('sees a drone where its span fills 0.065° by eye, as observers in field trials did, and less at night', () => {
     const at = (type) => sightRange({ def: DRONES[type] });
-    expect(at('fpv7inch')).toBeGreaterThanOrEqual(100); expect(at('fpv7inch')).toBeLessThan(120);
-    expect(at('shahed136')).toBe(200);
+    expect(at('fpv7inch')).toBeGreaterThan(280); expect(at('fpv7inch')).toBeLessThan(300); // the trials: a Phantom 4 at 245 m, a Mavic Air at 307 m
+    expect(at('shahed136')).toBeGreaterThan(2100); expect(at('shahed136')).toBeLessThan(2300);
+    expect(at('wingloong2')).toBe(CREW.eyeMax);
     ENV.now = 'night';
-    expect(at('shahed136')).toBe(200 * CREW.nightFloor);
+    expect(at('shahed136')).toBeCloseTo((2.5 / Math.tan((CREW.eyeAngle * Math.PI) / 180)) * CREW.nightFloor, 6); // with night sights, never below the floor
+    expect(at('wingloong2')).toBe(CREW.eyeMax * CREW.nightFloor);
+  });
+
+  it('hears a loud drone further off than it sees a small one, without a line of sight, and less in rain', () => {
+    expect(hearingRange({ def: DRONES.fpv7inch })).toBe(CREW.earRange);
+    expect(hearingRange({ def: DRONES.shahed136 })).toBe(CREW.earRange * DRONES.shahed136.sound);
+    ENV.now = 'rain';
+    expect(hearingRange({ def: DRONES.shahed136 })).toBe(CREW.earRange * DRONES.shahed136.sound * 0.5);
+  });
+
+  it('points a handheld jammer at a silent drone it can hear but not see', () => {
+    sim.addStructure('jammer_skywiper', ...SPOT);
+    sim.commands.startWave();
+    ENV.now = 'night'; // a Shahed is seen at about 1.1 km with night sights, and heard at 1.5 km
+    const jam = placed('jammer_skywiper'), d = droneAt('shahed136', 1300, 300); // no radio link to warn of
+    expect(sightRange(d)).toBeLessThan(1300);
+    stepFor(CREW.reaction + 1);
+    expect(jam.mode).toBe('Jam');
+    expect(jam.task.drone).toBe(d);
   });
 
   it('keeps the guns with a radar of their own networked', () => {
