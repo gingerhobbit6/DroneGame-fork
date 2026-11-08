@@ -31,6 +31,24 @@ describe('a world from any source', () => {
     expect(w.onBuilding(-8, 0)).toBe(false); // an unmarked cell stays free, so no laydown that worked before can stop working
   });
 
+  it('finds the same building a scan of every one would, filed by square', () => {
+    const rng = mulberry32(5);
+    const houses = Array.from({ length: 400 }, () => ({ x: (rng() - 0.5) * 2000, z: (rng() - 0.5) * 2000, w: 5 + rng() * 60, d: 5 + rng() * 30, h: 8, angle: rng() * Math.PI }));
+    houses.push({ x: 0, z: 0, w: 900, d: 4, h: 8, angle: 0.3 }); // a long wall across many squares
+    const w = makeWorld({ ...emptyGrids(11, 20, 100), ...features, buildings: houses, geo: {} });
+    const scan = (x, z) => houses.find((b) => {
+      const dx = x - b.x, dz = z - b.z, c = Math.cos(b.angle), s = Math.sin(b.angle);
+      return Math.abs(dx * c - dz * s) <= b.w / 2 + 1 && Math.abs(dx * s + dz * c) <= b.d / 2 + 1;
+    }) || null;
+    let found = 0;
+    for (let i = 0; i < 20000; i++) {
+      const x = (rng() - 0.5) * 2200, z = (rng() - 0.5) * 2200, b = w.buildingAt(x, z);
+      expect(b).toBe(scan(x, z));
+      if (b) found++;
+    }
+    expect(found).toBeGreaterThan(100);
+  });
+
   it('answers the rules from its grids', () => {
     const grids = emptyGrids(11, 20, 100); // posts from -100 to 100 m
     const post = (x, z) => ((z + 100) / 20) * 11 + (x + 100) / 20;

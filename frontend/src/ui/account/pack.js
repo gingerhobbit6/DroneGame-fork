@@ -8,7 +8,7 @@ import { unitCost } from '../../sim/unit-config.js';
 export const AccountContext = createContext(null);
 export const useAccount = () => useContext(AccountContext);
 
-export const emptyAssets = () => ({ systems: [], vehicles: [], people: [] });
+const emptyAssets = () => ({ systems: [], vehicles: [], people: [] });
 export const blankPack = () => ({ name: '', echelon: 'section', callsign: '', assets: emptyAssets() });
 
 export function packTotals({ systems = [], vehicles = [], people = [] }) {

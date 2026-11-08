@@ -3,7 +3,6 @@
 import * as S from '../sapient.js';
 import { FUSION, DRONES } from '../config/index.js';
 import { canFire } from '../magazine.js';
-import { DETECT_PX, IDENTIFY_PX, zoomMax } from '../camera-model.js';
 import { coverArc, inArcOf } from '../sensor-model.js';
 import { bandGhz } from '../rf-model.js';
 import { antennaHeight, reachOnPath, typicalAltitude } from '../site-range.js';
@@ -11,6 +10,7 @@ import { terrainState } from '../terrain.js';
 import { canFollow, hears } from '../jamming.js';
 import { burnTime, hitChance, meetTime } from '../hit-chance.js';
 import { threatLibrary } from './threats.js';
+import { cueCameras } from './cameras.js';
 
 // s: a jammer on its own receiver that has heard nothing for this long stops to listen. It switches once a second, so a barrage, deaf to
 // the bands it fills, jams 3 s in every 4: an assumption.
@@ -18,6 +18,9 @@ const LOOK = 2.5;
 // Pairing: an effector is in the running for a track with at least this share of the best chance any free one has at it. A beam's cost
 // is reckoned on a drone of this many hit points when the track has no model. Assumptions.
 const FAIR = 0.5, BEAM_HP = 20;
+// s: how long a kill is still credited to an engagement given up while its rounds may be in the air. Longer than a round flies.
+const RELEASED_FOR = 30;
+const DESTROYED = 'target destroyed or removed';
 
 // Would this effector ever take this airframe? Unknown tracks are offered, and the effector can reject them.
 const takesAirframe = (def, airframe) => !def.engages || !airframe || airframe === 'Unknown' || def.engages.some((t) => DRONES[t].airframe === airframe);
@@ -115,8 +118,19 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     send(S.envelope(s.nodeId, 'task_ack', body), s.nodeId, fusion.nodeId);
   }
 
+  // Engagements given up (a re-task, a launcher that has just fired its last) while rounds may still be flying at them: a kill they
+  // make is still reported, so the fusion node waits for the sensors rather than cueing others at a dead track.
+  let released = [];
+  function watchKill(trackId, by) {
+    const tr = tracker.tracks.get(trackId);
+    if (!tr || tr.killWatch) return;
+    tr.killWatch = { t: T(), lastT: tr.lastT, by };
+    raiseAlert('information', `Kill reported by ${by} on ${tr.short}: waiting for sensors to confirm`, null, 'DISCRETE_PRIORITY_LOW', tr);
+  }
+
   function completeTask(s, status, reasons) {
     if (!s.task) return;
+    if (reasons?.[0] !== DESTROYED) released.push({ drone: s.task.drone, trackId: s.task.trackId, by: s.name, until: T() + RELEASED_FOR });
     sendTaskAck(s, s.task.id, status, reasons);
     s.task = null;
     sendStatus(s);
@@ -177,46 +191,6 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     return true;
   }
 
-  // Point each camera at the most useful track: radar finds things, the camera is then cued to classify them, unclassified first.
-  // It comes back to a classified track once it is close enough to name its model, but an unclassified one cuts that look short.
-  // Uses the SAPIENT Task `look_at` command. With nothing to look at, a camera sweeps (and rarely catches anything).
-  function cueCameras(live) {
-    for (const s of nodes.values()) {
-      if (!s.def.fov || s.offline) continue;
-      const dwelling = s.cue && T() < s.cue.until && tracker.tracks.has(s.cue.trackId);
-      if (dwelling && !s.cue.identify) continue; // still dwelling on a live track
-      let best = null, bs = Infinity;
-      const reach = s.def.range * zoomMax(s.def), identifyAt = (reach * DETECT_PX) / IDENTIFY_PX; // where a typical drone can be named to its model
-      for (const tr of live) {
-        const dist = distToTrack(s, tr);
-        if (dist > reach * 1.3) continue; // it zooms in on a cue
-        const looked = s.lookedAt.get(tr.id);
-        if (tr.airframe !== 'Unknown' && looked !== undefined && (tr.model || dist > identifyAt)) continue; // classified, and identified or too far to be
-        if (looked !== undefined && T() - looked < 4) continue;
-        const score = (tr.airframe === 'Unknown' ? 0 : 1e6) + siteDist(tr);
-        if (score < bs) { bs = score; best = tr; }
-      }
-      if (dwelling && best?.airframe !== 'Unknown') continue; // only an unclassified track cuts short a look to name a model
-      if (best) {
-        const identify = best.airframe !== 'Unknown';
-        const loc = S.location(best.est.east, best.est.north, best.est.up, Math.max(best.estErr, 5));
-        const { id, res } = sendTask(s, { control: 'CONTROL_START', command: { look_at: { location_list: { locations: [loc] } } } }, `Look at ${best.short}`, `Slew to track ${best.short} and dwell`);
-        s.lookedAt.set(best.id, T());
-        deliver(res, () => { // the camera turns once the task arrives
-          s.cue = { trackId: best.id, until: T() + s.def.dwell, from: T(), onAt: null, identify };
-          s.mode = 'Track';
-          sendTaskAck(s, id, 'TASK_STATUS_ACCEPTED');
-          sendStatus(s, true);
-        });
-      } else if (s.mode !== 'Search' && s.modePending !== 'Search') {
-        const { id, res } = sendTask(s, { control: 'CONTROL_START', command: { mode_change: 'Search' } }, 'Mode Search', `Return ${s.name} to its search sweep`);
-        s.modePending = 'Search';
-        deliver(res, () => { s.cue = null; s.mode = 'Search'; s.modePending = null; sendTaskAck(s, id, 'TASK_STATUS_ACCEPTED'); sendStatus(s, true); });
-        if (res.dropped) s.modePending = null;
-      }
-    }
-  }
-
   // Does this jammer's own receiver hear a drone it would jam? Through its own barrage it hears nothing on the bands it fills, so having
   // heard nothing for LOOK seconds it switches off to listen, and back on at once if something is still there.
   function hearsThreat(s) {
@@ -256,7 +230,10 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     const live = confirmedTracks();
     believe = threatLibrary(ctx.expected?.());
     reachMemo = new Map();
-    cueCameras(live);
+    released = released.filter((r) => { if (r.drone?.dead) { watchKill(r.trackId, r.by); return false; } return T() < r.until; });
+    // what each node remembers about tracks that have gone: a track id never comes back, so it is only clutter
+    for (const s of nodes.values()) for (const seen of [s.lookedAt, s.rejected, s.denied]) for (const id of seen?.keys() ?? []) if (!tracker.tracks.has(id)) seen.delete(id);
+    cueCameras(core, live, { sendTask, sendTaskAck, sendStatus });
     const free = [];
     for (const s of nodes.values()) {
       if (s.def.networked === false) continue; // its crew works it by hand (crew.js)
@@ -272,11 +249,8 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
       if (s.task) {
         const d = s.task.drone, tr = tracker.tracks.get(s.task.trackId);
         if (d.dead) { // the effector reports the target gone; the fusion node then waits for the sensors to agree
-          completeTask(s, 'TASK_STATUS_COMPLETED', ['target destroyed or removed']);
-          if (tr && !tr.killWatch) {
-            tr.killWatch = { t: T(), lastT: tr.lastT, by: s.name };
-            raiseAlert('information', `Kill reported by ${s.name} on ${tr.short}: waiting for sensors to confirm`, null, 'DISCRETE_PRIORITY_LOW', tr);
-          }
+          completeTask(s, 'TASK_STATUS_COMPLETED', [DESTROYED]);
+          if (tr) watchKill(tr.id, s.name);
         }
         else if (!tr) completeTask(s, 'TASK_STATUS_FAILED', ['track lost']);
         else if (!inEnvelope(s, tr)) {
@@ -335,5 +309,9 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     }
   }
 
-  return { assign, tasking, reset: () => softKill.clear() };
+  // An operator's approval goes ahead only if the engagement still makes sense: while they decided, the track may have come inside the
+  // launcher's minimum range or turned away, or the launcher may have emptied or lost contact.
+  const approve = (s, tr) => { if (!s.offline && canFire(s) && takes(s, tr)) assign(s, tr, true); };
+
+  return { assign, approve, tasking, reset: () => { softKill.clear(); released = []; } };
 }

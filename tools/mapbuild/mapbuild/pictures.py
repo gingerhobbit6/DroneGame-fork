@@ -84,6 +84,7 @@ def composite(layers: list[np.ndarray]) -> np.ndarray:
 
 def satellite(window: Window, years: list[int], say, crs: int = BRITISH_CRS) -> tuple[list[dict], int | None]:
     """Returns the picture, and the year to credit. If too few scenes are clear, the pack simply has no satellite layer."""
+    # PROJ_NETWORK lets PROJ fetch the OSTN15 datum-shift grid from cdn.proj.org, for an exact fit to the national grid (see docs/SECURITY_NOTES.md)
     os.environ.update(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif", GDAL_HTTP_MAX_RETRY="3", GDAL_HTTP_RETRY_DELAY="2", PROJ_NETWORK="ON")
     size = 2 * window.half // SATELLITE_M
     transform = from_origin(window.west, window.top, SATELLITE_M, SATELLITE_M)

@@ -112,9 +112,13 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     if (fieldsFor(id).includes(field)) setSetting(loadoutFor(id), field, id, value);
     bump();
   }
-  // A deployed pack's lines: each system is placed with the settings its line holds, or the catalogue's.
+  // A deployed pack's lines: each system is placed with the settings its line holds, or the catalogue's. With no pack (null), the
+  // systems the last one set go back to the catalogue's settings, and its price.
+  let fromPack = [];
   function usePackLoadouts(lines) {
-    for (const l of lines) loadouts[l.id] = cleanSettings(l.id, l.settings);
+    for (const id of fromPack) delete loadouts[id];
+    fromPack = (lines ?? []).map((l) => l.id);
+    for (const l of lines ?? []) loadouts[l.id] = cleanSettings(l.id, l.settings);
     bump();
   }
   // With a pack's kit, a hotkey opens its kind's list of what the pack holds rather than picking a system to place.
@@ -202,7 +206,6 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   // Starting wave 1 rebuilds every system, with a new id and perhaps a new callsign. Only its position is sure to be the same.
   const rebuilt = (was) => was && sim.structures.find((s) => s.def.id === was.def.id && s.pos.x === was.pos.x && s.pos.z === was.pos.z) || null;
-  sim.on('reset', () => { view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); }); // the ground view stays on its system too
 
   // when the fusion node asks the operator to authorise an engagement, stop the clock so there is time to decide
   let pausedForApproval = false, simAcc = 0;
@@ -223,7 +226,10 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       pausedForApproval = false;
     },
   };
+  // One handler, in this order: the selection and ground view move to the rebuilt systems before the views are cleared, and the replay
+  // is left (which can set the speed) before the speed is set for the new run.
   sim.on('reset', ({ kept, begin, loading }) => {
+    view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); // the ground view stays on its system too
     if (replay) replay.reset();
     if (gameView) gameView.clear();
     simAcc = 0; pausedForApproval = false;
@@ -298,8 +304,9 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (key === 'planView' && gameView) gameView.viewFromAbove(value);
       if (['baseMap', 'mapRoads', 'mapGrid', 'mapContours'].includes(key) && gameView) {
         view.mapLoading = true;
+        const world = sim.state.terrainSeed;
         gameView.refreshMap().then((live) => {
-          if (live?.stale) return;
+          if (live?.stale) { if (sim.state.terrainSeed !== world) { view.mapLoading = false; bump(); } return; } // a newer paint has it, unless the world changed
           view.mapLoading = false;
           bump();
           if (live?.total && live.failed === live.total) { view.baseMap = 'os'; toast('The live map could not load: it needs an internet connection'); gameView.refreshMap().catch(() => {}); bump(); }

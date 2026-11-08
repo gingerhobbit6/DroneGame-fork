@@ -14,6 +14,7 @@ import { u } from '../sim/units.js';
 import { SYMBOL_PX, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
 import { view } from './view.js';
 import { createTrail } from './trail.js';
+import { setText } from './labels.js';
 
 const CLASS_COLOUR = { Unknown: 0xffffff, Multirotor: 0xff5a3c, 'Fixed wing': 0xe040fb };
 const CLASS_DIM = { Unknown: 0x9aa4b4, Multirotor: 0xa8938e, 'Fixed wing': 0x9d93aa };
@@ -87,7 +88,7 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
         b.label.style.top = ((1 - _p.y) / 2) * innerHeight + 'px';
         const cls = tr.model ?? (tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV');
         const err = `±${Math.round(tr.estErr || 0)} m`;
-        b.label.textContent = tr.status === 'tentative' ? `tentative ${err}` : `${tr.short} · ${cls} ${err}${tr.status === 'coasting' ? ' · coasting' : ''}`;
+        setText(b.label, tr.status === 'tentative' ? `tentative ${err}` : `${tr.short} · ${cls} ${err}${tr.status === 'coasting' ? ' · coasting' : ''}`);
       }
     }
     // bearing candidates: rays from the sensor, coloured by sensor type

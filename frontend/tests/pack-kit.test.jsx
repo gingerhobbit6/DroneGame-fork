@@ -9,6 +9,7 @@ import { createGame } from '../src/game.js';
 import { DRONES, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { effectorFor, kitLeft, sensorChecklist, stepStatus } from '../src/ui/assistant/guide.js';
 import { closestOnPath } from '../src/sim/effectors.js';
+import { fieldsFor } from '../src/sim/unit-config.js';
 import { magazineWord, updateMagazine } from '../src/sim/magazine.js';
 import { hereU, u } from '../src/sim/units.js';
 import { view } from '../src/render/view.js';
@@ -61,6 +62,14 @@ describe('a deployed pack limits what can be placed', () => {
     expect(game.loadoutFor('radar_a800')).toEqual({ mount: 12, clutter: 'high' });
     expect(game.sim.commands.place('radar_a800', 30, 0, game.loadoutFor('radar_a800'))).toBeNull();
     expect(game.sim.structures.at(-1).def.settings).toEqual({ mount: 12, clutter: 'high' });
+  });
+
+  it("puts the settings back to the catalogue's once the pack is withdrawn", () => {
+    game.setLoadout('radar', fieldsFor('radar').find((f) => f.key === 'mount'), 9); // the player's own choice for a system the pack does not hold
+    game.usePackLoadouts([{ id: 'radar_a800', count: 1, settings: { mount: 12 } }]);
+    game.usePackLoadouts(null);
+    expect(game.loadoutFor('radar_a800')).toEqual({});
+    expect(game.loadoutFor('radar').mount).toBe(9);
   });
 });
 
@@ -149,6 +158,20 @@ describe('choosing a pack on the start screen', { timeout: 30000 }, () => {
   it('is not there without an account', () => {
     start({ user: null });
     expect($('#start-pack')).toBeNull();
+  });
+
+  it('lists a pack built in the profile once the profile closes', async () => {
+    game.sim.commands.leave();
+    const value = { user: USER, activeUnit: null, deploy: vi.fn(), openProfile: vi.fn(), covered: false };
+    const page = (account) => <GameContext.Provider value={game}><AccountContext.Provider value={account}><Overlay /></AccountContext.Provider></GameContext.Provider>;
+    const { rerender } = render(page(value));
+    await settle();
+    expect($('#start-pack').textContent).toContain('You have no packs yet.');
+    await api.units.create(PACK);
+    rerender(page({ ...value, covered: true })); // the profile, where it was built
+    rerender(page({ ...value, covered: false }));
+    await settle();
+    expect([...$('#start-pack-select').options].map((o) => o.textContent)).toContain('1 Troop (1 sensor · 2 effectors)');
   });
 });
 

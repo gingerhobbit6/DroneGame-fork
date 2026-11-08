@@ -10,7 +10,7 @@ import { u } from '../sim/units.js';
 import { buildModel } from './models.js';
 import { TRUE_UNIT, drawnUnit } from './system-parts.js';
 import { drapedRing } from './terrain-view.js';
-import { hexCss } from './labels.js';
+import { hexCss, setText } from './labels.js';
 import { SYMBOL_OVER, symbolScale, symbolSprite } from './symbols.js';
 import { wideLines } from './wide-lines.js';
 import { view } from './view.js';
@@ -98,9 +98,9 @@ export function createStructureViews(scene, sim, labels) {
     for (const [s, v] of views) if (!live.has(s)) dispose(s, v);
     for (const s of sim.structures) {
       const v = views.get(s) || create(s);
-      if (s.escort) { // it moves with its patrol: the ring follows, and is re-predicted for the ground every 100 m
-        v.holder.position.copy(s.pos);
-        if (Math.hypot(s.pos.x - v.ringAt.x, s.pos.z - v.ringAt.z) > u(100)) makeRing(s, v);
+      if (s.escort) { // it moves with its patrol: the ring follows, and is re-predicted for the ground every 100 m, at most every 250 ms
+        v.holder.position.copy(s.pos); // at high speed a patrol walks 100 m in a frame, and a prediction costs milliseconds
+        if (Math.hypot(s.pos.x - v.ringAt.x, s.pos.z - v.ringAt.z) > u(100) && performance.now() - (v.ringMadeAt ?? 0) > 250) { makeRing(s, v); v.ringMadeAt = performance.now(); }
       }
       if (v.ringKey !== ringKey(s)) { makeRing(s, v); setModel(s, v); } // this unit was reconfigured
       if (v.unit !== unit) { v.model.scale.setScalar(unit * (s.def.modelScale || 1)); v.parts.raise(unit / TRUE_UNIT); v.unit = unit; } // true size up close
@@ -153,7 +153,7 @@ export function createStructureViews(scene, sim, labels) {
     updateLabels(net) {
       for (const [s, v] of views) {
         const target = s.task && net.tracks.get(s.task.trackId);
-        v.label.textContent = `${s.short} · ${s.mode}${target ? ' ▸ ' + (target.short || '?') : ''}`;
+        setText(v.label, `${s.short} · ${s.mode}${target ? ' ▸ ' + (target.short || '?') : ''}`);
         labels.place(v.label, s.pos.x, s.pos.y + labelLift(s.def), s.pos.z, view.labels);
       }
     },

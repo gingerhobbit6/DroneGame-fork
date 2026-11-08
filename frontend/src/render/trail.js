@@ -1,5 +1,7 @@
 // A line behind something that moves, of where it has been: a point every STEP metres, with the newest one following it.
 // shortcut: the oldest points drop off after POINTS (30 km of flight); a longer trail would need a bigger buffer.
+// shortcut: a point is fixed per frame, not per STEP, so at x16 (about 160 m a frame) the trail is drawn in chords that cut corners.
+// Fill in the points between frames if trails at high speed ever need to be true.
 
 import * as THREE from 'three';
 import { u } from '../sim/units.js';

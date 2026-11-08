@@ -12,6 +12,7 @@ import { ENV, cleanConditions } from './conditions.js';
 import { buyTerminal, money } from './economy.js';
 import { capturePeople, clearPeople, restorePeople } from './people.js';
 import { fillMagazine } from './magazine.js';
+import { LAYDOWN_LOCKED, designLocked } from './lock.js';
 import { DEFAULT_PLAN, planOf, setPatrol } from './patrol.js';
 import { inCorridor } from './route.js';
 import { cleanCallsign, cleanName, cleanSettings, fieldsFor, setSetting, unitCost, unitDef } from './unit-config.js';
@@ -40,9 +41,10 @@ export function removeStructure(w, s) {
 
 // Why a structure can't go here, or null if it can.
 export function placementProblem(w, x, z, def, cost = def.cost) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 'Choose a spot on the map';
   const r = Math.hypot(x, z);
   const xm = x * WORLD.metresPerUnit, zm = z * WORLD.metresPerUnit;
-  if (BUILD.lockAfterStart && w.state.wave > 0) return 'The laydown is locked once the first wave starts';
+  if (designLocked(w)) return LAYDOWN_LOCKED;
   if (w.structures.length >= BUILD.maxSystems) return `No more than ${BUILD.maxSystems} systems, so the laydown can still be saved`;
   if (!siteIsFree(w) && r < u(BUILD.minDist)) return `Too close to the station (minimum ${BUILD.minDist} m)`;
   const far = reachProblem(w, x, z);
@@ -87,7 +89,7 @@ export function place(w, id, x, z, settings, vehicle) {
 
 // Sell the nearest system to this point, if one is close enough.
 export function sell(w, x, z) {
-  if (BUILD.lockAfterStart && w.state.wave > 0) { w.emit('toast', 'The laydown is locked once the first wave starts'); return; }
+  if (designLocked(w)) { w.emit('toast', LAYDOWN_LOCKED); return; }
   let best = null, bd = u(150);
   for (const s of w.structures) { const d = hdist(s.pos, { x, z }); if (d < bd && !s.escort) { bd = d; best = s; } } // the escort goes with its patrol
   if (!best) return;
@@ -179,7 +181,7 @@ export function setZone(w, points) {
 
 // Change one field on one unit, paying or being refunded the difference. A null value goes back to the standard one. Returns why not, or null.
 export function configureUnit(w, s, key, value) {
-  if (designLocked(w)) return 'The laydown is locked once the first wave starts';
+  if (designLocked(w)) return LAYDOWN_LOCKED;
   const field = fieldsFor(s.def.id).find((f) => f.key === key);
   if (!field) return 'That cannot be changed on this system';
   const before = s.def.cost, was = s.def.settings[key];
@@ -196,7 +198,7 @@ export function configureUnit(w, s, key, value) {
 
 // Give a unit its own name and callsign. An empty one goes back to the automatic one. Returns why not, or null.
 export function renameUnit(w, s, name, callsign) {
-  if (designLocked(w)) return 'The laydown is locked once the first wave starts';
+  if (designLocked(w)) return LAYDOWN_LOCKED;
   const cleanN = cleanName(name), cleanC = cleanCallsign(callsign);
   if (callsign && !cleanC) return 'A callsign is up to 12 letters, numbers, spaces or dashes';
   const short = cleanC || s.autoShort;
@@ -210,7 +212,6 @@ export function renameUnit(w, s, name, callsign) {
 // ---------- the network design: terminals, wires and settings ----------
 // Every sensor and effector reaches the fusion node through a terminal (Starlink or cellular) that costs money; the fusion
 // node needs its own.
-export const designLocked = (w) => BUILD.lockAfterStart && w.state.wave > 0;
 // a system the network can wire: not the perimeter, and not one its crew works by hand off the network
 const isNode = (s) => (s.def.role === 'sensor' || s.def.role === 'effector') && s.def.id !== 'perimeter' && s.def.networked !== false;
 const locked = (w) => { if (!designLocked(w)) return false; w.emit('toast', 'The network is locked once the first wave starts'); return true; };

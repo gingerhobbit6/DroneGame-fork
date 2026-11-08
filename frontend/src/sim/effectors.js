@@ -82,8 +82,8 @@ const FIRE = {
     useRound(w, s);
     launchMissile(w, s, t, logShot(w, t, def));
   },
-  // a jammer's effect is applied to each drone it covers (see drones.js)
-  jam(w, s, t, dt) { if (s.mode === 'Jam') s.jamTime = (s.jamTime || 0) + dt; },
+  // a jammer's effect is applied to each drone it covers (see drones.js), and its time on is counted below
+  jam() {},
 };
 
 export function updateStructures(w, dt) {
@@ -94,7 +94,7 @@ export function updateStructures(w, dt) {
     if (def.role === 'sensor') continue;
     updateMagazine(w, s, dt);
     if (crewed(def)) crewTask(w, s, dt); // off the network, its crew picks its own target
-    if (def.kind === 'jammer' && s.mode === 'Jam') tally(w.ledger.jamTime, def.id, dt);
+    if (def.kind === 'jammer' && s.mode === 'Jam') { s.jamTime = (s.jamTime || 0) + dt; tally(w.ledger.jamTime, def.id, dt); } // this unit's, and its type's
     const near = s.task && s.pos.distanceTo(s.task.drone.pos);
     const t = s.task && state.time >= (s.task.activeAt || 0) && !s.task.drone.dead && near <= u(def.range) && near >= u(def.minRange ?? 0) ? s.task.drone : null; // acts once its task has arrived
     FIRE[def.fire](w, s, t, dt);

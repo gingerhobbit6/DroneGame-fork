@@ -7,6 +7,7 @@ import { WORLD, DRONES, STRUCTURES } from '../sim/config/index.js';
 import { view } from './view.js';
 import { drawScale } from './drone-models.js';
 import { labelLift } from './structure-view.js';
+import { setText } from './labels.js';
 import { SYMBOL_OVER, SYMBOL_PX, droneSymbol, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
 
 // deps: { scene, rec, droneTemplate, makeLabel, placeLabel, trackColour, getStructures, labelOf, hideLive, getLastSpeed, setPaused, resume }
@@ -16,9 +17,8 @@ export function createReplay(deps) {
   const u = (m) => m / WORLD.metresPerUnit;
 
   // ---------- the view ----------
-  const group = new THREE.Group();
+  const group = new THREE.Group(); // in the scene only while reviewing: three walks even a hidden group's children every frame
   group.visible = false;
-  scene.add(group);
   const droneObjs = new Map(); // uid -> { group, model, unseen, label }
   const trackObjs = [];        // pool of { mesh, label }
   const missileObjs = [];
@@ -43,6 +43,7 @@ export function createReplay(deps) {
 
   function show(f, camera) {
     group.visible = true;
+    if (group.parent !== scene) scene.add(group);
     const seen = new Set();
     for (const d of f.drones) {
       seen.add(d.u);
@@ -70,7 +71,7 @@ export function createReplay(deps) {
       const col = deps.trackColour(tr);
       o.label.style.borderColor = '#' + col.toString(16).padStart(6, '0');
       const cls = tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV';
-      o.label.textContent = tr.status === 'tentative' ? 'tentative' : `${tr.short} · ${cls}${tr.kill ? ' · kill reported' : ''}`;
+      setText(o.label, tr.status === 'tentative' ? 'tentative' : `${tr.short} · ${cls}${tr.kill ? ' · kill reported' : ''}`);
       deps.placeLabel(o.label, tr.x, tr.y, tr.z, view.labels);
     });
     for (let i = f.tracks.length; i < trackObjs.length; i++) { trackObjs[i].mesh.visible = false; trackObjs[i].label.style.display = 'none'; }
@@ -88,7 +89,7 @@ export function createReplay(deps) {
       const st = f.structs.find((x) => x.id === s.nodeId);
       const label = deps.labelOf(s);
       if (!st) { label.style.display = 'none'; continue; }
-      label.textContent = `${s.short} · ${st.mode}${st.trackShort ? ' ▸ ' + st.trackShort : ''}`;
+      setText(label, `${s.short} · ${st.mode}${st.trackShort ? ' ▸ ' + st.trackShort : ''}`);
       deps.placeLabel(label, s.pos.x, s.pos.y + labelLift(s.def), s.pos.z, view.labels);
       const tgt = st.target != null ? byUid.get(st.target) : null;
       if (tgt) {
@@ -108,6 +109,7 @@ export function createReplay(deps) {
   function hide() {
     if (!group.visible) return;
     group.visible = false;
+    scene.remove(group);
     for (const o of droneObjs.values()) o.label.style.display = 'none';
     for (const o of trackObjs) o.label.style.display = 'none';
   }
@@ -150,7 +152,10 @@ export function createReplay(deps) {
   // forget the cached replay drones (uids restart from 1 after a reset, so they must not be reused)
   function reset() {
     exit();
-    for (const o of droneObjs.values()) { group.remove(o.group); o.label.remove(); }
+    for (const o of droneObjs.values()) {
+      group.remove(o.group); o.label.remove();
+      o.symbol.material.dispose(); o.symbol.geometry.dispose(); // the models share their template's buffers; the sprite has its own
+    }
     droneObjs.clear();
   }
 

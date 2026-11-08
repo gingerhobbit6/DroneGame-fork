@@ -9,7 +9,7 @@ import { latLonOf } from '../sim/world-pack.js';
 import { contourLines, topoPixels } from './topo.js';
 
 const SIZE = 4096, SMALL = 1024, PREVIEW = 192, PREVIEW_SPAN = 6000, TILE_REFRESH_MS = 400;
-export const OSM_URL = 'https://tile.openstreetmap.org', OSM_ZOOM = 14;
+const OSM_URL = 'https://tile.openstreetmap.org', OSM_ZOOM = 14;
 const ROADS = [['Motorway', 34, '#4d9de0'], ['Primary', 27, '#3fbf6f'], ['A Road', 24, '#e15554'], ['B Road', 20, '#f0a33a'], ['Minor', 12, '#ffffff'], ['Local', 7, '#dddddd'], ['Restricted', 7, '#cccccc']]; // widths in metres on the ground
 
 const roadStyle = (cls) => ROADS.find(([start]) => cls.startsWith(start));
@@ -189,7 +189,7 @@ function paintGrid({ g, west, top, span, size, px }) {
 // MGRS, in the UTM zone of the map's middle, carried across the whole map. Its lines sit at an angle to the national grid the map is
 // drawn on, so each goes through points worked out every few km. Each 100 km square is named once, in the middle of what shows of it.
 // shortcut: one zone for the whole map, as no pack yet straddles a zone edge; split the lines at the edge if one ever does.
-export function paintMgrs({ g, west, top, span, px }, data) {
+function paintMgrs({ g, west, top, span, px }, data) {
   const STEP = 5000, toGrid = gridFor(data.geo.n0), zone = utmZone(toLatLon(data.geo.e0, data.geo.n0).lon);
   const at = (e, n) => { const { lat, lon } = fromUtm(zone, e, n), p = toGrid(lat, lon); return [px(p.e - west), px(top - p.n)]; };
   const corners = [[west, top], [west + span, top], [west, top - span], [west + span, top - span]].map(([e, n]) => { const c = toLatLon(e, n); return toUtm(c.lat, c.lon, zone); });

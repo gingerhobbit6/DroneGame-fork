@@ -36,7 +36,7 @@ function makeNoise(rng) {
 }
 
 // The power station, in metres from the origin. 'yard' is the switchyard where the power lines start.
-export const STATION = [
+const STATION = [
   { kind: 'box', x: -60, z: 40, w: 120, d: 40, h: 26, name: 'Turbine hall' },
   { kind: 'box', x: 30, z: 40, w: 50, d: 45, h: 48, name: 'Boiler house' },
   { kind: 'cyl', x: 75, z: 60, r: 5, h: 100, name: 'Stack' },

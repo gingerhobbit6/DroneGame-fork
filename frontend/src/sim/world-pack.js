@@ -9,6 +9,7 @@ import { gridRef } from './grids.js';
 const ID = /^pack:([0-9a-f]{32}):(\d{6}):(\d{7}):real$/;
 const CELL = 20, MAX_N = 4001, WATER = 4; // 80 km at most
 const MAX_BUILDINGS = 500000, MAX_HEIGHT = 20000; // metres: no ground is that high or deep, so anything past it is damage
+const MAX_SIDE = 1000; // metres: the largest building in a real pack so far is 577 m long, and a vast one would wall off the map
 
 export const parseWorldId = (world) => {
   const m = ID.exec(world || '');
@@ -18,6 +19,11 @@ export const worldId = (hash, e0, n0) => `pack:${hash.slice(0, 32)}:${String(e0)
 export const worldLabel = (world) => { const id = parseWorldId(world); return id ? `Real map, ${gridRef(id.e0, id.n0)}` : world; };
 
 const finiteList = (v, n) => Array.isArray(v) && v.length === n && v.every(Number.isFinite);
+const building = (b) => finiteList(b, 6) && [b[2], b[3], b[4]].every((v) => v >= 0 && v <= MAX_SIDE); // x, z, width, depth, height, angle
+const path = (points) => Array.isArray(points) && points.every((p) => finiteList(p, 2));
+const road = (r) => Array.isArray(r) && path(r[1]); // class, points
+const name = (n) => Array.isArray(n) && n.length === 5 && Number.isFinite(n[3]) && Number.isFinite(n[4]); // text, kind, height, x, z
+const optionalList = (v, ok) => v === undefined || (Array.isArray(v) && v.every(ok)); // a pack may have no roads or names
 
 // Checks everything the rules will trust. Grids are { ground: Float32Array, canopy, bldg, cover: Uint8Array }.
 export function parsePack(header, grids, features) {
@@ -33,7 +39,8 @@ export function parsePack(header, grids, features) {
   // a NaN compares false in the line of sight test, which would silently report a clear line
   for (let i = 0; i < size; i++) if (!(Math.abs(grids.ground[i]) < MAX_HEIGHT)) throw new Error('This pack has a height that is not a real one.');
   if (!Array.isArray(features?.buildings) || features.buildings.length > MAX_BUILDINGS || !Array.isArray(features.lines)) throw new Error('This pack has unreadable features.');
-  if (!features.buildings.every((b) => finiteList(b, 6)) || !features.lines.every((l) => Array.isArray(l) && l.every((p) => finiteList(p, 2)))) throw new Error('This pack has unreadable features.');
+  // the point counts need no cap of their own: the features section is capped in bytes before it is read
+  if (!features.buildings.every(building) || !features.lines.every(path) || !optionalList(features.roads, road) || !optionalList(features.names, name)) throw new Error('This pack has unreadable features.');
   return { hash: gridsSha256.slice(0, 32), header, grids, features };
 }
 

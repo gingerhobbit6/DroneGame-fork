@@ -30,6 +30,16 @@ describe('placing and selling', () => {
     expect(sim.canPlace(u(100), 0, STRUCTURES.radar)).toBe(false);
   });
 
+  it('refuses a spot that is not a number, for systems and people', () => {
+    fresh();
+    const before = sim.state.budget;
+    expect(sim.commands.place('radar', NaN, NaN)).toBe('Choose a spot on the map');
+    expect(sim.commands.placePeople(u(500), Infinity, 10, 'open')).toBe('Choose a spot on the map');
+    expect(sim.structures.length).toBe(0);
+    expect(sim.people.length).toBe(0);
+    expect(sim.state.budget).toBe(before);
+  });
+
   it('refuses what cannot be afforded', () => {
     fresh();
     sim.state.budget = 10;
@@ -288,6 +298,19 @@ describe('engagement authority', () => {
       sim.step();
       for (const r of sim.net.pendingRequests) expect(r.s.def.shotCost).toBeGreaterThanOrEqual(FUSION.authorityThreshold);
     }
+  }, 30000);
+
+  it('does not act on an approval once the launcher can no longer take the shot', () => {
+    FUSION.authority = 'all';
+    armed();
+    const req = pendingAfter(6000)[0], s = req.s;
+    const engaged = () => sim.bus.entries.filter((e) => e.type === 'task' && e.to === s.nodeId && e.msg.task.command?.request === 'Engage').length;
+    const before = engaged();
+    expect(s.def.magazine).toBeGreaterThan(0);
+    s.rounds = 0; // emptied while the operator decided
+    sim.commands.decide(req.id, true);
+    expect(engaged()).toBe(before);
+    expect(s.task).toBeNull();
   }, 30000);
 
   it('lets an unanswered request lapse', () => {

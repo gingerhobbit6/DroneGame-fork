@@ -190,6 +190,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     const data = terrainState.data, source = data.geo && getMapSource(world);
     const found = source ? map.previews(data, source, ids) : Promise.resolve({ generated: relief.toDataURL('image/jpeg', 0.8) });
     previews = { world, found };
+    found.catch(() => { if (previews.found === found) previews = { world: null }; }); // a failure is not kept: the next look tries again
     return found;
   }
 

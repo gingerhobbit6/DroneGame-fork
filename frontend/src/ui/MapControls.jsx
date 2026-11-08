@@ -121,7 +121,7 @@ export function MapControls() {
   useEffect(() => {
     let live = true;
     setPictures({});
-    gameView?.mapPreviews?.(maps.map(([id]) => id)).then((found) => { if (live) setPictures(found); });
+    gameView?.mapPreviews?.(maps.map(([id]) => id)).then((found) => { if (live) setPictures(found); }).catch(() => {}); // no pictures: the switcher still works by name
     return () => { live = false; };
   }, [gameView, seed]); // eslint-disable-line react-hooks/exhaustive-deps
 

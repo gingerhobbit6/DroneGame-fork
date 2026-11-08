@@ -51,7 +51,7 @@ export function Root({ game }) {
   }, [who, api, game, storage]);
   useEffect(() => { // with a pack, the budget only counts the cost and only the pack's kit can be placed, with its settings
     game.commands.setPacked(activeUnit ? kitOf(activeUnit.assets) : false);
-    if (activeUnit) game.usePackLoadouts(activeUnit.assets.systems);
+    game.usePackLoadouts(activeUnit ? activeUnit.assets.systems : null); // withdrawn: its settings go too
   }, [game, activeUnit]);
   useEffect(() => {
     const lost = () => { if (game.sim.state.waveActive) game.setSpeed(0); setUser(null); }; // a wave waits under the login page

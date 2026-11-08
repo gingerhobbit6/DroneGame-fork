@@ -27,7 +27,7 @@ export function jamReaches(s, d, band, k = 1, at = d.pos) {
 // Where a drone's operator receives its video: at its launch point, on an antenna OPERATOR_MAST metres up, an ASSUMPTION.
 const OPERATOR_MAST = 2;
 const _operator = new Vector3(); // scratch: used at once by the reach check
-export const operatorOf = (d) => _operator.set(d.launch.x, hereU(d.launch.x, d.launch.z) + u(OPERATOR_MAST), d.launch.z);
+const operatorOf = (d) => _operator.set(d.launch.x, hereU(d.launch.x, d.launch.z) + u(OPERATOR_MAST), d.launch.z);
 
 // A control link is easier to jam the further the drone is from its operator, whose signal it is listening for: jamming wins when the
 // jammer is louder at the drone, so its reach goes with that distance. The launch point stands in for the operator, and a jammer's

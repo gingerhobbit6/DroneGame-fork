@@ -24,7 +24,7 @@ export const alerts = (s, d) => {
   return (!!d.def.rfEmitter && metres <= CREW.alertRange) || metres <= hearingRange(d);
 };
 
-export function crewSees(s, d) {
+function crewSees(s, d) {
   const m = WORLD.metresPerUnit;
   if (s.pos.distanceTo(d.pos) * m > sightRange(d)) return false;
   const r = terrainState.data.los(s.pos.x * m, s.pos.y * m + (s.def.mount ?? EYE_HEIGHT), s.pos.z * m, d.pos.x * m, d.pos.y * m, d.pos.z * m);

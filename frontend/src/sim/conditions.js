@@ -21,7 +21,7 @@ export const ENV = { now: 'day' };
 export const cleanConditions = (name) => (Object.hasOwn(CONDITIONS, name) ? name : 'day');
 
 // Light a lens gathers against the catalogue's own lens: it goes with the inverse square of the F-number.
-export const lensLight = (def) => (def.fnumber && STRUCTURES[def.id]?.fnumber ? (STRUCTURES[def.id].fnumber / def.fnumber) ** 2 : 1);
+const lensLight = (def) => (def.fnumber && STRUCTURES[def.id]?.fnumber ? (STRUCTURES[def.id].fnumber / def.fnumber) ** 2 : 1);
 
 // The share of its clear-day range this system keeps in the conditions now. A camera uses its better channel, and its thermal channel
 // is as sharp as its lens and pixels allow.

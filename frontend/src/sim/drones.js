@@ -40,11 +40,11 @@ export function spawnDrone(w, type, bearing, rolls = {}) {
   const y = hereU(sx, sz) + u(agl);
   const pos = new Vector3(sx, y, sz);
   const aim = w.state.zone && def.role !== 'spotter' ? chooseAim(w, rand) : null; // only a drawn area uses a random draw, so runs without one are unchanged
-  const uid = ++w.droneUid;
+  const uid = ++w.droneUid, to = aim ?? w.state.zoneCentre; // what it flies at: a patrol's lead, not the station, when there is one
   const d = {
     uid, def, type, pos, launch: pos.clone(),
     hp: def.hp, evade, jamResist, jamT: 0, detected: false, dead: false,
-    agl0: agl, h0: aim ? Math.max(Math.hypot(sx - aim.x, sz - aim.z), 1) : Math.hypot(sx, sz), // launch height above ground and distance, for the descent
+    agl0: agl, h0: Math.max(Math.hypot(sx - to.x, sz - to.z), 1), // launch height above ground and distance, for the descent
     mode: 'approach', angle: 0, orbitT: 0, bank: 0, heading: 0, // spotter state
     vel: new Vector3(), track: null, nav: 0, videoJammed: false, targetStructure: null, aim,
   };
@@ -108,12 +108,21 @@ function impact(w, d, onPatrol) {
   if (state.health <= 0 && !state.sandbox) { state.over = true; w.emit('gameOver'); }
 }
 
+// Gone for good, alive: it counts as escaped. Returns false, as a mover does once its drone has gone.
+function escape(w, d, why) {
+  tally(w.ledger.escaped, d.type);
+  logEnd(w, d, 'left');
+  w.rec.event('escaped', `${d.def.name} ${why}`, d.uid);
+  removeDrone(w, d);
+  return false;
+}
+
 // Flies away from what is defended until it is off the map. Returns false once it has gone.
 function leave(w, d, spd) {
   const c = w.state.zoneCentre;
   _v.set(d.pos.x - c.x, 0, d.pos.z - c.z).normalize().multiplyScalar(spd);
   d.pos.add(_v);
-  if (hdist(d.pos, c) > u(WORLD.spawnDist) || !onMap(d.pos.x, d.pos.z)) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); removeDrone(w, d); return false; }
+  if (hdist(d.pos, c) > u(WORLD.spawnDist) || !onMap(d.pos.x, d.pos.z)) return escape(w, d, 'left the area');
   return true;
 }
 
@@ -143,7 +152,7 @@ function moveSpotter(w, d, spd, dt) {
 // A strike with no fix on a patrol flies to the corridor's middle and circles there until it has one, or until it must turn for home.
 function holdOff(w, d, tgt, hrem, spd, dt) {
   d.holdT = (d.holdT || 0) + dt;
-  if (d.holdT > PATROL.enemy.holdTime) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); w.rec.event('escaped', `${d.def.name} gave up waiting for a fix`, d.uid); removeDrone(w, d); return false; }
+  if (d.holdT > PATROL.enemy.holdTime) return escape(w, d, 'gave up waiting for a fix');
   let dx = (tgt.x - d.pos.x) / hrem, dz = (tgt.z - d.pos.z) / hrem;
   if (hrem < u(PATROL.enemy.holdRadius)) [dx, dz] = [-dz, dx]; // round, not in
   d.pos.x += dx * spd; d.pos.z += dz * spd;
@@ -154,7 +163,7 @@ function holdOff(w, d, tgt, hrem, spd, dt) {
 // Strike: fly at the target, hugging the terrain. Returns false if it was removed.
 function moveStrike(w, d, spd, dt) {
   // GNSS drift can turn it away for good. Only a drifted drone is held to the circle: one from off the map can start at a corner, further out.
-  if (!onMap(d.pos.x, d.pos.z) || (d.nav && hdist(d.pos, w.state.zoneCentre) > u(WORLD.radius))) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); w.rec.event('escaped', `${d.def.name} left the area`, d.uid); removeDrone(w, d); return false; }
+  if (!onMap(d.pos.x, d.pos.z) || (d.nav && hdist(d.pos, w.state.zoneCentre) > u(WORLD.radius))) return escape(w, d, 'left the area');
   if (d.mode === 'home') return leave(w, d, spd);
   const tgt = pickTarget(w, d);
   const hrem = Math.hypot(tgt.x - d.pos.x, tgt.z - d.pos.z);

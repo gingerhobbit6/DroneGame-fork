@@ -5,10 +5,12 @@ import { parsePack } from '../sim/world-pack.js';
 
 const MAGIC = 'SGMAP', VERSION = 1, HEAD = 10;
 const MAX_HEADER = 1 << 20, MAX_RAW = 64 * 1024 * 1024; // the largest grid an 80 km pack could need: 4001 x 4001 heights of 4 bytes
+const MAX_FEATURES = 32 * 1024 * 1024; // MAX_FEATURES in tools/mapbuild/mapbuild/packfile.py: the densest real pack, 70 km round Hereford, has 15.6 MB
+const MAX_PIXELS = 8192 * 8192; // an 80 km satellite picture at 10 m is 8000 pixels square
 const DB = 'site-guard-packs', STORE = 'packs';
 
-async function gunzip(bytes, rawLength) {
-  if (!Number.isInteger(rawLength) || rawLength <= 0 || rawLength > MAX_RAW) throw new Error('This pack declares an unreasonable size.');
+async function gunzip(bytes, rawLength, max = MAX_RAW) {
+  if (!Number.isInteger(rawLength) || rawLength <= 0 || rawLength > max) throw new Error('This pack declares an unreasonable size.');
   const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
   const out = new Uint8Array(rawLength);
   for (let at = 0; ;) {
@@ -21,6 +23,19 @@ async function gunzip(bytes, rawLength) {
     out.set(value, at);
     at += value.length;
   }
+}
+
+// A picture's width x height from its own header, so one declaring a vast size never reaches the image decoder.
+export function pixelsOf(b) {
+  const at = (i) => (b[i] << 8) | b[i + 1];
+  if (b.length >= 24 && at(0) === 0x8950 && at(2) === 0x4e47) return (at(16) * 65536 + at(18)) * (at(20) * 65536 + at(22)); // PNG: IHDR is first
+  if (at(0) !== 0xffd8) return Infinity;
+  for (let i = 2; i + 9 < b.length; i += 2 + at(i + 2)) { // JPEG: walk the segments to the frame header
+    const marker = b[i + 1];
+    if (b[i] !== 0xff) return Infinity;
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return at(i + 5) * at(i + 7);
+  }
+  return Infinity;
 }
 
 const hex = (buffer) => [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -41,7 +56,7 @@ export async function decodePack(buffer) {
   };
   const section = (name) => { const s = header.sections.find((x) => x.name === name); if (!s) throw new Error('This map pack is missing a section.'); return s; };
   const cells = section('canopy').rawLength; // every grid has one value a post, and a height is 4 bytes, so sizes are checked before anything is unpacked
-  if (section('ground').rawLength !== 4 * cells || section('bldg').rawLength !== cells || section('cover').rawLength !== cells) throw new Error('This map pack is damaged.');
+  if (!Number.isInteger(header.N) || cells !== header.N * header.N || section('ground').rawLength !== 4 * cells || section('bldg').rawLength !== cells || section('cover').rawLength !== cells) throw new Error('This map pack is damaged.');
   const raw = {};
   for (const name of ['ground', 'canopy', 'bldg', 'cover']) raw[name] = await gunzip(slice(section(name)), section(name).rawLength);
 
@@ -50,9 +65,9 @@ export async function decodePack(buffer) {
   if (raw.ground.length % 4) throw new Error('This map pack is damaged.');
   const grids = { ground: new Float32Array(raw.ground.buffer, 0, raw.ground.length / 4), canopy: raw.canopy, bldg: raw.bldg, cover: raw.cover };
   const feature = section('features');
-  const features = JSON.parse(new TextDecoder().decode(await gunzip(slice(feature), feature.rawLength)));
+  const features = JSON.parse(new TextDecoder().decode(await gunzip(slice(feature), feature.rawLength, MAX_FEATURES)));
   const pack = parsePack(header, grids, features);
-  const pictures = header.sections.filter((s) => s.length <= MAX_RAW && /^picture\d+$/.test(s.name) && ['osmap', 'satellite'].includes(s.layer) && ['image/png', 'image/jpeg'].includes(s.type)).map((s) => ({
+  const pictures = header.sections.filter((s) => s.length <= MAX_RAW && /^picture\d+$/.test(s.name) && ['osmap', 'satellite'].includes(s.layer) && ['image/png', 'image/jpeg'].includes(s.type) && pixelsOf(slice(s)) <= MAX_PIXELS).map((s) => ({
     layer: s.layer, west: s.west, top: s.top, width: s.width, height: s.height, blob: new Blob([slice(s)], { type: s.type }),
   }));
   return { pack, pictures };
@@ -111,12 +126,19 @@ export function createPackStore({ api, idb = globalThis.indexedDB, fetchFile = (
     return reply.blob();
   }
 
-  async function load(entry) {
-    if (loaded.has(entry.hash)) return loaded.get(entry.hash);
-    const decoded = await decodePack(await (await fileOf(entry)).arrayBuffer());
-    if (decoded.pack.hash !== entry.hash) throw new Error('That map pack has changed since it was listed.');
-    loaded.set(decoded.pack.hash, decoded);
-    return decoded;
+  // A pack clicked while it is still loading in the background is decoded once: each decode can hold 64 MB or more.
+  const loading = new Map(); // hash -> the load under way
+  function load(entry) {
+    if (loaded.has(entry.hash)) return Promise.resolve(loaded.get(entry.hash));
+    if (!loading.has(entry.hash)) {
+      loading.set(entry.hash, (async () => {
+        const decoded = await decodePack(await (await fileOf(entry)).arrayBuffer());
+        if (decoded.pack.hash !== entry.hash) throw new Error('That map pack has changed since it was listed.');
+        loaded.set(decoded.pack.hash, decoded);
+        return decoded;
+      })().finally(() => loading.delete(entry.hash)));
+    }
+    return loading.get(entry.hash);
   }
 
   // A pack file the player chose. It is checked in full before it is kept.

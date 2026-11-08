@@ -5,7 +5,8 @@
 import { COMMS, MAX_ESCORTS, MAX_ESCORT_GAP, MAX_ESCORT_SIDE, MOUNTS, PATROL, PATROL_VEHICLES, STRUCTURES } from './config/index.js';
 import { SITE_POS, hereU, u } from './units.js';
 import { buyTerminal, money } from './economy.js';
-import { addStructure, designLocked, removeStructure, wireFusion, wireNode } from './laydown.js';
+import { addStructure, removeStructure, wireFusion, wireNode } from './laydown.js';
+import { designLocked } from './lock.js';
 import { addGroup, cleanCount } from './people.js';
 import { FORMATIONS, placeIn, soldierSpot } from './formation.js';
 import { legEnds, routeProblem, widthProblem } from './route.js';

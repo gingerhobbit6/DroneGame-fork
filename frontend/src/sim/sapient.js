@@ -13,7 +13,7 @@ import { idRand, EPOCH_MS } from './rng.js';
 
 export const ICD_VERSION = 'BSI Flex 335 v2.0';
 
-export const CONTENT_KEYS = [
+const CONTENT_KEYS = [
   'registration', 'registration_ack', 'status_report', 'detection_report',
   'task', 'task_ack', 'alert', 'alert_ack', 'error',
 ];
@@ -46,7 +46,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // ---------- geometry ----------
 const M_PER_DEG = 111320;
-const round = (x, n) => Number(x.toFixed(n));
+export const round = (x, n = 3) => Number(x.toFixed(n));
 
 // Location (SAPIENT: x = longitude, y = latitude, z = altitude in metres) from metres east/north of the origin.
 export function location(eastM, northM, altM, errM = 0) {
@@ -81,12 +81,14 @@ export const typeOf = (msg) => CONTENT_KEYS.find((k) => msg[k] !== undefined);
 export function validate(msg) {
   const problems = [];
   if (!msg.timestamp) problems.push('timestamp is mandatory');
+  else if (Number.isNaN(Date.parse(msg.timestamp))) problems.push('timestamp must be an RFC 3339 time');
   if (!UUID_RE.test(msg.node_id || '')) problems.push('node_id must be a UUID');
   if (msg.destination_id !== undefined && !UUID_RE.test(msg.destination_id)) problems.push('destination_id must be a UUID');
   const present = CONTENT_KEYS.filter((k) => msg[k] !== undefined);
   if (present.length !== 1) { problems.push(`exactly one content field required, found ${present.length}`); return problems; }
   const type = present[0];
   const c = msg[type];
+  if (!c || typeof c !== 'object') { problems.push(`${type}: must be a message, not ${c === null ? 'null' : typeof c}`); return problems; }
   const need = (cond, text) => { if (!cond) problems.push(`${type}: ${text}`); };
   switch (type) {
     case 'registration':

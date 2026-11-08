@@ -10,9 +10,8 @@ import { distToZone } from '../attack-area.js';
 export const RB_UNITS = 'RANGE_BEARING_COORDINATE_SYSTEM_DEGREES_M';
 // A real world's scene is aligned to the national grid, so its bearings are measured from grid north.
 export const rbDatum = () => (terrainState.data?.geo ? 'RANGE_BEARING_DATUM_GRID' : 'RANGE_BEARING_DATUM_TRUE');
-export const deg = (r) => (r * 180) / Math.PI;
-export const round = (x, n = 3) => Number(x.toFixed(n));
-export const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
+const deg = (r) => (r * 180) / Math.PI;
+export { round } from '../sapient.js';
 export const dur = (value) => ({ units: 'TIME_UNITS_SECONDS', value });
 
 export const classDepth = (cls) => {

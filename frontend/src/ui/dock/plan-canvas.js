@@ -37,6 +37,21 @@ export function createPlanCanvas(cv, sim) {
   const ringStep = () => (viewR > 10000 ? 5000 : 1000); // km rings: every 1 km close in, every 5 km zoomed out
   cv.addEventListener('wheel', onWheel, { passive: false });
 
+  // The coverage map, painted once for each grid worked out into a canvas of one pixel a cell, then drawn as one picture: filling every
+  // cell of a 54 km map each time the view is drawn was about 46,000 rectangles every 200 ms, even while paused.
+  let cover = { grid: null, canvas: null };
+  function coverLayer(c) {
+    if (cover.grid === c) return cover.canvas;
+    const canvas = cover.canvas ?? document.createElement('canvas'), cg = canvas.getContext('2d');
+    canvas.width = canvas.height = c.n;
+    for (let j = 0; j < c.n; j++) for (let i = 0; i < c.n; i++) {
+      cg.fillStyle = COVER_FILL[Math.min(c.counts[j * c.n + i], 2)];
+      cg.fillRect(i, j, 1, 1); // row 0 is the north edge: z is south
+    }
+    cover = { grid: c, canvas };
+    return canvas;
+  }
+
   // coverage: the drone type to map, or null for none
   function draw(coverage) {
     const w = cv.clientWidth, h = cv.clientHeight;
@@ -52,13 +67,9 @@ export function createPlanCanvas(cv, sim) {
       g.drawImage(terrainState.hillshade, X(-Rt), Y(Rt), 2 * Rt * k, 2 * Rt * k);
     }
     if (coverage) {
-      const c = coverageGrid(sim, coverage);
-      for (let j = 0; j < c.n; j++) for (let i = 0; i < c.n; i++) {
-        const cnt = c.counts[j * c.n + i];
-        g.fillStyle = COVER_FILL[Math.min(cnt, 2)];
-        // z is south, so the cell at scene z maps to plan y = -north
-        g.fillRect(X(-c.half + i * c.cell), Y(c.half - j * c.cell), c.cell * k + 1, c.cell * k + 1);
-      }
+      const c = coverageGrid(sim, coverage), side = c.n * c.cell * k;
+      g.imageSmoothingEnabled = false; // crisp cells, as they were drawn one by one
+      g.drawImage(coverLayer(c), X(-c.half), Y(c.half), side, side);
     }
     g.lineWidth = 1; g.font = '10px system-ui'; g.fillStyle = '#5f7391'; g.strokeStyle = '#1c2b46';
     for (let r = ringStep(); r <= viewR * 1.5; r += ringStep()) {

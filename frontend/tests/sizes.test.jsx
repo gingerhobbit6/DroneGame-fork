@@ -107,6 +107,23 @@ describe('the hotkeys', () => {
     expect(game.getTool()).toBe('radar');
   });
 
+  it('leave Space to a focused button, and typing to a text area', () => {
+    show();
+    const speed = game.clock.speed;
+    for (const tag of ['button', 'summary']) {
+      const el = document.body.appendChild(document.createElement(tag));
+      fireEvent.keyDown(el, { key: ' ' });
+      el.remove();
+    }
+    expect(game.clock.speed).toBe(speed);
+    const area = document.body.appendChild(document.createElement('textarea'));
+    fireEvent.keyDown(area, { key: '1' });
+    area.remove();
+    expect(game.getTool()).toBeFalsy();
+    press(' ');
+    expect(game.clock.speed).not.toBe(speed); // Space anywhere else still pauses or resumes
+  });
+
   it('picks medium, then cycles through the sizes', () => {
     show();
     press('1');

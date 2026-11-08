@@ -10,7 +10,9 @@ import { ADAPT, STRUCTURES, importFigures, resetAllFigures } from '../src/sim/co
 import { terrainState } from '../src/sim/terrain.js';
 import { createStructureViews } from '../src/render/structure-view.js';
 import { buildWorldView } from '../src/render/terrain-view.js';
-import { createLabels } from '../src/render/labels.js';
+import { createLabels, setText } from '../src/render/labels.js';
+import { createReplay } from '../src/render/replay-view.js';
+import { droneTemplate } from '../src/render/models.js';
 import { GameContext, useLoad } from '../src/ui/hooks.js';
 import { RunsTab } from '../src/ui/dock/RunsTab.jsx';
 import { Timeline } from '../src/ui/Timeline.jsx';
@@ -270,5 +272,37 @@ describe('3D resources are freed', () => {
     world.dispose();
     expect(freed).toBe(instanced.length);
     expect(sharedFreed).toBe(false); // the site material outlives the ground
+  });
+
+  it('when a reviewed run is reset, and its group leaves the scene when not reviewing', () => {
+    const scene = new THREE.Scene(), labels = createLabels(document.createElement('div'), new THREE.PerspectiveCamera());
+    const frame = { t: 0, drones: [{ u: 1, type: 'fpv', x: 0, y: 1, z: 0, ry: 0, tracked: true }], tracks: [], missiles: [], structs: [] };
+    const replay = createReplay({
+      scene, rec: { frames: [frame] }, droneTemplate, makeLabel: labels.make, placeLabel: labels.place, trackColour: () => 0xffffff,
+      getStructures: () => [], labelOf: () => null, hideLive: () => {}, getLastSpeed: () => 1, setPaused: () => {}, resume: () => {},
+    });
+    expect(scene.children.length).toBe(0);
+    replay.enter(0);
+    replay.update(0, new THREE.PerspectiveCamera());
+    expect(scene.children.length).toBe(1);
+    const live = track(scene);
+    expect(live.size).toBeGreaterThan(0);
+    const own = [...live].filter((res) => res.isSpriteMaterial || res.isBufferGeometry && res.attributes.position.count === 4);
+    expect(own.length).toBeGreaterThan(0);
+    replay.reset();
+    expect(scene.children.length).toBe(0);
+    for (const res of own) expect(live.has(res)).toBe(false); // the sprite's own; the models share their template's
+  });
+});
+
+describe('labels', () => {
+  it('are rewritten only when their text changes', () => {
+    const el = document.createElement('div');
+    setText(el, 'T1 · Multirotor');
+    const node = el.firstChild;
+    setText(el, 'T1 · Multirotor');
+    expect(el.firstChild).toBe(node); // the same text node: nothing was replaced
+    setText(el, 'T1 · Fixed wing');
+    expect(el.textContent).toBe('T1 · Fixed wing');
   });
 });

@@ -23,7 +23,7 @@ export const tally = (obj, key, n = 1) => { obj[key] = (obj[key] || 0) + n; };
 export const enemyCost = (counts) => Object.entries(counts).reduce((sum, [type, n]) => sum + n * DRONES[type].cost, 0);
 // Prices are kept in US dollars, as their sources give them, and shown in pounds at this one rate.
 // ASSUMPTION: about the rate through 2025. The Sources tab keeps the dollars each figure was quoted in.
-export const GBP_PER_USD = 0.75;
+const GBP_PER_USD = 0.75;
 export const pounds = (usd) => `£${Math.round(usd * GBP_PER_USD).toLocaleString('en-GB')}`;
 export const money = (usd) => {
   const v = usd * GBP_PER_USD;
