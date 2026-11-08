@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { money } from '../sim/economy.js';
-import { RANGE_BINS, runStats, wavesFlown } from '../sim/stats.js';
+import { RANGE_BINS, liveStats, runStats, wavesFlown } from '../sim/stats.js';
 import { hex, km as kmOf, useGame, useTick } from './hooks.js';
 import './run-stats.css';
 
@@ -124,7 +124,7 @@ export function RunStats() {
   const { sim } = useGame();
   const [wave, setWave] = useState(null);
   const waves = wavesFlown(sim.ledger), shown = waves.includes(wave) ? wave : null;
-  const s = runStats(sim, shown), d = s.drones, f = s.fire, c = s.cost, whole = shown == null ? '' : ' (whole run)';
+  const s = shown == null ? liveStats(sim) : runStats(sim, shown), d = s.drones, f = s.fire, c = s.cost, whole = shown == null ? '' : ' (whole run)';
   return (
     <div className="run-stats" id="run-stats">
       <div className="st-waves" role="group" aria-label="Which wave">

@@ -2,7 +2,7 @@
 // assumptions or game rules), with the evidence beside them. Editing a number changes the game straight away; the arrow
 // resets it to the researched value. "Export" saves just your changes as JSON so an experiment can be repeated.
 
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { COMMS, DRONES, FIGURE_FIELDS, PATROL, PEOPLE, RESEARCHED, STRUCTURES, THREAT_GROUPS, WAVES, WORLD, exportFigures } from '../../sim/config/index.js';
 import { download, hex, useGame } from '../hooks.js';
 import { NumberInput } from '../NumberInput.jsx';
@@ -48,7 +48,8 @@ function Figures({ kind, id, def, onChange }) {
 const Row = ({ k, children }) => <div><span className="k">{k}</span> {children}</div>;
 const Conf = ({ text }) => <span className={`conf${isAssumption(text) ? ' assume' : ''}`}>{text}</span>;
 
-export function SourcesTab({ active }) {
+// Memoised: it builds about 750 inputs, and the dock re-renders every tab on each click. It redraws itself after its own edits.
+export const SourcesTab = memo(function SourcesTab({ active }) {
   const game = useGame();
   const { commands } = game;
   const [, setVersion] = useState(0);
@@ -139,4 +140,4 @@ export function SourcesTab({ active }) {
       ))}
     </>
   );
-}
+});

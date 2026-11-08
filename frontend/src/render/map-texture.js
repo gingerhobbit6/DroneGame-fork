@@ -63,10 +63,12 @@ export async function paintPictures(f, pictures, layer, still) {
   const { g, west, top, span, px } = f;
   for (const p of pictures) {
     if (p.layer !== layer || p.west >= west + span || p.west + p.width <= west || p.top <= top - span || p.top - p.height >= top) continue;
-    const bitmap = await createImageBitmap(p.blob).catch(() => null); // a picture the browser cannot read is left out, not the whole map
+    // decoded at the size it is drawn: an OS piece is 4000 px across, and most of those pixels would be thrown away
+    const w = Math.max(Math.ceil(px(p.width)), 1), h = Math.max(Math.ceil(px(p.height)), 1);
+    const bitmap = await createImageBitmap(p.blob, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' }).catch(() => null); // a picture the browser cannot read is left out, not the whole map
     if (!bitmap) continue;
     if (!still()) { bitmap.close(); return; } // a newer choice took over, and must not be drawn over
-    g.drawImage(bitmap, px(p.west - west), px(top - p.top), px(p.width), px(p.height));
+    g.drawImage(bitmap, px(p.west - west), px(top - p.top), w, h);
     bitmap.close();
   }
 }
@@ -236,6 +238,16 @@ export function createMapTexture(renderer, relief) {
     return topo;
   }
 
+  // The last base map, before lines and names: switching those on or off starts again from it rather than decoding every picture again.
+  // Kept by the pack's own pictures and features, as the source object around them is made afresh for each paint.
+  const base = { canvas: null, data: null, pictures: null, features: null, baseMap: null };
+  const isBase = (data, source, baseMap) => base.data === data && base.pictures === source.pictures && base.features === source.features && base.baseMap === baseMap;
+  function keepBase(data, source, baseMap) {
+    base.canvas ??= Object.assign(document.createElement('canvas'), { width: SIZE, height: SIZE });
+    base.canvas.getContext('2d').drawImage(canvas, 0, 0);
+    Object.assign(base, { data, pictures: source.pictures, features: source.features, baseMap });
+  }
+
   async function paintBase(f, data, source, baseMap, still, onTile) {
     const { g, west, top, px, size } = f, worldX = px(data.geo.e0 - data.R - west), worldZ = px(top - data.geo.n0 - data.R), world = px(2 * data.R);
     if (baseMap === 'live') return paintLive(f, data, still, onTile);
@@ -243,7 +255,8 @@ export function createMapTexture(renderer, relief) {
     if (baseMap === 'relief') { g.drawImage(relief(data), worldX, worldZ, world, world); return {}; }
     if (baseMap === 'topo') { g.drawImage(topoOf(data).picture, worldX, worldZ, world, world); return {}; }
     await paintPictures(f, source.pictures, usesSatellite(baseMap) ? 'satellite' : 'osmap', still);
-    if (!usesSatellite(baseMap) && still()) paintBeyond(f, data, source.features?.beyond, topoOf(data));
+    // only a pack with ground past a border has outlines, and the topography takes about a second to work out
+    if (!usesSatellite(baseMap) && still() && source.features?.beyond?.length) paintBeyond(f, data, source.features.beyond, topoOf(data));
     if (RESTYLE[baseMap] && still()) restyle(f, RESTYLE[baseMap]);
     return {};
   }
@@ -260,8 +273,13 @@ export function createMapTexture(renderer, relief) {
       shown = performance.now();
       texture.needsUpdate = true;
     };
-    const layer = await paintBase(f, data, source, options.baseMap, still, onTile);
-    if (!still()) return { stale: true };
+    let layer = {};
+    if (isBase(data, source, options.baseMap)) f.g.drawImage(base.canvas, 0, 0);
+    else {
+      layer = await paintBase(f, data, source, options.baseMap, still, onTile);
+      if (!still()) return { stale: true };
+      if (options.baseMap !== 'live') keepBase(data, source, options.baseMap); // a live map is fetched again, so missing tiles get another try
+    }
     if (options.contours || options.baseMap === 'topo') paintContours(f, topoOf(data).lines, data, options.baseMap, true);
     if (roads) paintRoads(f, source.features, data);
     if (options.grid === 'mgrs') paintMgrs(f, data);

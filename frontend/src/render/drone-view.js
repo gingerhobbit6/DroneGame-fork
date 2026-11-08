@@ -8,7 +8,7 @@ import { hereU } from '../sim/units.js';
 import { droneTemplate } from './models.js';
 import { drawScale } from './drone-models.js';
 import { hexCss } from './labels.js';
-import { SYMBOL_PX, asSymbol, droneSymbol, setSymbol, symbolScale, symbolSprite } from './symbols.js';
+import { SYMBOL_PX, asSymbol, droneTagHeight, styleDrone, symbolScale, symbolSprite } from './symbols.js';
 import { view } from './view.js';
 import { createTrail } from './trail.js';
 
@@ -76,18 +76,11 @@ export function createDroneViews(scene, sim, labels, camera) {
       v.group.visible = view.truth;
       v.trail.push(d.pos); // kept while hidden, so switching it on shows the whole flight
       v.trail.line.visible = view.trails && view.truth;
-      v.model.visible = tracked && !symbol;
-      v.unseen.visible = !tracked && !symbol;
-      v.symbol.visible = symbol;
+      styleDrone(v, d.def, tracked, symbol, k);
       v.bar.visible = tracked;
-      if (symbol) {
-        setSymbol(v.symbol, droneSymbol(d.def, tracked));
-        v.symbol.material.opacity = tracked ? 1 : 0.6;
-        v.symbol.scale.setScalar(symbolScale(SYMBOL_PX, k));
-      }
       // the bar and the name tag clear the top of whatever is drawn
       v.bar.position.y = symbol ? symbolScale(SYMBOL_PX * 0.55, k) * dist : d.def.size * 0.5;
-      v.top = symbol ? symbolScale(SYMBOL_PX * 0.75) * dist : d.def.size * k * 0.7;
+      v.top = droneTagHeight(d.def, symbol, k, dist);
       if (v.hp !== d.hp) { // health bar
         v.hp = d.hp;
         const k = Math.max(d.hp / d.def.hp, 0);

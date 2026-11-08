@@ -244,13 +244,16 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   const debug = { frozen: false }; // scripted browser runs drive the simulation themselves
   const frameClock = new THREE.Clock();
-  let lastBump = 0;
+  // Panels refresh on the timer only while what they show can change: the run moving, a replay, or the player's hand on the mouse or
+  // keys (the cursor read-outs, a dragged panel). Paused, idle or on the start screen, nothing re-renders.
+  let lastBump = 0, stirred = true, covered = false;
+  const stir = () => { stirred = true; };
   function frame() {
     const real = Math.min(frameClock.getDelta(), 0.05);
+    let n = 0;
     if (!debug.frozen && state.started && !state.over && clock.speed > 0) {
       // fixed-size steps: the same seed and laydown give the same run at any frame rate or speed
       simAcc += real * WORLD.timeScale * clock.speed;
-      let n = 0;
       while (simAcc >= SIM_STEP && n < 400 && !state.over) { sim.step(); simAcc -= SIM_STEP; n++; }
       if (n >= 400) simAcc = 0;
     }
@@ -258,16 +261,17 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     for (const fn of frameListeners) fn(real);
     replay.update(real, gameView.camera);
     placement.update();
-    gameView.draw();
+    if (!covered) gameView.draw(); // the profile screen hides the whole scene
     const now = performance.now();
-    if (now - lastBump >= PANEL_INTERVAL) { lastBump = now; bump(); }
+    if (now - lastBump >= PANEL_INTERVAL && (n || stirred || replay.active())) { lastBump = now; stirred = false; bump(); }
   }
 
   // Called once, when the canvas and label layer are in the page.
   function attach(canvas, labelLayer) {
+    for (const type of ['pointermove', 'pointerdown', 'wheel', 'keydown']) addEventListener(type, stir, { capture: true, passive: true });
     gameView = createGameView(canvas, labelLayer, sim, mapSource);
     placement = createPlacement({
-      scene: gameView.scene, camera: gameView.camera, canvas, getWorldMesh: gameView.getWorldMesh, sim,
+      scene: gameView.scene, camera: gameView.camera, canvas, sim,
       getTool: tools.get, defFor: (id) => unitDef(id, onVehicle(id, loadoutFor(id), tools.vehicle())), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
     });
     replay = createReplay({
@@ -286,6 +290,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     catalogue: tools.catalogue, openCatalogue: tools.openCatalogue, pickFromTray: tools.pickFromTray, startDrag: tools.startDrag, endDrag: tools.endDrag, dropAt,
     toast, onToast(fn) { toastListeners.add(fn); return () => toastListeners.delete(fn); },
     onFrame(fn) { frameListeners.add(fn); return () => frameListeners.delete(fn); },
+    setCovered(on) { covered = on; },
     getReplay: () => replay,
     getView: () => gameView,
     // settings shared with the 3D view

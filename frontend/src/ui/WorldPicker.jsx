@@ -40,7 +40,6 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
     setListing(found);
     return found;
   };
-  useEffect(() => { if (wantReal && !listing) refresh(); }, [wantReal]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let live = true;
     const sentHere = view.startAt; // from a game, to open a map of a place outside that world

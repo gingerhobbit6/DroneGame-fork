@@ -7,6 +7,12 @@ import { typicalAltitude } from '../sim/site-range.js';
 import { inZone } from '../zone.js';
 
 const caches = new WeakMap(); // sim -> drone type -> the last grid worked out
+const CELL = 250; // metres
+
+// A patrol's escorts move and turn every step, and a jammer on a pan-and-tilt head turns, so these count by the grid's own cell and
+// by 15°, or the grid would be worked out again on every refresh.
+const placed = (n, v) => (n.escort ? Math.round((v * WORLD.metresPerUnit) / CELL) : v);
+const covers = (n) => coverKey(n.escort || n.slewTo != null ? Object.create(n.def, { facing: { value: Math.round(n.def.facing / 15) * 15 } }) : n.def);
 
 // For each cell, how many sensors would see a drone of this type there (it flies at that type's usual height).
 export function coverageGrid(sim, threat) {
@@ -14,11 +20,11 @@ export function coverageGrid(sim, threat) {
   const def = DRONES[threat];
   const agl = typicalAltitude(def);
   // everything the answer depends on: node ids repeat after a reload, so they cannot tell two laydowns apart
-  const key = [threat, sim.state.terrainSeed, JSON.stringify(exportFigures()), ...[...net.nodes.values()].map((n) => `${n.nodeId}:${n.pos.x}:${n.pos.z}:${n.def.range}:${n.def.mount}:${n.def.fov}:${coverKey(n.def)}`)].join('|');
+  const key = [threat, sim.state.terrainSeed, JSON.stringify(exportFigures()), ...[...net.nodes.values()].map((n) => `${n.nodeId}:${placed(n, n.pos.x)}:${placed(n, n.pos.z)}:${n.def.range}:${n.def.mount}:${n.def.fov}:${covers(n)}`)].join('|');
   if (!caches.has(sim)) caches.set(sim, new Map());
   const cache = caches.get(sim), hit = cache.get(threat);
   if (hit && hit.key === key) return hit;
-  const cell = 250, half = terrainState.data.R - 200, n = Math.round((2 * half) / cell);
+  const cell = CELL, half = terrainState.data.R - 200, n = Math.round((2 * half) / cell);
   const counts = new Uint8Array(n * n);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) counts[j * n + i] = net.coverageAt(-half + (i + 0.5) * cell, -half + (j + 0.5) * cell, agl, def);
   const grid = { key, n, cell, half, counts };

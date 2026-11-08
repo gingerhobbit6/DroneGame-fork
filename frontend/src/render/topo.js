@@ -27,6 +27,10 @@ export function rampColour(t) {
   return [1, 2, 3].map((c) => a[c] + (b[c] - a[c]) * mix);
 }
 
+// The ramp at 1,024 steps, worked out once: working it out for each of a real world's 7 million posts took most of a second.
+const STEPS = 1024, TABLE = new Float32Array(STEPS * 3);
+for (let k = 0; k < STEPS; k++) TABLE.set(rampColour(k / (STEPS - 1)), 3 * k);
+
 // One RGBA pixel per grid post, north at the top.
 export function topoPixels(data) {
   const { N, cell, ground, cover, geo } = data, range = heightRange(data), span = Math.max(range.high - range.low, 1);
@@ -39,7 +43,8 @@ export function topoPixels(data) {
       const gx = (ground[j * N + Math.min(i + 1, N - 1)] - ground[j * N + Math.max(i - 1, 0)]) / cell;
       const gz = (ground[Math.min(j + 1, N - 1) * N + i] - ground[Math.max(j - 1, 0) * N + i]) / cell;
       const shade = clamp((1 + gx + gz) / Math.hypot(gx, gz, 1), 0.55, 1.25);
-      let [r, g, b] = rampColour((ground[k] + geo.H0 - range.low) / span);
+      const c = 3 * Math.round(clamp((ground[k] + geo.H0 - range.low) / span, 0, 1) * (STEPS - 1));
+      let r = TABLE[c], g = TABLE[c + 1], b = TABLE[c + 2];
       if (cover[k] === WOOD) { r *= 0.72; g *= 0.86; b *= 0.68; }
       if (cover[k] === BUILDING) { r = 95; g = 90; b = 88; }
       out[o] = r * shade; out[o + 1] = g * shade; out[o + 2] = b * shade; out[o + 3] = 255;

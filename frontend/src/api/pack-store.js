@@ -9,10 +9,13 @@ const MAX_FEATURES = 32 * 1024 * 1024; // MAX_FEATURES in tools/mapbuild/mapbuil
 const MAX_PIXELS = 8192 * 8192; // an 80 km satellite picture at 10 m is 8000 pixels square
 const DB = 'site-guard-packs', STORE = 'packs';
 
-async function gunzip(bytes, rawLength, max = MAX_RAW) {
-  if (!Number.isInteger(rawLength) || rawLength <= 0 || rawLength > max) throw new Error('This pack declares an unreasonable size.');
+const reasonable = (rawLength, max) => { if (!Number.isInteger(rawLength) || rawLength <= 0 || rawLength > max) throw new Error('This pack declares an unreasonable size.'); };
+
+// Unpacks into `out` when given, so the grids can share one buffer.
+async function gunzip(bytes, rawLength, max = MAX_RAW, out = null) {
+  reasonable(rawLength, max);
   const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
-  const out = new Uint8Array(rawLength);
+  out ??= new Uint8Array(rawLength);
   for (let at = 0; ;) {
     const { done, value } = await reader.read();
     if (done) {
@@ -57,13 +60,18 @@ export async function decodePack(buffer) {
   const section = (name) => { const s = header.sections.find((x) => x.name === name); if (!s) throw new Error('This map pack is missing a section.'); return s; };
   const cells = section('canopy').rawLength; // every grid has one value a post, and a height is 4 bytes, so sizes are checked before anything is unpacked
   if (!Number.isInteger(header.N) || cells !== header.N * header.N || section('ground').rawLength !== 4 * cells || section('bldg').rawLength !== cells || section('cover').rawLength !== cells) throw new Error('This map pack is damaged.');
-  const raw = {};
-  for (const name of ['ground', 'canopy', 'bldg', 'cover']) raw[name] = await gunzip(slice(section(name)), section(name).rawLength);
+  // The four grids unpack one after another into one buffer, in the order they are fingerprinted, so hashing them copies nothing.
+  reasonable(4 * cells, MAX_RAW);
+  const all = new Uint8Array(7 * cells), raw = {};
+  for (let at = 0, k = 0; k < 4; k++) {
+    const name = ['ground', 'canopy', 'bldg', 'cover'][k], s = section(name);
+    raw[name] = await gunzip(slice(s), s.rawLength, MAX_RAW, all.subarray(at, at + s.rawLength));
+    at += s.rawLength;
+  }
 
-  const hash = await crypto.subtle.digest('SHA-256', await new Blob([raw.ground, raw.canopy, raw.bldg, raw.cover]).arrayBuffer());
+  const hash = await crypto.subtle.digest('SHA-256', all);
   if (hex(hash) !== header.gridsSha256) throw new Error('This map pack is damaged: its grids do not match their fingerprint.');
-  if (raw.ground.length % 4) throw new Error('This map pack is damaged.');
-  const grids = { ground: new Float32Array(raw.ground.buffer, 0, raw.ground.length / 4), canopy: raw.canopy, bldg: raw.bldg, cover: raw.cover };
+  const grids = { ground: new Float32Array(all.buffer, 0, cells), canopy: raw.canopy, bldg: raw.bldg, cover: raw.cover };
   const feature = section('features');
   const features = JSON.parse(new TextDecoder().decode(await gunzip(slice(feature), feature.rawLength, MAX_FEATURES)));
   const pack = parsePack(header, grids, features);

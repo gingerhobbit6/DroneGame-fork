@@ -24,6 +24,7 @@ export function createTrail(scene, color) {
     line,
     get length() { return n; },
     push(p) {
+      if (n && pos[3 * n - 3] === p.x && pos[3 * n - 2] === p.y && pos[3 * n - 1] === p.z) return; // unmoved, as when paused: nothing to send
       if (n >= 2 && fromLastFixed(p) < u(STEP)) set(n - 1, p); // the head follows it until it has gone a step
       else {
         if (n === POINTS) { pos.copyWithin(0, 3); n--; }

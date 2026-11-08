@@ -1,8 +1,8 @@
 // The smaller panels: tuning, legend, toasts and the operator's approval cards.
 
 import { useEffect, useRef, useState } from 'react';
-import { ADAPT, WORLD } from '../sim/config/index.js';
-import { useGame, useTick } from './hooks.js';
+import { ADAPT, DRONES, WORLD } from '../sim/config/index.js';
+import { hex, useGame, useTick } from './hooks.js';
 import { NumberInput } from './NumberInput.jsx';
 import { Movable } from './Movable.jsx';
 
@@ -24,10 +24,10 @@ export function Tuning({ open }) {
 }
 
 const LEGEND = [
-  ['#ffd600', 'Fixed-wing spotter drone: high, orbits, hard to jam, boosts strikes'],
-  ['#ff9100', 'Fibre-optic strike drone: slower, flown down a fibre line, so no radio and no jamming'],
-  ['#ff1744', 'First-person-view strike drone: a pilot flies it by live video over radio. Fast, agile, can be jammed'],
-  ['#d500f9', 'Fixed-wing strike drone: fast, high, flies itself with no radio link, partly jammable'],
+  [hex(DRONES.spotter.color), 'Fixed-wing spotter drone: high, orbits, hard to jam, boosts strikes'],
+  [hex(DRONES.fo.color), 'Fibre-optic strike drone: slower, flown down a fibre line, so no radio and no jamming'],
+  [hex(DRONES.fpv.color), 'First-person-view strike drone: a pilot flies it by live video over radio. Fast, agile, can be jammed'],
+  [hex(DRONES.fw.color), 'Fixed-wing strike drone: fast, high, flies itself with no radio link, partly jammable'],
   ['#5f7596', 'Real drones (sandbox) take the colour of their type'],
   ['#8a94a3', 'Grey ghost: real drone no sensor has (truth overlay)'],
   ['#ff8080', 'Air track symbol: a fused track (yellow clover frame = unclassified, red peaked frame = named by a camera, with a rotor over a multirotor; dashed = tentative, dimmer = coasting). Faint unless Highlight tracks is ticked'],

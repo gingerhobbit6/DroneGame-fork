@@ -82,6 +82,7 @@ export function Root({ game }) {
       signOut: () => api.auth.signOut().catch(() => null).then(() => leave('You are signed out.')),
     };
   }, [user, screen, activeUnit, editActive, api, game, storage, clear]);
+  useEffect(() => { game.setCovered(account.covered); }, [game, account.covered]); // nothing is drawn under the profile screen
 
   if (user === undefined) return <main className="acct"><div className="acct-sky" aria-hidden="true" /></main>;
   const signedIn = (u) => {

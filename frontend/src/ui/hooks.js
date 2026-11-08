@@ -62,7 +62,7 @@ export function useArmed(ms = 3000) {
   return { armed, confirm };
 }
 
-export const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+export { hexCss as hex } from '../render/labels.js';
 export const km = (metres, trim = false) => `${(metres / 1000).toFixed(1).replace(trim ? /\.0$/ : '', '')} km`; // trim: 3 km, not 3.0 km
 
 // Run one request and show its outcome in a note, so a refusal or a dead server is never silent. done: the note, or one made from the result.

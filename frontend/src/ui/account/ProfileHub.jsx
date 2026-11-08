@@ -6,7 +6,7 @@ import { money } from '../../sim/economy.js';
 import { useArmed } from '../hooks.js';
 import { Logo, MIN_PASSWORD, PasswordField, RecoveryCode, TextField, ZuluClock, initials, useRequest } from './parts.jsx';
 import { PackEditor } from './PackEditor.jsx';
-import { blankPack, describeTotals, packTotals } from './pack.js';
+import { blankPack, describeTotals, fetchPacks, packTotals } from './pack.js';
 
 const when = (iso) => (iso ? new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'Never');
 
@@ -109,8 +109,7 @@ function Packs({ api, account, onEnter }) {
   const [packs, setPacks] = useState(null);
   const [editing, setEditing] = useState(() => (account.editActive ? account.activeUnit : null)); // opened from the game's pack tray
   const { error, run } = useRequest();
-  // the list holds summaries, so each card's contents are fetched too; a profile has at most 50 packs
-  const load = () => run(async () => setPacks(await Promise.all((await api.units.list()).map((p) => api.units.get(p.id)))));
+  const load = () => run(async () => setPacks(await fetchPacks(api)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
   const remove = (id) => run(async () => { await api.units.remove(id); if (account.activeUnit?.id === id) account.deploy(null); await load(); });

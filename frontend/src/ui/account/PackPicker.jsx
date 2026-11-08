@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useGame } from '../hooks.js';
-import { describeTotals, packTotals, useAccount } from './pack.js';
+import { describeTotals, fetchPacks, packTotals, useAccount } from './pack.js';
 
 export function PackPicker() {
   const { api } = useGame(), account = useAccount();
@@ -14,9 +14,7 @@ export function PackPicker() {
     if (!who || covered) return undefined; // fetched again whenever the profile closes: packs may have been built or deleted there
     let live = true;
     setPacks(null); setFailed(false); // never the last account's packs, or an old failure
-    // the list holds summaries, so each pack's kit is fetched too; a profile has at most 50
-    api.units.list().then((rows) => Promise.all(rows.map((p) => api.units.get(p.id))))
-      .then((all) => { if (live) setPacks(all); }, () => { if (live) setFailed(true); });
+    fetchPacks(api).then((all) => { if (live) setPacks(all); }, () => { if (live) setFailed(true); });
     return () => { live = false; };
   }, [api, who, covered]);
   if (!who) return null;

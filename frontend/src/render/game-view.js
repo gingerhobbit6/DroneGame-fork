@@ -50,8 +50,8 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   setModelEnv(pmrem.fromScene(room, 0.04).texture);
   room.dispose(); pmrem.dispose();
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b1220);
-  scene.fog = new THREE.Fog(0x0b1220, u(12000), u(30000));
+  scene.background = new THREE.Color();
+  scene.fog = new THREE.Fog(0); // colours, distances and light come from LOOKS on the first update
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.02, 8000); // 160 km: the far side of a 25 km ring, seen from right out
   camera.position.set(0, 300, 380);
   const controls = new OrbitControls(camera, canvas);
@@ -68,9 +68,9 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   // A pinch arrives as many tiny wheel steps with Ctrl held, so it zooms far more per step than a wheel notch. Both are tuned by hand.
   canvas.addEventListener('wheel', (e) => { controls.zoomSpeed = e.ctrlKey ? PINCH_ZOOM : WHEEL_ZOOM; }, { capture: true, passive: true });
 
-  const sky = new THREE.HemisphereLight(0xbcd4ff, 0x203020, 0.9);
+  const sky = new THREE.HemisphereLight(0xbcd4ff, 0x203020);
   scene.add(sky);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+  const sun = new THREE.DirectionalLight();
   sun.position.copy(SUN_FROM);
   sun.shadow.mapSize.set(2048, 2048);
   scene.add(sun, sun.target);
@@ -85,7 +85,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     c.left = c.bottom = -half; c.right = c.top = half; c.near = half; c.far = half * 8;
     c.updateProjectionMatrix();
   }
-  let lit = 'day', fogBase = LOOKS.day.fog.map(u);
+  let lit = null, fogBase = null;
   function light(name) {
     const look = LOOKS[name] ?? LOOKS.day;
     lit = name;
@@ -101,7 +101,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const siteRing = drapedRing(u(SITE.radius), 0.8, 0xff5252, 0.6);
   const buildRing = drapedRing(u(BUILD.maxDist), 1.2, 0x5c7bb0, 0.4);
   scene.add(siteRing.mesh, buildRing.mesh);
-  let worldView = null, flash = 0, ownMaterial = null, relief = null;
+  let worldView = null, flash = 0, ownMaterial = null, relief = null, siteOpacity = 0.6;
   const osmMap = createOsmMap(renderer);
   const map = createMapTexture(renderer, () => relief);
   function showOsm() { // the demo picture on generated ground, and on the 2D maps
@@ -131,7 +131,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     siteRing.update(0, 0);
     buildRing.update(0, 0);
     siteRing.mesh.position.y = buildRing.mesh.position.y = groundU(0, 0); // a draped ring's heights are from the ground at its centre
-    siteRing.mesh.material.opacity = terrainState.data.geo ? 0.9 : 0.6; // a real map is bright, so these need more to show
+    siteOpacity = terrainState.data.geo ? 0.9 : 0.6; // a real map is bright, so these need more to show
     buildRing.mesh.material.opacity = terrainState.data.geo ? 0.9 : 0.4;
   }
   // Plan view is the same camera looking straight down, as the minimap reads its field of view and placement raycasts through it.
@@ -224,7 +224,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     fly(real);
     flash = Math.max(0, flash - real);
     siteMat.emissiveIntensity = flash > 0 ? flash * 1.5 : 0;
-    siteRing.mesh.material.opacity = flash > 0 ? 1 : 0.6; // a real site has no station to light up
+    siteRing.mesh.material.opacity = flash > 0 ? 1 : siteOpacity; // a real site has no station to light up
     siteRing.mesh.visible = buildRing.mesh.visible = !sim.siteIsFree(); // a drawn area is the site, and you can build anywhere
   }
 
@@ -239,7 +239,6 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
 
   return {
     scene, camera, controls, labels, structures, update, showOsm, loadOsm: () => osmMap.load(), refreshMap, mapPreviews, viewFromAbove, centreOn,
-    getWorldMesh: () => worldView && worldView.mesh,
     draw() {
       if (eyeView.update()) view.zoom = u(20); // from a mast, what is near is drawn true size
       else { controls.update(); view.zoom = camera.position.distanceTo(controls.target); }
