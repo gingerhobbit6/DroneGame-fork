@@ -1,10 +1,15 @@
 """Protections for a local service with no sign-in: a page on another site must not be able to read or change anything here."""
 
+import os
+
 from starlette.datastructures import MutableHeaders
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+# Only this machine by default. To reach it through a proxy such as `tailscale serve`, list the extra hostname(s) in
+# SITEGUARD_EXTRA_HOSTS (comma separated). The server itself stays bound to 127.0.0.1.
+EXTRA_HOSTS = [h.strip() for h in os.environ.get("SITEGUARD_EXTRA_HOSTS", "").split(",") if h.strip()]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", *EXTRA_HOSTS]
 MAX_BODY_BYTES = 1024 * 1024
 HEADERS = {
     "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org https://tiles.maps.eox.at; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",

@@ -3,6 +3,7 @@ import { cleanSeed, createGame } from './game.js';
 import { parseWorldId } from './sim/world-pack.js';
 import { App } from './ui/App.jsx';
 import './style.css';
+import './mobile.css'; // last, so its narrow-screen rules win over the desktop ones
 
 // The scenario seed fixes every chance event: wave contents, sensor noise, message IDs. The terrain seed is separate, so you
 // can change the attack without changing the ground.

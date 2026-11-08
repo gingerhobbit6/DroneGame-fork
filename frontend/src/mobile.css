@@ -1,0 +1,132 @@
+/* Phone and small-tablet layout. Loaded after style.css, so these rules win.
+
+   Which layout you get depends on the DEVICE, not the window: a touch screen with no hover (a phone or small tablet) gets the
+   compact layout, and a laptop or desktop always gets the normal one, however its window is sized. A browser window made
+   very narrow (under 640 px) also gets the compact layout, since the normal one cannot fit.
+
+   Compact layout: status along the top, the controls folded behind a menu button, the purchase bar as a strip along the bottom
+   (or a column down the left when the phone is on its side), and every other panel as a sheet. */
+
+#btn-menu { display: none; }
+
+html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+
+/* touch: bigger things to press, and text boxes large enough that the browser does not zoom in on them */
+@media (hover: none) and (pointer: coarse) {
+  button { min-height: 40px; }
+  button.mini, button.fr, .tool-sizes button, .up-reset, .wz-progress button { min-height: 0; }
+  button.speed { min-height: 40px; }
+  .tool-sizes button { width: 34px; height: 24px; }
+  input[type=checkbox], input[type=radio] { width: 20px; height: 20px; }
+  input[type=text], input[type=number], input[type=search], select, textarea { font-size: 16px; min-height: 36px; }
+  #tl-time { min-width: 44px; }
+  .tl-row button { padding: 6px 12px; }
+}
+
+@media (hover: none) and (pointer: coarse) and (max-width: 1000px), (max-width: 640px) {
+  :root { --strip: 60px; --tools: 56px; --left: 8px; --top: 60px; }
+
+  /* top bar: status on the left, guide and menu buttons on the right */
+  #left-col { display: contents; }
+  #left-col .panel { position: fixed; }
+  #hud-top-left { top: 8px; left: 8px; width: calc(100vw - 120px); padding: 6px 10px; z-index: 2; }
+  #hud-top-left .label { margin-bottom: 2px; }
+  #hud-top-left .bb-legend, #hud-top-left #status { display: none; }
+  #hud-top-left .stats { margin-top: 4px; flex-wrap: wrap; gap: 0 10px; justify-content: flex-start; font-size: 12px; }
+  #btn-menu { display: flex; align-items: center; justify-content: center; position: fixed; top: 8px; right: 8px; width: 44px; height: 44px; padding: 0; font-size: 20px; z-index: 4; background: rgba(12, 20, 34, 0.92); }
+  #btn-wizard { top: 8px; right: 60px; width: 44px; height: 44px; font-size: 0; gap: 0; }
+
+  /* the controls: hidden until the menu button is pressed, then a sheet below the top bar */
+  #hud-top-right { display: none; top: var(--top); left: 8px; right: 8px; width: auto; max-height: calc(100vh - var(--top) - 8px); max-height: calc(100dvh - var(--top) - 8px); z-index: 7; overflow-y: auto; }
+  #hud-top-right.menu-open { display: flex; }
+  #hud-top-right label { font-size: 14px; padding: 4px 0; }
+  #hud-top-right button, #hud-top-right select { min-height: 40px; font-size: 14px; }
+
+  /* the purchase bar: a strip you swipe along, above the timeline */
+  #toolbar { left: 8px; right: 8px; bottom: var(--strip); width: auto; flex-direction: row; gap: 4px; padding: 4px; overflow-x: auto; overflow-y: hidden; z-index: 2; }
+  #toolbar .tool-row { flex: none; width: 128px; }
+  #toolbar .tool .k { display: none; }
+  #toolbar .tool.sized { padding-bottom: 24px; }
+  #tool-sell { position: static; }
+  .tool-sizes button { width: 30px; height: 22px; }
+
+  /* the timeline along the very bottom */
+  #timeline { left: 8px; right: 8px; bottom: 8px; width: auto; min-width: 0; transform: none; z-index: 2; }
+  #review-banner { top: var(--top); max-width: calc(100vw - 16px); font-size: 12px; text-align: center; }
+
+  /* the minimap shrinks to a corner thumbnail above the strip; the map buttons go down the other side */
+  #minimap { left: 8px; bottom: calc(var(--strip) + var(--tools) + 8px); width: 108px; height: 108px; padding: 3px; z-index: 1; }
+  #minimap-canvas { width: 100px; height: 100px; }
+  #map-rail { left: auto; right: 8px; bottom: calc(var(--strip) + var(--tools) + 8px); }
+  #map-credit { bottom: calc(var(--strip) + var(--tools) + 8px); max-width: calc(100vw - 140px); font-size: 10px; }
+  #hud-bottom-left { display: none; } /* the legend; the same names are on the labels */
+
+  /* every other panel opens as a sheet above the strip */
+  #dock, #dock.max, #sandbox, #tuning, #attack-mix, #unit-panel, #tool-picker, #wizard, #wizard-pill {
+    left: var(--left); right: 8px; top: auto; width: auto; max-width: none; z-index: 6;
+    bottom: calc(var(--strip) + var(--tools) + 8px); max-height: calc(100vh - var(--strip) - var(--tools) - 70px); max-height: calc(100dvh - var(--strip) - var(--tools) - 70px);
+  }
+  #dock, #dock.max { top: var(--top); max-height: none; bottom: var(--strip); }
+  #dock:not(.hidden) ~ #unit-panel { left: var(--left); right: 8px; }
+  #wizard-pill { height: 44px; max-height: 44px; }
+  #sandbox-banner { font-size: 11px; padding: 2px 10px; white-space: nowrap; }
+  #approval { top: var(--top); width: calc(100vw - 16px); max-height: 60vh; }
+  #toast { top: calc(var(--top) + 4px); max-width: calc(100vw - 24px); text-align: center; }
+
+  /* the dock's tables and lists scroll sideways instead of squeezing */
+  .tabs button { padding: 8px 8px; }
+  .net-main { flex-direction: column; min-height: 0; }
+  #net-canvas { min-height: 260px; }
+  #net-side { width: auto; max-height: 40%; }
+  #msg-list { overflow-x: auto; }
+  #msg-list .row { min-width: 560px; }
+  .figs { grid-template-columns: 1fr; }
+  #node-table, table.mini { display: block; overflow-x: auto; }
+  #sr-polar { width: min(170px, 60vw); height: auto; aspect-ratio: 1; }
+
+  /* the start screen and the cards */
+  .card { max-width: none; width: calc(100vw - 16px); padding: 16px; }
+  .card.welcome h1 { font-size: 26px; }
+  .card.welcome .lead { font-size: 15px; line-height: 22px; }
+  .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card.game-over { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .site-choose { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .seed-row { flex-wrap: wrap; }
+  #btn-results { top: var(--top); }
+}
+
+/* a phone held upright: a little narrower tool names */
+@media (hover: none) and (pointer: coarse) and (max-width: 480px), (max-width: 480px) {
+  #toolbar .tool-row { width: 112px; }
+  .tool .n { font-size: 12px; }
+}
+
+/* a phone on its side has little height, so everything is slim: the status is one short row, the purchase bar is a column down
+   the left edge (not a strip eating the height), and the timeline is a thin bar */
+@media (hover: none) and (pointer: coarse) and (max-width: 1000px) and (max-height: 520px), (max-width: 640px) and (max-height: 520px) {
+  :root { --strip: 38px; --tools: 0px; --left: 140px; --top: 44px; }
+
+  #hud-top-left { top: 4px; left: 4px; width: auto; max-width: calc(100vw - 100px); padding: 3px 8px; display: flex; align-items: center; gap: 8px; border-radius: 6px; }
+  #hud-top-left > .label:first-child { display: none; }
+  #hud-top-left .bar { flex: none; width: 70px; height: 8px; }
+  #hud-top-left .label { margin: 0 !important; font-size: 10px; letter-spacing: 0.04em; white-space: nowrap; }
+  #hud-top-left .budget-num { float: none; margin-left: 4px; }
+  #hud-top-left .budget-bar { flex: none; width: 70px; height: 8px; margin: 0; }
+  #hud-top-left .stats { display: flex; margin: 0; gap: 8px; font-size: 11px; white-space: nowrap; }
+  #hud-top-left .stats span { white-space: nowrap; }
+  #btn-menu, #btn-wizard { top: 4px; width: 36px; height: 36px; font-size: 18px; }
+  #btn-menu { right: 4px; }
+  #btn-wizard { right: 44px; font-size: 0; }
+
+  #toolbar { left: 4px; right: auto; top: var(--top); bottom: calc(var(--strip) + 4px); width: 128px; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+  #toolbar .tool-row { width: 100%; }
+
+  #timeline { left: 4px; right: 4px; bottom: 4px; padding: 3px 8px; }
+  .tl-row button { padding: 2px 10px; min-height: 28px; }
+  #minimap { display: none; }
+  #map-rail { right: 4px; bottom: calc(var(--strip) + 8px); gap: 4px; }
+  #map-rail button { width: 36px; height: 36px; }
+  #map-credit { bottom: calc(var(--strip) + 6px); left: calc(var(--left) + 8px); transform: none; }
+  #hud-top-right { left: auto; width: min(360px, calc(100vw - 16px)); }
+  #dock, #dock.max { bottom: calc(var(--strip) + 4px); }
+}

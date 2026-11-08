@@ -40,7 +40,8 @@ function Screen() {
   const [dockOpen, setDockOpen] = useState(false);
   const [dockTab, setDockTab] = useState('nodes');
   const [tuningOpen, setTuningOpen] = useState(false);
-  const openDock = (tab) => { setDockTab(tab); setDockOpen(true); };
+  const [menuOpen, setMenuOpen] = useState(false); // on a narrow screen the controls fold away behind a menu button
+  const openDock = (tab) => { setMenuOpen(false); setDockTab(tab); setDockOpen(true); };
   useHotkeys();
   return (
     <>
@@ -51,7 +52,8 @@ function Screen() {
       </div>
       <Minimap />
       <GameMapControls />
-      <ControlPanel onToggleDock={() => setDockOpen((o) => !o)} onToggleTuning={() => setTuningOpen((o) => !o)} onSandbox={() => setTuningOpen(false)} />
+      <button id="btn-menu" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>{menuOpen ? '✕' : '☰'}</button>
+      <ControlPanel menuOpen={menuOpen} onToggleDock={() => { setMenuOpen(false); setDockOpen((o) => !o); }} onToggleTuning={() => { setMenuOpen(false); setTuningOpen((o) => !o); }} onSandbox={() => { setMenuOpen(false); setTuningOpen(false); }} />
       <Tuning open={tuningOpen} />
       <WizardButton />
       <Dock open={dockOpen} onClose={() => setDockOpen(false)} tab={dockTab} onTab={setDockTab} />

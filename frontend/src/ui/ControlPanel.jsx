@@ -10,7 +10,7 @@ import { ConditionsPicker } from './ConditionsPicker.jsx';
 
 const SPEEDS = [[0, '❚❚', 'Pause (Space)'], [1, '1x'], [2, '2x'], [3, '3x']];
 
-export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
+export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox, menuOpen }) {
   useTick();
   const game = useGame();
   const { sim, commands, clock } = game;
@@ -27,7 +27,7 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
 
   return (
     <>
-    <div id="hud-top-right" className="panel">
+    <div id="hud-top-right" className={`panel${menuOpen ? ' menu-open' : ''}`}>
       <button id="btn-wave" className="primary" disabled={state.waveActive || state.over || state.sandbox} onClick={() => commands.startWave()}>
         {state.sandbox ? 'Exit sandbox to start' : state.waveActive ? `Wave ${state.wave} in progress` : `Start wave ${state.wave + 1}`}
       </button>
