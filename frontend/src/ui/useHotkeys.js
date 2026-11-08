@@ -42,7 +42,7 @@ export function useHotkeys() {
           game.toast(`Map: ${mapName(next, game.sim.state.terrainSeed)}`);
           return;
         }
-      } else if (e.key === 'm' || e.key === 'M') { game.setViewOption('osm', !view.osm); return; }
+      }
       const group = TOOLBAR.find((g) => g.key === e.key);
       if (group) game.cycleTool(group);
     };

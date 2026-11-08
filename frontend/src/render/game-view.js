@@ -15,7 +15,6 @@ import { createBeliefViews } from './belief-view.js';
 import { createEffects } from './effects.js';
 import { createZoneView } from './zone-view.js';
 import { createEyeView } from './eye-view.js';
-import { createOsmMap } from './osm-map.js';
 import { createMapTexture } from './map-texture.js';
 import { setModelEnv } from './paint.js';
 import { sizeWideLines } from './wide-lines.js';
@@ -102,13 +101,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const buildRing = drapedRing(u(BUILD.maxDist), 1.2, 0x5c7bb0, 0.4);
   scene.add(siteRing.mesh, buildRing.mesh);
   let worldView = null, flash = 0, ownMaterial = null, relief = null, siteOpacity = 0.6;
-  const osmMap = createOsmMap(renderer);
   const map = createMapTexture(renderer, () => relief);
-  function showOsm() { // the demo picture on generated ground, and on the 2D maps
-    if (terrainState.data.geo) return; // a real world has its own map
-    worldView.mesh.material = view.osm ? osmMap.material : ownMaterial;
-    view.hillshade = view.osm ? osmMap.canvas : relief;
-  }
   // Paint the chosen picture onto a real world. Resolves with how a live map's tiles went.
   function refreshMap() {
     const data = terrainState.data, source = data.geo && getMapSource(sim.state.terrainSeed);
@@ -127,7 +120,6 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     for (const m of [worldView.mesh, ...worldView.scenery]) m.receiveShadow = true;
     ownMaterial = worldView.mesh.material;
     if (terrainState.data.geo) { worldView.mesh.material = map.material; refreshMap().catch(() => {}); } // the terrain still shows if its picture fails
-    else showOsm();
     siteRing.update(0, 0);
     buildRing.update(0, 0);
     siteRing.mesh.position.y = buildRing.mesh.position.y = groundU(0, 0); // a draped ring's heights are from the ground at its centre
@@ -238,7 +230,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   resize();
 
   return {
-    scene, camera, controls, labels, structures, update, showOsm, loadOsm: () => osmMap.load(), refreshMap, mapPreviews, viewFromAbove, centreOn,
+    scene, camera, controls, labels, structures, update, refreshMap, mapPreviews, viewFromAbove, centreOn,
     draw() {
       if (eyeView.update()) view.zoom = u(20); // from a mast, what is near is drawn true size
       else { controls.update(); view.zoom = camera.position.distanceTo(controls.target); }

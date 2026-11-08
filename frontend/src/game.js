@@ -300,15 +300,6 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       view[key] = value;
       if (key === 'zone') syncZone();
       if (key === 'rings' && gameView) gameView.structures.setRingsVisible(value);
-      if (key === 'osm' && gameView) {
-        gameView.showOsm();
-        if (value) {
-          gameView.loadOsm().then(({ failed, total }) => {
-            if (failed === total) { view.osm = false; gameView.showOsm(); toast('The map could not load: it needs an internet connection'); bump(); }
-            else if (failed) toast(`${failed} of ${total} map tiles could not load`);
-          });
-        }
-      }
       if (key === 'planView' && gameView) gameView.viewFromAbove(value);
       if (['baseMap', 'mapRoads', 'mapGrid', 'mapContours'].includes(key) && gameView) {
         view.mapLoading = true;

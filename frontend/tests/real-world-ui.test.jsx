@@ -167,7 +167,7 @@ describe('choosing a world', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, blob: async () => new NodeBlob([buffer]) })));
     vi.stubGlobal('indexedDB', undefined);
     game = createGame({ seed: '1', terrainSeed: '1', api, storage: createFakeStorage() });
-    Object.assign(view, { baseMap: 'os', mapRoads: false, mapGrid: 'national', mapContours: false, scenery: true, mapPanel: true, mapLoading: false, startAt: null, planView: false, me: null, osm: false, zone: null, wizard: 'closed' });
+    Object.assign(view, { baseMap: 'os', mapRoads: false, mapGrid: 'national', mapContours: false, scenery: true, mapPanel: true, mapLoading: false, startAt: null, planView: false, me: null, zone: null, wizard: 'closed' });
     history.replaceState(null, '', '/');
   });
   afterEach(() => { cleanup(); resetAllFigures(); vi.unstubAllGlobals(); });
@@ -427,15 +427,13 @@ describe('choosing a world', () => {
     };
     const fakeView = () => ({ centreOn: vi.fn(), refreshMap: vi.fn(async () => null), viewFromAbove: vi.fn() });
 
-    it('offers the generated ground and the live demo on generated ground, and no real overlays', () => {
+    it('offers only the generated ground on generated ground, with no real maps, overlays or outside credit', () => {
       show(<MapControls />);
       expect($('#map-plan')).toBeTruthy();
       expect($('#map-type-generated').getAttribute('aria-checked')).toBe('true');
-      expect($('#map-type-topo')).toBeNull();
+      expect([...document.querySelectorAll('#map-types button')].map((b) => b.id)).toEqual(['map-type-generated']);
       expect($('#map-overlays')).toBeNull();
-      fireEvent.click($('#map-type-live'));
-      expect(view.osm).toBe(true);
-      expect($('#map-credit').textContent).toContain('OpenStreetMap');
+      expect($('#map-credit')).toBeNull();
     });
     it('shows options that cannot be used as greyed out, with the reason', async () => {
       await deployed();
@@ -531,13 +529,6 @@ describe('choosing a world', () => {
       fireEvent.click($('#map-grid-mgrs'));
       expect(view.mapGrid).toBe(false);
       expect([nextGrid('national'), nextGrid('mgrs'), nextGrid(false)]).toEqual(['mgrs', false, 'national']);
-    }, 30000);
-    it('leaves the demo credit behind on a real map', async () => {
-      await deployed();
-      view.osm = true; // left on from generated ground
-      show(<MapControls />);
-      expect($('#map-credit').textContent).toContain('OS credit');
-      expect($('#map-type-generated')).toBeNull();
     }, 30000);
     it('goes back to the start screen from a game, and opens on the place asked for', async () => {
       await deployed();
