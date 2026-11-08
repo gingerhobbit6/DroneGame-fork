@@ -18,7 +18,7 @@ export const DRONES = {
   // for the real drones; for these types, the mass their site damage was scaled from (blast() in real-drones.js).
   // label: the tag drawn over it on the map.
   spotter: {
-    name: 'Fixed-wing spotter drone', label: 'Fixed-wing spotter', role: 'spotter', model: 'fw', hp: 50, speed: 30, damage: 0, evade: 0.9,
+    name: 'Fixed-wing spotter drone', label: 'Fixed-wing spotter', role: 'spotter', model: 'fw', hp: 50, speed: 30, evade: 0.9,
     links: { control: 'control900', video: 'video58', gnss: true }, // radio dependencies, for jamming
     color: 0xffd600, alt: [400, 500], jamResist: 0.75, adapt: 0.5, rfEmitter: true, protocol: 'tactical', airframe: 'Fixed wing',
     loiterDist: 2500, loiterTime: 60, // orbit radius (m) and seconds on station before it leaves
@@ -34,7 +34,7 @@ export const DRONES = {
   },
   fo: {
     // fibre-optic FPV: an FPV that is slower and less agile, flies low, emits no radio and cannot be jammed
-    name: 'Fibre-optic strike drone', label: 'Fibre-optic', model: 'quad', hp: 20, speed: 18, damage: 12, evade: 0.8,
+    name: 'Fibre-optic strike drone', label: 'Fibre-optic', model: 'quad', hp: 20, speed: 18, evade: 0.8,
     links: {}, seeksEmitters: true, // fibre: nothing to jam; operator-guided, so it goes for emitters too
     rfEmitter: false, airframe: 'Multirotor', color: 0xff9100, alt: [10, 25], minAgl: 8, jamResist: 1, adapt: 0, fibre: true,
     cost: 1000, rcs: 0.01, size: 0.35, rfPower: 1, warhead: 2, sound: 1,
@@ -48,7 +48,7 @@ export const DRONES = {
     },
   },
   fpv: {
-    name: 'First-person-view strike drone', label: 'First-person-view', model: 'quad', hp: 20, speed: 30, damage: 12, evade: 0.6,
+    name: 'First-person-view strike drone', label: 'First-person-view', model: 'quad', hp: 20, speed: 30, evade: 0.6,
     links: { control: 'control24', video: 'video58' }, seeksEmitters: true, // goes for the loudest emitter it can find
     rfEmitter: true, protocol: 'hobby', airframe: 'Multirotor', color: 0xff1744, alt: [30, 90], minAgl: 15, jamResist: 0, adapt: 1,
     cost: 400, rcs: 0.01, size: 0.35, rfPower: 1, warhead: 2, sound: 1,
@@ -62,7 +62,7 @@ export const DRONES = {
     },
   },
   fw: {
-    name: 'Fixed-wing strike drone', label: 'Fixed-wing strike', model: 'fw', hp: 60, speed: 45, damage: 30, evade: 0.8,
+    name: 'Fixed-wing strike drone', label: 'Fixed-wing strike', model: 'fw', hp: 60, speed: 45, evade: 0.8,
     launch: 'edge', // the Shahed class flies hundreds of km, so it comes in from off the map (WORLD.launchBand)
     links: { gnss: true }, // autonomous, navigates by GNSS
     rfEmitter: false, airframe: 'Fixed wing', color: 0xd500f9, alt: [150, 300], minAgl: 30, jamResist: 0.5, adapt: 0.7,
@@ -78,9 +78,10 @@ export const DRONES = {
   },
 };
 // A real drone starts from its type's rules and adds what is publicly known, so anything not public stays a labelled class value.
-// Its damage to the site follows its warhead (blast()).
-for (const [id, real] of Object.entries({ ...REAL_DRONES, ...EXTRA_REAL_DRONES, ...COTS_DRONES })) DRONES[id] = { ...DRONES[real.variantOf], ...real, ...(real.warhead != null && { damage: blast(real.warhead) }) };
-for (const [id, def] of Object.entries(DRONES)) def.id = id;
+for (const [id, real] of Object.entries({ ...REAL_DRONES, ...EXTRA_REAL_DRONES, ...COTS_DRONES })) DRONES[id] = { ...DRONES[real.variantOf], ...real };
+// Every drone's damage to the site follows its warhead (blast()) as it is now, so a warhead edit in the Sources tab reaches it. Defined
+// after the spreads above, which would copy a getter's value.
+for (const [id, def] of Object.entries(DRONES)) { def.id = id; Object.defineProperty(def, 'damage', { get: () => blast(def.warhead ?? 0), enumerable: true }); }
 
 // The four types the waves send and the wizard reasons about. Every real drone belongs to one of them (variantOf).
 export const DRONE_CLASSES = Object.values(DRONES).filter((d) => !d.variantOf);
