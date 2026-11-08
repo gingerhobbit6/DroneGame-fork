@@ -22,13 +22,21 @@ function roomToEdge(centre, dx, dz) {
   return Math.min(along(centre.x, dx), along(centre.z, dz));
 }
 
-// Where a drone starts: out from what is being defended along its bearing, and always on the map. Defending near the map's edge,
-// a bearing may have no room to fly in, so it uses the opposite one. In a corner both can be short, and the middle of the map never is.
-export function launchPoint(centre, angle) {
+// How far out, in metres, a drone of this kind starts: `share` (0 to 1) of the way across its launch band (WORLD.launchBand).
+export function launchDistance(def, share) {
+  if (def.launch === 'edge') return Infinity; // flown from far off the map, so it comes in at the edge (launchPoint stops it there)
+  const [near, far] = WORLD.launchBand[def.launch ?? (def.model === 'quad' ? 'short' : 'long')];
+  return near + share * (far - near);
+}
+
+// Where a drone starts: `dist` metres out from what is being defended along its bearing, and always on the map. Defending near
+// the map's edge, a bearing may have no room to fly in, so it uses the opposite one. In a corner both can be short, and the
+// middle of the map never is.
+export function launchPoint(centre, angle, dist) {
   const cos = Math.cos(angle), sin = Math.sin(angle), toMiddle = Math.hypot(centre.x, centre.z);
   const options = [[cos, sin], [-cos, -sin], [-centre.x / toMiddle, -centre.z / toMiddle]];
   const [dx, dz] = options.find(([x, z]) => roomToEdge(centre, x, z) >= u(MIN_RUN));
-  const reach = Math.min(u(WORLD.spawnDist), roomToEdge(centre, dx, dz));
+  const reach = Math.min(u(dist), roomToEdge(centre, dx, dz));
   return { x: centre.x + dx * reach, z: centre.z + dz * reach };
 }
 
@@ -39,6 +47,18 @@ export function inZone(points, x, z) {
     if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
   }
   return inside;
+}
+
+// How far a point is from the area's outline, in the units of its points: 0 inside it.
+export function distToZone(points, x, z) {
+  if (inZone(points, x, z)) return 0;
+  let best = Infinity;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [ax, az] = points[j], [bx, bz] = points[i], dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+    const t = len2 ? Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / len2)) : 0;
+    best = Math.min(best, Math.hypot(x - ax - t * dx, z - az - t * dz));
+  }
+  return best;
 }
 
 // A saved laydown's area comes from outside the game, so anything that is not a usable outline counts as no area.

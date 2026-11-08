@@ -67,7 +67,7 @@ describe('the classifier library', () => {
     sim.state.warnedWire = true;
     sim.commands.startWave(); // the first wave is all first-person-view drones, on 2.4 and 5.8 GHz
     const with_ = (library) => sim.structures.find((s) => s.def.kind === 'rf' && s.def.library === library); // starting a wave rebuilds every unit
-    sim.run(2500);
+    sim.run(7500);
     const from = (s) => sim.bus.entries.filter((e) => e.type === 'detection_report' && e.from === s.nodeId).map((e) => e.msg.detection_report);
     const drones = (s) => from(s).filter((r) => r.classification[0].type === 'Air Vehicle');
     const airframe = (r) => r.classification[0].sub_class[0].sub_class?.[0]?.type;
@@ -125,7 +125,7 @@ describe('the bands monitored and the bandwidth', () => {
     expect(sim.commands.configureUnit(sim.structures[2], 'ibw', 'narrow')).toBeNull();
     sim.state.warnedWire = true;
     sim.commands.startWave();
-    sim.run(2500);
+    sim.run(7500);
     const [wide, narrow] = ['wide', 'narrow'].map((ibw) => sim.structures.find((s) => s.def.kind === 'rf' && (s.def.ibw ?? 'wide') === ibw)); // starting a wave rebuilds every unit
     const reports = (s) => sim.bus.entries.filter((e) => e.type === 'detection_report' && e.from === s.nodeId).length;
     expect(reports(narrow)).toBeGreaterThan(0);

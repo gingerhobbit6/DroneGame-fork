@@ -10,11 +10,12 @@
 // No game rendering here, so it can run headless.
 
 import { WORLD, TERRAIN, COMMS, SPECTRUM, overlaps } from './config/index.js';
+import { noiseBands } from './jamming.js';
 import { terrainState } from './terrain.js';
 import { rand } from './rng.js';
 import { inArcOf } from './sensor-model.js';
+import { clamp } from './world.js';
 
-const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
 const LOCAL = { ok: true, local: true, delay: 0, dropped: false };
 
 // deps: { getTime, nodes: Map, fusion, gui, getJammers: () => structure[] }
@@ -25,7 +26,8 @@ export function createComms(deps) {
   const packets = [];         // recent packets, newest last
   const listeners = new Set();
   let packetSeq = 0;
-  const skyCache = new Map(); // node id -> { blocked, x, z, up }
+  const skyCache = new Map(); // node id -> { blocked, x, z, y }
+  const towerCache = new Map(); // node id and band reach -> { best, x, z, y, T3 }: a terrain raycast per tower is too dear for every message
 
   const mpu = () => WORLD.metresPerUnit;
   const T = () => deps.getTime();
@@ -39,7 +41,7 @@ export function createComms(deps) {
   function skyBlocked(s) {
     const w = where(s);
     const cached = skyCache.get(s.nodeId);
-    if (cached && cached.x === w.x && cached.z === w.z) return cached.blocked;
+    if (cached && cached.x === w.x && cached.z === w.z && cached.y === w.y) return cached.blocked;
     const T3 = terrainState.data;
     const el = (COMMS.starlink.minElevation * Math.PI) / 180, dist = 1500;
     let blocked = 0;
@@ -49,7 +51,7 @@ export function createComms(deps) {
       if (!r.clear || r.canopy > TERRAIN.opticalCanopyTol) blocked++;
     }
     blocked /= 12;
-    skyCache.set(s.nodeId, { blocked, x: w.x, z: w.z });
+    skyCache.set(s.nodeId, { blocked, x: w.x, z: w.z, y: w.y });
     return blocked;
   }
 
@@ -57,7 +59,9 @@ export function createComms(deps) {
   function bestTower(s, bandId) {
     const band = COMMS.cellular.bands[bandId] || COMMS.cellular.bands.B8;
     const range = COMMS.cellular.towerRange * band.rangeFactor;
-    const w = where(s), T3 = terrainState.data;
+    const w = where(s), key = `${s.nodeId}|${range}`, cached = towerCache.get(key);
+    if (cached && cached.x === w.x && cached.z === w.z && cached.y === w.y && cached.T3 === terrainState.data) return cached.best;
+    const T3 = terrainState.data;
     let best = null;
     towers().forEach((t, i) => {
       const d = Math.hypot(t.x - w.x, t.z - w.z);
@@ -67,6 +71,7 @@ export function createComms(deps) {
       const q = (1 - d / range) * Math.exp(-r.canopy / (TERRAIN.rfCanopyLength * 3));
       if (!best || q > best.q) best = { tower: i, q, d };
     });
+    towerCache.set(key, { best, x: w.x, z: w.z, y: w.y, T3 });
     return best;
   }
 
@@ -77,7 +82,7 @@ export function createComms(deps) {
     const hits = [];
     for (const j of deps.getJammers()) {
       if (j.mode !== 'Jam' || !j.jamBands) continue;
-      const jf = [...j.jamBands].flatMap((b) => (SPECTRUM.bands[b] ? SPECTRUM.bands[b].f : []));
+      const jf = [...noiseBands(j)].flatMap((b) => (SPECTRUM.bands[b] ? SPECTRUM.bands[b].f : []));
       if (!overlaps(jf, bandF)) continue;
       const jw = where(j), d = Math.hypot(jw.x - w.x, jw.z - w.z), range = j.def.range;
       if (d < range && inArcOf(j.def, j.pos, s.pos)) { q *= clamp(d / range, 0, 1) * 0.5; hits.push(j.short); }
@@ -171,7 +176,7 @@ export function createComms(deps) {
     if (!p.ok) res = { ok: false, dropped: true, reason: p.reason, delay: 0 };
     else {
       const w1 = hop('n:' + nodeId, bytes, p.a.capacity, t);
-      const w2 = hop(`f:${p.b.kind}:${from === fusion.nodeId ? 'tx' : 'rx'}`, bytes, p.b.capacity, t);
+      const w2 = w1 === null ? null : hop(`f:${p.b.kind}:${from === fusion.nodeId ? 'tx' : 'rx'}`, bytes, p.b.capacity, t); // dropped at the node: it never reaches the fusion queue
       if (w1 === null || w2 === null) res = { ok: false, dropped: true, reason: 'link congested', delay: 0 };
       else if (rand() < p.loss) res = { ok: false, dropped: true, reason: 'packet lost', delay: 0 };
       else res = { ok: true, dropped: false, delay: p.latency + w1 + w2, reason: '' };
@@ -195,7 +200,7 @@ export function createComms(deps) {
     return { ...st, utilisation };
   }
 
-  function reset() { queues.clear(); stats.clear(); packets.length = 0; skyCache.clear(); packetSeq = 0; }
+  function reset() { queues.clear(); stats.clear(); packets.length = 0; skyCache.clear(); towerCache.clear(); packetSeq = 0; }
 
-  return { transmit, pathFor, nodeLink, fusionLink, linkFor, linkStats, bestTower, towers, packets, listeners, reset, skyBlocked, LOCAL };
+  return { transmit, pathFor, nodeLink, fusionLink, linkFor, linkStats, towers, packets, listeners, reset, skyBlocked };
 }

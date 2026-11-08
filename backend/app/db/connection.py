@@ -16,6 +16,7 @@ def connect(path: Path) -> sqlite3.Connection:
     # FastAPI may open and use a request's connection on different threads, but only one at a time
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")  # off by default in SQLite, and a deleted account must take its sessions and packs with it
     return conn
 
 

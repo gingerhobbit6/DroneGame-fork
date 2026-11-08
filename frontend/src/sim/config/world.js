@@ -6,16 +6,24 @@
 // independent test results. Edit freely, or use the in-game Tuning panel.
 
 // Stored with saved laydowns and runs. Raise it when a change means old saves no longer replay the same.
-export const GAME_VERSION = '0.10.0';
+export const GAME_VERSION = '0.19.2';
 
 export const WORLD = {
   metresPerUnit: 20,     // 3D scene scale: 1 scene unit = this many metres
-  radius: 7000,          // size of the ground disc
-  spawnDist: 6000,       // drones appear this far from the site
+  radius: 27000,         // the ground reaches this far from the middle: a square 54 km across
+  spawnDist: 26000,      // the furthest a drone starts from the site, 1 km inside the edge; a spotter that gets this far out has left
+  // How far out a drone starts. A quadcopter has the range of its radio or fibre, about 12 to 15 km (short), and a fixed-wing
+  // drone starts anywhere out to spawnDist (long); a drone's `launch` can name another band. A wave's launch areas each roll a
+  // share of the band. Long-range one-way attack drones, the Shahed class, have launch: 'edge' and fly in from off the map.
+  launchBand: { short: [12000, 15000], long: [12000, 26000] },
   timeScale: 5,          // game seconds per real second at 1x (distances are real-scale, so time is compressed)
-  droneVisualScale: 4,   // drones are drawn this much larger than "true" size so you can see them
+  droneVisualScale: 4,   // zoomed right out, drones are drawn at most this much larger than the models' units (render/drone-models.js)
+  // Closer in, a drone or system keeps at least this share of the screen's height (a Shahed's span, a system's height),
+  // until the camera is close enough to show it at true size.
+  droneOnScreen: 0.06, systemOnScreen: 0.05,
   rangeScale: 1,         // game range = published range x this. 1 = published figures.
 };
+export const WORLD_KM = (2 * WORLD.radius) / 1000; // the world's width, for wording
 
 // Simulated geodetic origin used to turn scene positions into the lat/lon that SAPIENT messages carry.
 // Deliberately fictional (0,0). North is -z in the scene, east is +x.
@@ -24,10 +32,11 @@ export const GEO = { originLat: 0, originLon: 0 };
 export const SITE = {
   radius: 150,           // a drone that gets this close hits the site (the power station is about 300 m across)
   targetAlt: 20,         // drones aim at this height above the ground (m)
+  diveAngle: 45,         // degrees: a fixed-wing strike drone holds its height until it can reach its target at this angle, then dives: an assumption
   maxHealth: 100,
 };
 
-export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, lockAfterStart: true };
+export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, lockAfterStart: true, maxSystems: 200 }; // maxSystems: what a save holds (MAX_SYSTEMS in backend/app/schemas.py)
 
 // Procedural terrain. The terrain seed is separate from the scenario seed, so you can change the attack
 // without changing the ground (or the other way round). Heights are metres above the station base.
@@ -41,11 +50,11 @@ export const TERRAIN = {
   riverWidth: 0.08,      // river valley width in noise units (bigger = wider rivers)
   snowLine: 0.72,        // snow above this fraction of the relief
   treeLine: 0.55,        // no trees above this fraction of the relief
-  meshStride: 3,         // drawn terrain vertex every this many grid cells (smaller = finer, slower)
+  meshStride: 3,         // drawn terrain vertex at least every this many grid cells (smaller = finer, slower); a bigger world draws coarser
   forestThreshold: 0.56, // higher = less forest
   canopyMin: 12, canopyMax: 20, // tree height range (m)
   clearRadius: 450,      // no trees within this of the station (m)
-  hamlets: 3,            // small clusters of buildings
+  hamlets: 48,           // small clusters of buildings
   treeStep: 40,          // one drawn tree per this many metres of forest
   rfCanopyLength: 300,   // a network link's signal falls by 1/e for each three of these through canopy. Detection and jamming use propagation.js.
   opticalCanopyTol: 40,  // radar/EO/guns are blocked by more than this many metres of canopy on the path
@@ -68,6 +77,8 @@ export const SENSING = {
   pdEdge: 1.35, pdSlope: 6,
   rangeCap: 2.2,         // detections beyond this many "reaches" are ignored
   clutterPenalty: 0.3,   // detection chance multiplier for a low flyer inside radar ground clutter
+  clutterSpeed: 5,       // m/s: a radar's Doppler filter loses a low flyer in ground clutter only below this speed. An ASSUMPTION;
+                         // drone radars are Doppler radars, so a drone moving faster stands out from the still ground
 };
 
 // SAPIENT fusion / C2 behaviour (seconds of simulated time, metres)
@@ -78,7 +89,10 @@ export const FUSION = {
   warnZone: 2500,        // WARNING alert when a track comes this close to the site
   critZone: 800,         // CRITICAL alert inside this
   rejectBackoff: 3,      // after a rejected task, don't retry that effector for this long
-  retaskAdvantage: 300,  // switch target only if the new one is this much closer to the site
+  emptyHold: 10,         // after an effector finds nothing at a track's position, no effector is offered that track for this long: an assumption
+  retaskGain: 0.25,      // switch target only if the new one is this much more urgent (sooner to arrive for the harm it would do)
+  minClosing: 10,        // m/s: a track slower than this is taken to close at this speed, so a hovering one still counts
+  softKillWait: 10,      // s a jammer is given to break a drone's link before rounds are fired at it anyway: an assumption, twice a jammer's kill time
   // Who decides to engage. SAPIENT has no message for a weapon-release decision (see the Alert/AlertAck emulation in
   // network.js), so this is a C2 policy: 'auto' engages by itself, 'costly' asks the operator for engagements whose
   // shot costs at least authorityThreshold dollars, 'all' asks for every engagement.
@@ -111,5 +125,8 @@ export const FUSION_DEF = {
 // jamResist = max(base, min(jamResistCap, base + jamResistPerWave * adapt * (wave - 1)))
 export const ADAPT = { evadePerWave: 0.07, evadeFloor: 0.25, jamResistPerWave: 0.05, jamResistCap: 0.95 };
 
-// Structures are drawn this much larger than true size. Muzzle heights scale with it, so it is part of the rules.
+// Zoomed right out, systems are drawn this many scene units per model unit, much larger than life; close up they are true size.
 export const STRUCT_SCALE = 1.8;
+// Metres per system model unit at true size: the models are built so that a truck is about 7.5 m long. A launcher's muzzle is
+// muzzleY model units up, so this many metres each.
+export const SYSTEM_UNIT_M = 2.2;

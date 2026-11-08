@@ -1,0 +1,32 @@
+/* The game speed control: a round play and pause button beside a pill of speeds, with a marker that slides to the one chosen. */
+#speed-control { display: flex; align-items: center; gap: 5px; padding: 3px; border-radius: 999px; background: rgba(6, 11, 21, 0.75);
+  border: 1px solid #2a3d5f; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45); }
+
+#speed-play { flex: none; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; color: #08111f;
+  background: linear-gradient(180deg, #9fd8ff, #4f9dff); box-shadow: 0 2px 8px rgba(79, 157, 255, 0.35); transition: transform 0.15s, background 0.2s; }
+#speed-play:hover { transform: scale(1.07); background: linear-gradient(180deg, #b8e2ff, #6aaeff); }
+#speed-play:focus-visible { outline: 2px solid #dbe4f0; outline-offset: 2px; }
+/* paused: amber and gently pulsing, so a stopped clock is hard to miss */
+#speed-control.paused #speed-play { background: linear-gradient(180deg, #ffe39a, #ffb300); animation: speed-pulse 1.8s ease-out infinite; }
+
+.speed-track { position: relative; flex: 1; display: grid; grid-template-columns: repeat(var(--count), 1fr); min-width: 0; }
+.speed-thumb { position: absolute; inset: 0 auto 0 0; width: calc(100% / var(--count)); transform: translateX(calc(100% * var(--at)));
+  border-radius: 999px; background: linear-gradient(180deg, #3f78e0, #2852a6); box-shadow: 0 1px 6px rgba(63, 120, 224, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.22s cubic-bezier(0.3, 0.7, 0.2, 1), opacity 0.2s; pointer-events: none; }
+#speed-control.paused .speed-thumb { opacity: 0.3; }
+
+.speed-track button.speed { position: relative; z-index: 1; min-width: 0; padding: 5px 0; border: 0; border-radius: 999px; background: transparent;
+  color: #8ea4c8; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; transition: color 0.15s; }
+.speed-track button.speed:hover { background: rgba(143, 180, 255, 0.1); color: #dbe4f0; }
+.speed-track button.speed.active { color: #fff; }
+.speed-track button.speed:focus-visible { outline: 2px solid #8fb4ff; outline-offset: -2px; }
+
+@keyframes speed-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 179, 0, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(255, 179, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 179, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .speed-thumb, #speed-play { transition: none; }
+  #speed-control.paused #speed-play { animation: none; }
+}

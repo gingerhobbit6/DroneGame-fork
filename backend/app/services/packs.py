@@ -15,7 +15,9 @@ FILE_NAME = re.compile(r"^[A-Za-z0-9_-]{1,64}\.sgmap$")
 BUILDER = Path(__file__).resolve().parents[3] / "tools" / "mapbuild"
 # The national files the builder fetches for Estonia, into their own folder (tools/mapbuild/mapbuild/estonia_files.py).
 ESTONIA_HEIGHTS, ESTONIA_SURFACE = "DTM_10m_eesti.tif", "ndsm_5m_2020-2023_kogu_Eesti.zip"
-ESTONIA_FEATURES = tuple(f"ETAK_Eesti_SHP_{theme}.zip" for theme in ("ehitised", "kolvikud", "transport", "veekogud", "tehnovorgud"))
+# Kilometres across: a pack, as BUILT_HALF in frontend/src/sim/world-pack.js, and a world, as WORLD.radius in frontend/src/sim/config/world.js
+PACK_KM, WORLD_KM = 70, 54
+ESTONIA_FEATURES = (*(f"ETAK_Eesti_SHP_{theme}.zip" for theme in ("ehitised", "kolvikud", "transport", "veekogud", "tehnovorgud")), "asustusyksus_shp.zip")
 
 
 def in_estonia(east: int, north: int) -> bool:
@@ -113,20 +115,26 @@ class PackBuilder:
             self.state = {"running": True, "ok": None, "message": "Starting"}
         name = f"area_{east // 1000}_{north // 1000}"
         estonian = in_estonia(east, north)
-        lidar_km = "0" if not lidar else "30" if estonian else "14"  # Estonian lidar is already on this machine by then, so the whole pack can have it
-        self.library.folder.mkdir(parents=True, exist_ok=True)
+        lidar_km = 0 if not lidar else PACK_KM if estonian else WORLD_KM  # Estonian lidar is already on this machine by then, so the whole pack can have it
         command = [
-            "uv", "run", "--quiet", "--directory", str(BUILDER), "python", "-m", "mapbuild",
+            "uv", "run", "--quiet", "--frozen", "--directory", str(BUILDER), "python", "-m", "mapbuild",
             "--centre", f"{east},{north}", "--name", f"Area around {east // 1000}, {north // 1000}",
-            "--data", str(self.library.root / ("estonia" if estonian else "os")), "--out", str(self.library.folder / f"{name}.sgmap"), "--fetch", "--lidar-km", lidar_km,
+            "--data", str(self.library.root / ("estonia" if estonian else "os")), "--out", str(self.library.folder / f"{name}.sgmap"), "--fetch", "--size", str(PACK_KM), "--lidar-km", str(lidar_km),
         ]
+        try:
+            self.library.folder.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return self._failed("The map folder could not be made.")
         try:
             process = self.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
         except OSError:
-            with self.lock:
-                self.state = {"running": False, "ok": False, "message": "The map builder could not start. It needs uv installed."}
-            return self.status()
+            return self._failed("The map builder could not start. It needs uv installed.")
         threading.Thread(target=self._watch, args=(process,), daemon=True).start()
+        return self.status()
+
+    def _failed(self, message: str) -> dict[str, Any]:
+        with self.lock:
+            self.state = {"running": False, "ok": False, "message": message}
         return self.status()
 
     def _watch(self, process) -> None:

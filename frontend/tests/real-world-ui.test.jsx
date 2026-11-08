@@ -8,17 +8,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
 import { createPackStore, decodePack } from '../src/api/pack-store.js';
 import { resetAllFigures } from '../src/sim/config/index.js';
+import { fieldsFor } from '../src/sim/unit-config.js';
 import { parseWorldId, worldId } from '../src/sim/world-pack.js';
 import { view } from '../src/render/view.js';
 import { tilesOver } from '../src/render/map-texture.js';
 import { GameContext } from '../src/ui/hooks.js';
 import { Overlay } from '../src/ui/Overlay.jsx';
-import { MapControls, mapName, nextBaseMap } from '../src/ui/MapControls.jsx';
+import { MapControls, mapName, nextBaseMap, nextGrid } from '../src/ui/MapControls.jsx';
 import { ControlPanel } from '../src/ui/ControlPanel.jsx';
 import { SavedTab } from '../src/ui/dock/SavedTab.jsx';
 import { ringZone } from '../src/zone.js';
 import { accuracyText, locateMe } from '../src/ui/locate.js';
-import { encodePack, CENTRE } from './support/fixture-pack.js';
+import { encodePack, CENTRE, pngHeader } from './support/fixture-pack.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 
 globalThis.Blob = NodeBlob; // jsdom's Blob has no stream(), which every browser's does
@@ -32,10 +33,10 @@ const NEAR = [51.3954, -1.6808], FAR = [56.8, -5.0]; // NEAR is about SU 223 663
 
 describe('reading a pack file', () => {
   it('reads a good one, with its pictures', async () => {
-    const data = new Uint8Array([1, 2, 3]);
+    const data = pngHeader(3, 4);
     const { pack, pictures } = await decodePack(await encodePack({ pictures: [{ layer: 'osmap', west: 1, top: 2, width: 3, height: 4, type: 'image/png', data }, { layer: 'evil', west: 1, top: 2, width: 3, height: 4, type: 'text/html', data }] }));
     expect(pack.header.name).toBe('Fixture');
-    expect(pack.grids.ground.length).toBe(801 * 801);
+    expect(pack.grids.ground.length).toBe(2801 * 2801);
     expect(pack.features.names[0][0]).toBe('Testville');
     expect(pictures.map((p) => p.layer)).toEqual(['osmap']);
   });
@@ -51,9 +52,11 @@ describe('reading a pack file', () => {
     await expect(damaged((h) => { h.gridsSha256 = 'f'.repeat(64); })).rejects.toThrow(/fingerprint/);
   });
   it('stops at the declared size, so a small file cannot expand without limit', async () => {
-    await expect(damaged((h) => { h.sections[1].rawLength = 10; })).rejects.toThrow(/longer/);
-    await expect(damaged((h) => { h.sections[1].rawLength = 801 * 801 + 5; })).rejects.toThrow(/shorter/);
-    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 40; })).rejects.toThrow(/unreasonable/);
+    await expect(damaged((h) => { h.sections[4].rawLength = 10; })).rejects.toThrow(/longer/); // the features, whose size is their own
+    await expect(damaged((h) => { h.sections[4].rawLength += 5; })).rejects.toThrow(/shorter/);
+    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 40; for (const i of [1, 2, 3]) h.sections[i].rawLength = 2 ** 38; })).rejects.toThrow(/damaged/); // not the grid the header gives
+    await expect(damaged((h) => { h.sections[4].rawLength = 33 * 1024 * 1024; })).rejects.toThrow(/unreasonable/); // more features than any real pack
+    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 26; })).rejects.toThrow(/damaged/); // grids that disagree are refused before any is unpacked
   });
   it('refuses sections outside the file, or missing', async () => {
     await expect(damaged((h) => { h.sections[0].offset = 1e12; })).rejects.toThrow(/damaged/);
@@ -65,12 +68,13 @@ describe('the pack store', () => {
   it('lists what the server has, loads once, and survives a stopped server', async () => {
     const buffer = await encodePack();
     const { pack } = await decodePack(buffer);
-    const api = { packs: { list: async () => [{ file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'A', east: CENTRE.east, north: CENTRE.north, half: 8000 }] } };
+    const api = { packs: { list: async () => [{ file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'A', east: CENTRE.east, north: CENTRE.north, half: 28000 }] } };
     const fetchFile = vi.fn(async () => ({ ok: true, blob: async () => new NodeBlob([buffer]) }));
     const store = createPackStore({ api, idb: null, fetchFile });
     const { packs } = await store.list();
     expect(packs[0].hash).toBe(pack.hash);
-    await store.load(packs[0]);
+    const [a, b] = await Promise.all([store.load(packs[0]), store.load(packs[0])]); // clicked while it was still loading
+    expect(a).toBe(b);
     await store.load(packs[0]);
     expect(fetchFile).toHaveBeenCalledTimes(1);
     expect(store.get(pack.hash).pack.header.name).toBe('Fixture');
@@ -83,6 +87,13 @@ describe('the pack store', () => {
     const file = await mine.fileOf({ source: 'server', file: 'a.sgmap' });
     const added = await createPackStore({ api: {}, idb: null }).importFile(file);
     expect(added.hash).toBe((await decodePack(buffer)).pack.hash);
+  });
+  it('keeps the pack it has when another with the same ground but other contents is imported', async () => {
+    const store = createPackStore({ api: {}, idb: null });
+    const first = await store.importFile(new NodeBlob([await encodePack()]));
+    expect((await store.importFile(new NodeBlob([await encodePack()]))).hash).toBe(first.hash); // the same file again is fine
+    await expect(store.importFile(new NodeBlob([await encodePack({ change: (h) => { h.name = 'Other'; } })]))).rejects.toThrow(/different map pack/);
+    expect(store.get(first.hash).pack.header.name).toBe('Fixture');
   });
   it('notices a pack that has changed, or cannot be fetched', async () => {
     const buffer = await encodePack();
@@ -150,13 +161,13 @@ describe('choosing a world', () => {
     HTMLCanvasElement.prototype.getContext = () => null;
     buffer = await encodePack();
     const { pack } = await decodePack(buffer);
-    entry = { file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'Fixture', east: CENTRE.east, north: CENTRE.north, half: 8000, tier: 'lidar', lidarHalf: 7000 };
+    entry = { file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'Fixture', east: CENTRE.east, north: CENTRE.north, half: 28000, tier: 'lidar', lidarHalf: 7000 };
     const api = createFakeApi();
     api.packs = { list: vi.fn(async () => [entry]), downloads: vi.fn(async () => ({ terrain50: true, squares: ['TF'] })), build: vi.fn(async () => ({ running: true, message: 'Starting' })), buildStatus: vi.fn(async () => ({ running: false, ok: true, message: 'Finished' })) };
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, blob: async () => new NodeBlob([buffer]) })));
     vi.stubGlobal('indexedDB', undefined);
     game = createGame({ seed: '1', terrainSeed: '1', api, storage: createFakeStorage() });
-    Object.assign(view, { baseMap: 'os', mapRoads: false, mapGrid: true, mapContours: false, mapPanel: true, mapLoading: false, startAt: null, planView: false, me: null, osm: false, zone: null, wizard: 'closed' });
+    Object.assign(view, { baseMap: 'os', mapRoads: false, mapGrid: 'national', mapContours: false, scenery: true, mapPanel: true, mapLoading: false, startAt: null, planView: false, me: null, osm: false, zone: null, wizard: 'closed' });
     history.replaceState(null, '', '/');
   });
   afterEach(() => { cleanup(); resetAllFigures(); vi.unstubAllGlobals(); });
@@ -222,6 +233,12 @@ describe('choosing a world', () => {
     await until(() => game.api.packs.build.mock.calls.length);
     expect(game.api.packs.build.mock.calls[0][0]).toMatchObject({ lidar: false });
     expect(game.api.packs.build.mock.calls[0][0].north).toBeGreaterThan(700000);
+    // once built, the list has a map there, and the picker goes to it rather than offering to build it again
+    const { east, north } = game.api.packs.build.mock.calls[0][0];
+    game.api.packs.list.mockImplementation(async () => [entry, { ...entry, file: 'built.sgmap', hash: 'b'.repeat(64), east, north }]);
+    const opened = () => fetch.mock.calls.some(([url]) => String(url).includes('built.sgmap'));
+    for (let i = 0; i < 200 && !opened(); i++) await settle(30); // the builder is asked how it is going every 2 s
+    expect(opened()).toBe(true);
   }, 30000);
   it('says when the laptop is outside Great Britain, or a location is refused', async () => {
     useGeolocation(fixAt(40, -100));
@@ -296,16 +313,17 @@ describe('choosing a world', () => {
     await until(() => $('#pack-needs'));
     expect(rows()[0]).toContain('On this computer');
     expect(rows()[1]).toMatch(/OS maps of TF.*On this computer/);
-    expect(rows()[2]).toMatch(/Lidar.*Download, up to about 0\.50 GB/);
-    expect($('#pack-build').textContent).toContain('Up to about 0.50 GB to download');
+    expect(rows()[2]).toMatch(/OS maps of TG.*Download, up to about 0\.55 GB/); // a 70 km pack here reaches into TG
+    expect(rows()[3]).toMatch(/Lidar.*Download, up to about 7\.1 GB/);
+    expect($('#pack-build').textContent).toContain('Up to about 7.7 GB to download');
     type('#site-ref', '56.8, -5'); // in NN, which it does not
     fireEvent.click($('#site-ref-go'));
     await until(() => $('#pack-build').textContent.includes('NN'));
-    expect(rows()[1]).toMatch(/OS maps of NN.*Download, up to about 0\.55 GB/);
-    expect($('#pack-build').textContent).toContain('Up to about 1.1 GB to download');
+    expect(rows()[1]).toMatch(/OS maps of NG, NH, NM, NN.*Download, up to about 2\.2 GB/); // a 70 km pack here reaches into three more
+    expect($('#pack-build').textContent).toContain('Up to about 9.3 GB to download');
     fireEvent.click($('#pack-lidar'));
     expect(rows().join()).not.toContain('Lidar');
-    expect($('#pack-build').textContent).toContain('Up to about 0.55 GB to download');
+    expect($('#pack-build').textContent).toContain('Up to about 2.2 GB to download');
   }, 30000);
   it('offers an Estonian map with its own downloads, and sends the build on the Estonian grid', async () => {
     game.api.packs.downloads = vi.fn(async () => ({ terrain50: true, squares: ['SU'], estonia: { heights: true, features: false, surface: false } }));
@@ -468,8 +486,9 @@ describe('choosing a world', () => {
       fireEvent.submit($('#map-goto'));
       expect(v.centreOn).toHaveBeenCalledWith(25, -25);
       game.setTool('rf');
+      game.setLoadout('rf', fieldsFor('rf').find((f) => f.key === 'mount'), 12); // the settings chosen for it come too
       fireEvent.submit($('#map-goto'));
-      expect(game.sim.structures[0].pos).toMatchObject({ x: 25, z: -25 });
+      expect(game.sim.structures[0]).toMatchObject({ pos: { x: 25, z: -25 }, def: { mount: 12 } });
       await settle();
       expect($('#map-message').textContent).toContain('Placed at SU 225 665');
     }, 30000);
@@ -490,8 +509,28 @@ describe('choosing a world', () => {
       fireEvent.click($('#map-overlay-mapContours'));
       expect(view.mapContours).toBe(true);
       expect($('#topo-legend')).toBeTruthy();
+      fireEvent.click($('#map-overlay-scenery'));
+      expect(view.scenery).toBe(false);
+      expect($('#map-overlay-scenery').getAttribute('aria-pressed')).toBe('false');
       fireEvent.click($('#map-close'));
       expect($('#map-panel')).toBeNull();
+    }, 30000);
+    it('shows the national grid or MGRS, and reads the cursor out on the one showing', async () => {
+      await deployed();
+      const v = fakeView();
+      game.getView = () => v; // one view: a new one each render would restart the map previews for ever
+      game.cursor = () => ({ x: 0, z: 0 });
+      show(<MapControls />);
+      expect($('#map-grid-national').textContent).toBe('OS grid');
+      expect($('#map-grid-national').getAttribute('aria-pressed')).toBe('true');
+      expect($('#map-here').textContent).toMatch(/^SU \d{3} \d{3}, /);
+      fireEvent.click($('#map-grid-mgrs'));
+      expect(view.mapGrid).toBe('mgrs');
+      expect($('#map-grid-mgrs').getAttribute('aria-pressed')).toBe('true');
+      expect($('#map-here').textContent).toMatch(/^30U [A-Z]{2} \d{3} \d{3}, /);
+      fireEvent.click($('#map-grid-mgrs'));
+      expect(view.mapGrid).toBe(false);
+      expect([nextGrid('national'), nextGrid('mgrs'), nextGrid(false)]).toEqual(['mgrs', false, 'national']);
     }, 30000);
     it('leaves the demo credit behind on a real map', async () => {
       await deployed();

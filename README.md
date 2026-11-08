@@ -35,7 +35,7 @@ uv --directory backend run --no-dev python -m app
 
 Then open <http://localhost:8200>. The first two commands are only needed once, or again after changing the frontend.
 
-It runs entirely on your machine, works offline, and is only reachable from this computer.
+It runs entirely on your machine, works offline, and is only reachable from this computer. The first time, press **Create account** on the login page: see [Accounts and deployment packs](#accounts-and-deployment-packs).
 
 ## How it works
 
@@ -47,7 +47,7 @@ You can mark an area anywhere on the map, and it becomes the site: you can build
 
 ### 1. Build a laydown
 
-Press **Deploy**, pick a system from the left (or press 1 to 7), and click the ground to place it. Everything comes out of one budget, including every shot fired, and nothing is earned back. No single system handles every drone.
+Press **Deploy**, then click a kind of system on the left, such as Radar, to open its list of real systems. Drag one onto the map, or click it and then click the ground. Keys 1 to 8 pick a kind's systems in turn. Everything comes out of one budget, including every shot fired, and nothing is earned back. No single system handles every drone.
 
 ![Eleven systems placed around the site, with their ranges drawn over the terrain](docs/screenshots/laydown.jpg)
 
@@ -138,7 +138,7 @@ The same scenario seed, terrain seed and laydown give the same run. Time between
 
 ## Architecture
 
-The simulation runs in the browser, and the backend only stores and serves. It takes no part in live play, so the game still plays if the backend stops. [ADR 0001](docs/adr/0001-simulation-runs-in-the-browser.md) explains why.
+The simulation runs in the browser, and the backend only stores and serves. It takes no part in live play, so the game still plays if the backend stops. [ADR 0001](docs/adr/0001-simulation-runs-in-the-browser.md) explains why. Signing in is the exception, as it needs the backend ([ADR 0004](docs/adr/0004-local-accounts-with-recovery-codes.md)).
 
 ```mermaid
 flowchart LR
@@ -222,7 +222,9 @@ frontend/src/
   render/     Three.js. Reads simulation state each frame, and never changes it.
   ui/         React panels, refreshed about 10 times a second.
     assistant/  The wizard: its steps, and what it reads from the game.
+    account/    The login page, the profile hub and the deployment pack editor.
   zone.js     The area to defend. Stays out of the simulation.
+  patrol-draw.js  Drawing a patrol route, which goes to the simulation once finished.
   api/        The backend client, and keeping runs safe when it is down.
   game.js     Wires the simulation to the view and runs the frame loop.
 backend/app/
@@ -230,7 +232,7 @@ backend/app/
   services/   The rules for saved records, behind small Protocols.
   db/         All the SQL, and numbered migrations.
   schemas.py  What the API accepts: the trust boundary.
-  security.py What protects a local service with no sign-in.
+  security.py Headers and request limits for a local service.
 ```
 
 ### API
@@ -240,12 +242,14 @@ Everything is under `/api/v1`, with the schema at `/api/v1/openapi.json`.
 | Resource | Routes |
 |---|---|
 | `/health` | `GET` |
+| `/auth` | `POST` `/register`, `/sign-in`, `/sign-out`, `/reset`, `/password`, `/recovery-code` and `/delete-account`, and `GET`, `PUT` `/me` |
+| `/units` | Deployment packs: `GET`, `POST`, and `GET`, `PUT`, `DELETE` by ID, for the signed-in account only |
 | `/laydowns` | `GET`, `POST`, and `GET`, `PUT`, `DELETE` by ID |
 | `/runs` | `GET`, `POST`, and `GET`, `DELETE` by ID |
 | `/figure-sets` | `GET`, `POST`, and `GET`, `DELETE` by ID |
 | `/packs` | `GET` the list, `GET` a pack file by name, `GET` `/packs/downloads` for the OS data already here, and `GET`, `POST` `/packs/build` |
 
-There is no sign-in, so the service binds to this machine only, and refuses other hosts and cross-site writes. See the [security notes](docs/SECURITY_NOTES.md), which also say what would be needed before hosting it.
+Every route except `/health`, `/auth` and the schema needs a signed-in session. The service binds to this machine only, and refuses other hosts and cross-site writes. See the [security notes](docs/SECURITY_NOTES.md), which also say what would be needed before hosting it.
 
 ## Real maps
 
@@ -264,15 +268,25 @@ uv --directory tools/mapbuild run python -m mapbuild --centre 611700,6570700 --n
 
 Real ground plays differently from generated ground. In Great Britain, lidar covers England only, and elsewhere the ground uses OS Terrain 50 with assumed tree and building heights. In Estonia, lidar covers the whole country, and a position can also be typed as eastings and northings on the Estonian grid (611700 6570700). Estonian data stops at the national border, so at Narva about half of a world around the city counts as water. Estonian maps download 6.8 GB of national files the first time, and come from the [Land and Spatial Development Board](https://geoportaal.maaruum.ee/opendata-licence). British map data is under the Open Government Licence, satellite pictures contain modified Copernicus Sentinel data, and live tiles are © OpenStreetMap contributors.
 
+## Accounts and deployment packs
+
+The game opens on a login page. **Create account** asks for your name, a username and a password of at least 10 characters, then shows a recovery code once. Save it: there is no email, so the code is the only way to reset a forgotten password, and each reset gives a new one. Five wrong tries lock the account for 5 minutes. **Keep me signed in** lasts 30 days, otherwise a session lasts 12 hours. If it runs out during a game, the login page comes back over the game, paused, and signing in again carries on where you were.
+
+Signing in opens your profile, where you can change your name, rank and organisation, your password or your recovery code. The badge at the bottom left of the game brings it back, and pauses a wave in progress.
+
+A deployment pack is a military unit, from a fireteam to a battalion, with a callsign and the real sensors, effectors, vehicles and groups of people assigned to it. Press **Deploy** on a pack and the game lists its kit in a tray at the top of the toolbar, with how many of each are left to place. Drag each onto the map. A pack's systems come out of the same budget as any other. A vehicle is placed with one of the pack's systems on board, chosen in the tray, and stands it at the vehicle's mast height. With a pack deployed, a patrol's column takes only the pack's vehicles, as many as it has less any parked.
+
+Packs belong to your profile. Laydowns, runs and figure sets are shared by every account on this computer.
+
 ## Saved data
 
-Laydowns, run history and figure sets are in `backend/data/siteguard.db`, a single SQLite file that git ignores. To back it up or move it, copy that file while the game is closed. Set `SITE_GUARD_DB` to keep it somewhere else.
+Laydowns, run history, figure sets, accounts and deployment packs are in `backend/data/siteguard.db`, a single SQLite file that git ignores. To back it up or move it, copy that file while the game is closed. Set `SITE_GUARD_DB` to keep it somewhere else.
 
-The game still plays if the save server is not running. Panels say so, and a finished run is kept in the browser and saved when the server returns.
+Signing in needs the server. If it stops during a game, the game still plays, panels say so, and a finished run is kept in the browser and saved when the server returns.
 
 ## Developing
 
-Run these in two terminals. The game is at <http://localhost:5199>, reloads as you edit, and sends saves through to the backend:
+Run these in two terminals. The game is at <http://localhost:5199>, reloads as you edit, and sends sign-in and saves through to the backend:
 
 ```bash
 uv --directory backend run --no-dev python -m app
@@ -310,6 +324,14 @@ Raise `GAME_VERSION` in `frontend/src/sim/config/world.js` at the same time, so 
 
 ## Accuracy
 
+The figures are drawn from public sources, mostly vendor claims and press reports, and many are labelled assumptions. The **Sources** tab shows the evidence and confidence for each one, and lets you change it. This is a game and a teaching tool, not a model to base real decisions on.
+
+## Patrol mode
+
+Instead of a site, protect soldiers on patrol. In the Area to defend panel, press **Draw a patrol route**, click waypoints from the start, and double-click at the end. Set how wide the corridor is, the soldiers' formation (single file, staggered column or wedge), and the vehicles that escort them, each ahead, behind or to one side. Systems from the toolbar stand anywhere inside the corridor and stay put.
+
+From the first wave the patrol walks to the end, waits a minute, and walks back, then holds at the start until the next wave. Weapons in the column halt it to fire. Strikes do not know where it is: spotters must search the corridor and keep it in sight, and strikes head for the last fix they passed, shown as a red ring. Jam or shoot down the spotter, or walk into woods, and they strike where the patrol was. Every speed, spacing and search figure is a labelled assumption in the Sources tab. The design and what is left out are in [docs/PATROL_MODE.md](docs/PATROL_MODE.md).
+
 ## Simulated people
 
 The **People** tool (key **9**) places groups of simulated people to see what an attack would do to them. Choose how many (1 to 500, up to 50 groups) and their protection: unarmoured, in a building (click on a building, and on a real map they stand inside its true outline) or in a bunker (drawn as a low concrete block). They cost nothing, and they lock with the laydown when the first wave starts. The wizard has the same choices in its optional step 6, "Who is on site?".
@@ -317,5 +339,3 @@ The **People** tool (key **9**) places groups of simulated people to see what an
 People are drawn to true scale, so they are too small to see from far away: each group has a name tag, and **Look** in the People panel flies the camera down to them. A blast can make anyone near it a casualty: likelier the closer they are and the less protected. Blasts come from a strike on the site, a strike on a system, and a drone destroyed in flight, where its height shelters those below. Casualties drop to the ground in the view, and appear in the HUD, on the timeline and in the end-of-run summary. They also count in the sandbox, and come back on leaving it.
 
 People are not targets and never change the attack: their rolls come from a random stream of their own, so a run plays out the same with or without them. **Every casualty figure is a round-number assumption, not real casualty or weapons-effects data.** They are all labelled so in the Sources tab, where you can change them. A laydown's people are saved with it.
-
-The figures are drawn from public sources, mostly vendor claims and press reports, and many are labelled assumptions. The **Sources** tab shows the evidence and confidence for each one, and lets you change it. This is a game and a teaching tool, not a model to base real decisions on.

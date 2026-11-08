@@ -7,7 +7,7 @@ import { mulberry32, hashSeed } from './rng.js';
 import { clamp, makeWorld, pickMasts, rasterBox } from './world.js';
 
 // The terrain currently in use. Other modules read it through the helpers below.
-export const terrainState = { data: null, hillshade: null };
+export const terrainState = { data: null };
 export const terrain = () => terrainState.data;
 
 const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
@@ -36,7 +36,7 @@ function makeNoise(rng) {
 }
 
 // The power station, in metres from the origin. 'yard' is the switchyard where the power lines start.
-export const STATION = [
+const STATION = [
   { kind: 'box', x: -60, z: 40, w: 120, d: 40, h: 26, name: 'Turbine hall' },
   { kind: 'box', x: 30, z: 40, w: 50, d: 45, h: 48, name: 'Boiler house' },
   { kind: 'cyl', x: 75, z: 60, r: 5, h: 100, name: 'Stack' },
@@ -48,7 +48,16 @@ export const STATION = [
   { kind: 'yard', x: 110, z: -40, w: 70, d: 60, name: 'Switchyard' },
 ];
 
+// Making the ground for a 54 km world takes seconds, and a restart (or a test) asks for the same ground again, so the last one is
+// kept. Nothing changes the ground once it is made.
+let last = null;
 export function generateTerrain(seed) {
+  const key = `${seed}|${WORLD.radius}|${JSON.stringify(TERRAIN)}`;
+  if (last?.key !== key) last = { key, data: makeTerrain(seed) };
+  return last.data;
+}
+
+function makeTerrain(seed) {
   const rng = mulberry32(hashSeed(`${seed}:terrain`));
   const nElev = makeNoise(rng), nRidge = makeNoise(rng), nForest = makeNoise(rng), nDetail = makeNoise(rng);
   const nWarp = makeNoise(rng), nRiver = makeNoise(rng);
@@ -119,7 +128,7 @@ export function generateTerrain(seed) {
   }
   for (let h = 0; h < TERRAIN.hamlets; h++) {
     for (let attempt = 0; attempt < 60; attempt++) {
-      const a = rng() * Math.PI * 2, d = 1800 + rng() * 3200;
+      const a = rng() * Math.PI * 2, d = 1800 + rng() * (R - 3800); // out to 2 km inside the edge
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const i = Math.round((x + R) / cell), j = Math.round((z + R) / cell);
       if (canopy[at(i, j)] || slopeAt(i, j) > 0.12 || cover[at(i, j)] === 4 || ground[at(i, j)] > relief * 0.3) continue;
@@ -140,7 +149,7 @@ export function generateTerrain(seed) {
   for (const ang0 of [baseAng, baseAng + Math.PI * (0.7 + rng() * 0.6)]) {
     const pylons = [];
     let x = yard.x, z = yard.z, a = ang0, len = 0;
-    const maxLen = 5500 + rng() * 1000;
+    const maxLen = R - 1500 + rng() * 1000;
     while (len < maxLen && Math.hypot(x, z) < R - 300) {
       pylons.push({ x, z });
       a += (rng() - 0.5) * 0.1;

@@ -1,9 +1,10 @@
 // The side panel of the Network tab: configuration for what is selected, its link stats, and the packets on its wire.
 
+import { pounds } from '../../sim/economy.js';
 import { useRef, useState } from 'react';
 import { COMMS, SPECTRUM } from '../../sim/config/index.js';
 import { annotate } from '../sapient-help.js';
-import { hex, useGame, usd } from '../hooks.js';
+import { hex, useGame } from '../hooks.js';
 import { linkColour, TYPE_COLOUR } from './network-canvas.js';
 
 const BANDS = Object.entries(COMMS.cellular.bands);
@@ -16,7 +17,7 @@ function FusionConfig({ net, commands, locked }) {
       <p className="muted">Every message passes through it, so it is the weak point. Give it more than one way in.</p>
       {['starlink', 'cellular'].map((k) => (
         <label className="opt" key={k}>
-          <input type="checkbox" data-fus={k} checked={net.fusion.uplinks.has(k)} disabled={locked} onChange={(e) => commands.wireFusion(k, e.target.checked)} /> {COMMS[k].name} terminal <span className="muted">{usd(COMMS[k].cost)}</span>
+          <input type="checkbox" data-fus={k} checked={net.fusion.uplinks.has(k)} disabled={locked} onChange={(e) => commands.wireFusion(k, e.target.checked)} /> {COMMS[k].name} terminal <span className="muted">{pounds(COMMS[k].cost)}</span>
         </label>
       ))}
       <label className="opt">Cellular band{' '}
@@ -34,16 +35,17 @@ function NodeConfig({ n, commands, locked }) {
       <h4 style={{ borderLeft: `4px solid ${hex(n.def.color)}`, paddingLeft: 6 }}>{n.name}</h4>
       <div className="muted">{n.def.sapient.nodeType.replace('NODE_TYPE_', '')} · {n.mode}</div>
       <div className="opt-h">Network terminal</div>
-      {[['', 'None'], ['starlink', `Starlink ${usd(COMMS.starlink.cost)}`], ['cellular', `Cellular ${usd(COMMS.cellular.cost)}`]].map(([k, l]) => (
+      {n.def.networked === false && <div className="muted crew-note">Worked by its crew, off the network: it cannot be wired, and fires or jams at what its crew can see.</div>}
+      {n.def.networked !== false && [['', 'None'], ['starlink', `Starlink ${pounds(COMMS.starlink.cost)}`], ['cellular', `Cellular ${pounds(COMMS.cellular.cost)}`]].map(([k, l]) => (
         <label className="opt" key={k}>
           <input type="radio" name="uplink" value={k} checked={(n.uplink || '') === k} disabled={locked} onChange={() => commands.wireNode(n, k || null)} /> {l}
         </label>
       ))}
-      <label className="opt">Cellular band{' '}
+      {n.def.networked !== false && <label className="opt">Cellular band{' '}
         <select data-band="" value={n.cellBand} disabled={locked} onChange={(e) => commands.setCellBand(n, e.target.value)}>
           {BANDS.map(([id, b]) => <option key={id} value={id}>{b.label}</option>)}
         </select>
-      </label>
+      </label>}
       {n.jamBands && (
         <>
           <div className="opt-h">Jamming bands</div>
@@ -127,14 +129,14 @@ export function NetworkSide({ sel }) {
           <>
             <h4>Network design</h4>
             <p className="muted">Click a system to configure it, or a wire to tap it.</p>
-            <p className="muted">Terminals: Starlink {usd(COMMS.starlink.cost)} each, cellular {usd(COMMS.cellular.cost)} each. {locked ? 'The network is locked: the first wave has started.' : 'You can rewire until the first wave starts.'}</p>
+            <p className="muted">Terminals: Starlink {pounds(COMMS.starlink.cost)} each, cellular {pounds(COMMS.cellular.cost)} each. {locked ? 'The network is locked: the first wave has started.' : 'You can rewire until the first wave starts.'}</p>
           </>
         )}
       </div>
       <div id="net-live">
         {n && <>
           <div className="opt-h">Link</div>
-          {n.uplink ? <LinkStats n={n} comms={net.comms} /> : <div className="lstats"><div className="muted">No terminal wired: this system is offline.</div></div>}
+          {n.uplink ? <LinkStats n={n} comms={net.comms} /> : <div className="lstats"><div className="muted">{n.def.networked === false ? 'Not networked: its crew works it by hand.' : 'No terminal wired: this system is offline.'}</div></div>}
           <Tap key={n.nodeId} n={n} comms={net.comms} />
         </>}
         {sel && sel.kind === 'fusion' && <FusionLinks net={net} />}

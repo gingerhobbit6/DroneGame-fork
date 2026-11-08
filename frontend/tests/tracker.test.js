@@ -173,6 +173,17 @@ describe('bearing-only measurements', () => {
     expect(same.ingest(bearingAt([0, 0, 0], 3000, 3000, 0, 1, 'rf1'), 0)).toBeNull();
   });
 
+  it('give no fix where the bearings cross far beyond what either sensor can hear', () => {
+    // two detectors 500 m apart whose bearings differ by 2 degrees cross about 14 km out; each hears 3.5 km at most
+    const heard = (from, east, north, node) => ({ ...bearingAt(from, east, north, 0, 0, node), reach: 3500 });
+    const tk = newTracker();
+    tk.ingest(heard([0, 0, 0], 0, 1000, 'rf1'), 0);
+    expect(tk.ingest(heard([500, 0, 0], 500 - Math.sin(rad(2)) * 1000, Math.cos(rad(2)) * 1000, 'rf2'), 0)).toBeNull();
+    const near = newTracker(); // the same pair still fixes a drone inside their reach
+    near.ingest(heard([0, 0, 0], 1000, 2000, 'rf1'), 0);
+    expect(near.ingest(heard([500, 0, 0], 1000, 2000, 'rf2'), 0)).not.toBeNull();
+  });
+
   it('triangulate in 3D when both sensors give elevation', () => {
     const tk = newTracker();
     const cam = (from, node) => {
@@ -183,6 +194,20 @@ describe('bearing-only measurements', () => {
     const tr = tk.ingest(cam([3000, 0, 10], 'eo2'), 0);
     expect(tr).not.toBeNull();
     expect(Math.abs(tr.pos[2] - 300)).toBeLessThan(60);
+  });
+
+  it('fix on the candidate that crosses closest, and use it up', () => {
+    const tk = newTracker();
+    const cam = (from, node, up, scan) => {
+      const dx = 1000 - from[0], dy = 2000 - from[1];
+      return { node, from, az: Math.atan2(dx, dy), el: Math.atan2(up - from[2], Math.hypot(dx, dy)), range: null, sigAz: rad(0.5), sigEl: rad(0.5), sigRange: 0, t: 0, scan };
+    };
+    const off = cam([0, 0, 10], 'eo1', 380, 0); // an earlier look, 80 m high
+    tk.ingest(off, 0);
+    tk.ingest(cam([0, 0, 10], 'eo1', 300, 1), 0);
+    const tr = tk.ingest(cam([3000, 0, 10], 'eo2', 300, 0), 0);
+    expect(Math.abs(tr.pos[2] - 300)).toBeLessThan(5);
+    expect(tk.candidates.map((c) => c.el)).toEqual([off.el]); // the one used is gone, so it cannot start a second track
   });
 
   it('update a track that already exists', () => {

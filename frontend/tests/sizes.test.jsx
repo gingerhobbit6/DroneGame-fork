@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { zoomMax } from '../src/sim/camera-model.js';
 import { createGame } from '../src/game.js';
-import { STRUCTURES, TOOLBAR, firstClass, resetAllFigures, sizeButtons } from '../src/sim/config/index.js';
+import { STRUCTURES, TOOLBAR, firstClass, resetAllFigures } from '../src/sim/config/index.js';
 import { GameContext } from '../src/ui/hooks.js';
 import { Toolbar } from '../src/ui/Toolbar.jsx';
 import { useHotkeys } from '../src/ui/useHotkeys.js';
@@ -15,6 +15,7 @@ import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 let game;
 const $ = (sel) => document.querySelector(sel);
 const group = (kind) => TOOLBAR.find((g) => g.kind === kind);
+const sizeButtons = ({ classes }) => classes.filter((id) => STRUCTURES[id].size && !STRUCTURES[id].variantOf); // a row's standard S, M and L, not its other real systems
 
 beforeEach(() => {
   game = createGame({ seed: '1', terrainSeed: '1', api: createFakeApi(), storage: createFakeStorage() });
@@ -65,32 +66,31 @@ describe('the catalogue', () => {
 describe('the toolbar', () => {
   const show = () => render(<GameContext.Provider value={game}><Toolbar /></GameContext.Provider>);
 
-  it('has one row per kind, and picks a size with its button', () => {
+  it('has one row per kind and no size buttons: each row opens its list of real systems', () => {
     show();
     expect(document.querySelectorAll('.tool-row').length).toBe(TOOLBAR.length);
-    expect(document.querySelectorAll('.tool-sizes button').length).toBe(TOOLBAR.length * 3);
-    fireEvent.click($('[data-tool="radar_l"]'));
-    expect(game.getTool()).toBe('radar_l');
-    expect($('.tool.active').textContent).toContain('$2.5M');
-    expect($('[data-tool="radar_l"]').getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelectorAll('.tool-sizes button').length).toBe(0);
+    fireEvent.click($('[data-catalogue="radar"]'));
+    expect(game.getTool()).toBeNull();
+    expect(game.catalogue()).toBe('radar');
+    expect($('.tool.active').textContent).toContain('from £');
+    act(() => game.setTool('radar_l'));
+    expect($('.tool.active').textContent).toContain('£1.88M');
   });
 
-  it('the row\'s own button offers the size last picked, and switches it off', () => {
+  it('the row\'s button closes its open list, and switches placing off', () => {
     show();
-    fireEvent.click($('[data-tool="rf_s"]'));
-    fireEvent.click($('[data-tool="rf_s"]'));
+    act(() => game.setTool('rf_s'));
+    fireEvent.click($('[data-catalogue="rf"]'));
     expect(game.getTool()).toBeNull();
-    fireEvent.click(document.querySelectorAll('.tool-row')[1].querySelector('.tool'));
-    expect(game.getTool()).toBe('rf_s');
-    fireEvent.click(document.querySelectorAll('.tool-row')[1].querySelector('.tool'));
-    expect(game.getTool()).toBeNull();
+    expect(game.catalogue()).toBeNull();
   });
 
-  it('remembers a size the wizard picks, and marks each standard system for its spotlight', () => {
+  it('remembers a system the wizard picks, for the hotkey, and marks each row for its spotlight', () => {
     show();
     act(() => game.setTool('jammer_l'));
     expect(game.toolChoice(group('jammer'))).toBe('jammer_l');
-    expect($('[data-tool="interceptor"]')).not.toBeNull();
+    expect($('[data-catalogue="interceptor"]')).not.toBeNull();
   });
 });
 
@@ -98,6 +98,31 @@ describe('the hotkeys', () => {
   const Keys = () => { useHotkeys(); return null; };
   const press = (key) => fireEvent.keyDown(window, { key });
   const show = () => render(<GameContext.Provider value={game}><Keys /></GameContext.Provider>);
+
+  it('leave keys with Ctrl, Cmd or Alt held to the browser', () => {
+    show();
+    for (const held of ['ctrlKey', 'metaKey', 'altKey']) fireEvent.keyDown(window, { key: '1', [held]: true });
+    expect(game.getTool()).toBeFalsy();
+    press('1');
+    expect(game.getTool()).toBe('radar');
+  });
+
+  it('leave Space to a focused button, and typing to a text area', () => {
+    show();
+    const speed = game.clock.speed;
+    for (const tag of ['button', 'summary']) {
+      const el = document.body.appendChild(document.createElement(tag));
+      fireEvent.keyDown(el, { key: ' ' });
+      el.remove();
+    }
+    expect(game.clock.speed).toBe(speed);
+    const area = document.body.appendChild(document.createElement('textarea'));
+    fireEvent.keyDown(area, { key: '1' });
+    area.remove();
+    expect(game.getTool()).toBeFalsy();
+    press(' ');
+    expect(game.clock.speed).not.toBe(speed); // Space anywhere else still pauses or resumes
+  });
 
   it('picks medium, then cycles through the sizes', () => {
     show();
@@ -137,6 +162,8 @@ describe('the hotkeys', () => {
     expect(game.getTool()).toBe('acoustic');
     press('9');
     expect(game.getTool()).toBe('people');
+    press('0');
+    expect(group('gun').classes).toContain(game.getTool());
   });
 
   it('switches a system with one size off on the second press', () => {

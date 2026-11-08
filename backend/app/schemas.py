@@ -7,9 +7,9 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, St
 
 # Names the game uses. A test compares these with the frontend's config, so they cannot drift apart.
 SystemId = Literal[
-    "radar", "radar_s", "radar_a400", "radar_a800", "radar_giraffe", "radar_l", "rf", "rf_s", "rf_elysion", "rf_l", "camera", "camera_s", "camera_l", "acoustic", "acoustic_s", "acoustic_l",
-    "jammer", "jammer_s", "jammer_l", "jammer_auds", "interceptor", "interceptor_s", "interceptor_l", "interceptor_p1",
-    "missile", "missile_s", "missile_l", "missile_rr", "missile_hvm", "missile_paladin", "missile_skysabre",
+    "radar", "radar_s", "radar_a400", "radar_a800", "radar_giraffe", "radar_l", "rf", "rf_s", "rf_elysion", "rf_airfence", "rf_l", "camera", "camera_s", "camera_l", "acoustic", "acoustic_s", "acoustic_l",
+    "jammer", "jammer_s", "jammer_l", "jammer_auds", "jammer_neo", "jammer_jupiter", "jammer_sf", "jammer_mk4", "jammer_skywiper", "jammer_kvertus", "jammer_dgmk3", "jammer_dgtac", "interceptor", "interceptor_s", "interceptor_l", "interceptor_p1",
+    "missile", "missile_s", "missile_l", "missile_rr", "missile_hvm", "missile_paladin", "missile_skysabre", "gun_hmg", "gun_s", "gun_50", "gun_l", "gun_skyranger", "gun_gepard",
     "laser", "laser_s", "laser_l", "laser_rfdew",
 ]
 Uplink = Literal["starlink", "cellular"]
@@ -19,8 +19,14 @@ JamBand = Literal["control900", "control24", "video58", "gnss"]
 DroneTypeId = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,31}$")]
 MAX_ATTACK_TYPES = 64
 Protection = Literal["open", "building", "bunker"]
+PatrolVehicle = Literal["patria", "hilux", "mule"]  # PATROL_VEHICLES in frontend/src/sim/config/patrol.js
+MAX_ESCORTS = 6
+MAX_ESCORT_GAP = 200  # metres along the route, ahead of the people or (negative) behind
+MAX_ESCORT_SIDE = 100  # metres to the right of the people or (negative) to the left
+PATROL_WIDTH = (20, 1000)  # metres: CORRIDOR in frontend/src/sim/route.js
+Formation = Literal["file", "staggered", "wedge"]  # FORMATIONS in frontend/src/sim/formation.js
 
-WORLD_LIMIT = 350  # scene units: the ground reaches 7 km from the site, at 20 m a unit
+WORLD_LIMIT = 1350  # scene units: the ground reaches 27 km from the site (WORLD.radius), at 20 m a unit
 MAX_SYSTEMS = 200
 MAX_COMMANDS = 20_000
 MAX_UNIT_SETTINGS = 16
@@ -73,6 +79,7 @@ class PlacedSystem(Strict):
     settings: dict[FigureKey, SettingNumber | SettingChoice | SettingArcs | SettingBands] | None = Field(default=None, max_length=MAX_UNIT_SETTINGS, exclude_if=lambda v: v is None)
     name: UnitName | None = Field(default=None, exclude_if=lambda v: v is None)
     callsign: Callsign | None = Field(default=None, exclude_if=lambda v: v is None)
+    vehicle: PatrolVehicle | None = Field(default=None, exclude_if=lambda v: v is None)  # parked on one from a deployment pack
 
 
 class PlacedPeople(Strict):
@@ -80,6 +87,24 @@ class PlacedPeople(Strict):
     z: Coordinate
     count: Annotated[int, Field(ge=1, le=MAX_PEOPLE_PER_GROUP)]
     protection: Protection
+    # soldiers are drawn in uniform; a group without it is civilians, as every group saved before it was
+    role: Literal["military"] | None = Field(default=None, exclude_if=lambda role: role is None)
+
+
+class Escort(Strict):
+    """One vehicle in a patrol's column: what it is, the system it carries, and its place in the formation."""
+
+    vehicle: PatrolVehicle
+    system: SystemId
+    gap: Annotated[float, Field(ge=-MAX_ESCORT_GAP, le=MAX_ESCORT_GAP)]
+    side: Annotated[float, Field(ge=-MAX_ESCORT_SIDE, le=MAX_ESCORT_SIDE)] | None = Field(default=None, exclude_if=lambda side: side is None)  # older columns have none
+
+
+class PatrolPlan(Strict):
+    """How wide a patrol's corridor is, and the formation its soldiers walk in."""
+
+    width: Annotated[float, Field(ge=PATROL_WIDTH[0], le=PATROL_WIDTH[1])]
+    formation: Formation
 
 
 class LaydownSpec(Strict):
@@ -92,8 +117,12 @@ class LaydownSpec(Strict):
     conditions: Literal["day", "dusk", "night", "rain"] | None = Field(default=None, exclude_if=lambda conditions: conditions is None)  # light and weather
     people: list[PlacedPeople] | None = Field(default=None, max_length=MAX_PEOPLE_GROUPS, exclude_if=lambda people: people is None)
     zone: list[Annotated[list[Coordinate], Field(min_length=2, max_length=2)]] | None = Field(default=None, min_length=3, max_length=MAX_ZONE_POINTS, exclude_if=lambda zone: zone is None)
-    # a patrol's looped route (see docs/PATROL_MODE.md); the game checks it again on the ground when it is restored
+    # a patrol's route from its start to its end (see docs/PATROL_MODE.md); the game checks it again on the ground when it is restored
     patrol: list[Annotated[list[Coordinate], Field(min_length=2, max_length=2)]] | None = Field(default=None, min_length=2, max_length=MAX_ZONE_POINTS, exclude_if=lambda patrol: patrol is None)
+    # the vehicles that escort it; a patrol saved before there was a choice gets the default column
+    patrolColumn: list[Escort] | None = Field(default=None, min_length=1, max_length=MAX_ESCORTS, exclude_if=lambda column: column is None)
+    # its corridor and formation; a patrol saved before there was a choice gets the default plan
+    patrolPlan: PatrolPlan | None = Field(default=None, exclude_if=lambda plan: plan is None)
 
 
 FigureGroup = Annotated[dict[FigureKey, Annotated[dict[FigureKey, Figure], Field(max_length=MAX_FIGURES_PER_ITEM)]], Field(max_length=MAX_FIGURES_PER_ITEM)]

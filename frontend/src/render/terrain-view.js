@@ -4,12 +4,12 @@
 import * as THREE from 'three';
 import { WORLD, TERRAIN, COMMS } from '../sim/config/index.js';
 import { terrainState } from '../sim/terrain.js';
+import { clamp } from '../sim/world.js';
 import { mulberry32, hashSeed } from '../sim/rng.js';
 
 const MPU = () => WORLD.metresPerUnit;
 const UP = new THREE.Vector3(0, 1, 0);
 const u = (m) => m / MPU();
-const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
 
 // ground height in scene units at a scene-unit position
 export const groundU = (xu, zu) => terrainState.data.groundAt(xu * MPU(), zu * MPU()) / MPU();
@@ -21,7 +21,8 @@ export function buildWorldView(scene, data, siteMat) {
   const vs = data.geo ? 1 : TERRAIN.visualScale; // on a real map, models are true to its scale
 
   // ---------- ground ----------
-  const stride = data.geo ? 2 : Math.max(1, TERRAIN.meshStride); // mesh vertex every few grid cells; the sim grid is finer
+  // mesh vertex every few grid cells; the sim grid is finer. At most 540 segments a side keeps a 54 km world near 580,000 triangles
+  const stride = Math.max(1, TERRAIN.meshStride, Math.ceil((data.N - 1) / 540));
   const seg = Math.floor((data.N - 1) / stride);
   const geo = new THREE.PlaneGeometry(u(2 * R), u(2 * R), seg, seg).rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -84,8 +85,13 @@ export function buildWorldView(scene, data, siteMat) {
   }
 
   // ---------- trees ----------
+  // On a real map, one tree fills each tree cell, centred on it, so the drawing shows exactly the grid the rules use.
+  // Generated ground is invented anyway, so its trees are thinned and scattered to look natural.
+  const scenery = [];
   const trng = mulberry32(hashSeed(`${data.seed}:trees`));
-  const k = Math.max(1, Math.round(TERRAIN.treeStep / data.cell));
+  const k = data.geo ? 1 : Math.max(1, Math.round(TERRAIN.treeStep / data.cell));
+  const scatter = data.geo ? 0 : data.cell * k;
+  const crown = data.geo ? data.cell / 2 : 5 * vs;
   const treeSpots = [];
   const treeR = 4500;
   for (let j = 0; j < data.N; j += k) {
@@ -94,15 +100,16 @@ export function buildWorldView(scene, data, siteMat) {
       if (x * x + z * z > treeR * treeR) continue;
       const idx = j * data.N + i;
       if (data.cover[idx] !== 1 || !data.canopy[idx]) continue;
-      treeSpots.push({ x: x + (trng() - 0.5) * data.cell * k, z: z + (trng() - 0.5) * data.cell * k, h: data.canopy[idx] });
+      treeSpots.push({ x: x + (trng() - 0.5) * scatter, z: z + (trng() - 0.5) * scatter, h: data.canopy[idx] });
     }
   }
   if (treeSpots.length) {
     const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 5).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: 0x24442a }), treeSpots.length);
+    scenery.push(trees);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
     treeSpots.forEach((t, n) => {
       p.set(u(t.x), u(data.groundAt(t.x, t.z)), u(t.z));
-      sc.set(u(5 * vs), u(t.h * vs), u(5 * vs));
+      sc.set(u(crown), u(t.h * vs), u(crown));
       m4.compose(p, q, sc);
       trees.setMatrixAt(n, m4);
     });
@@ -112,6 +119,7 @@ export function buildWorldView(scene, data, siteMat) {
   // ---------- hamlet buildings ----------
   if (data.buildings.length) {
     const houses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), data.buildings.length);
+    scenery.push(houses);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
     const palette = [0xc9c2b4, 0xb88a6a, 0xd8d4cc, 0x9aa3ad];
     data.buildings.forEach((b, n) => {
@@ -189,7 +197,7 @@ export function buildWorldView(scene, data, siteMat) {
       if (o.isInstancedMesh) o.dispose();
     });
   }
-  return { group, mesh, dispose };
+  return { group, mesh, scenery, dispose };
 }
 
 // A ring that follows the ground: a flat ribbon whose vertices are raised to the terrain height. `update(cx, cz)` re-fits
@@ -203,7 +211,7 @@ export function drapedRing(radiusU, thicknessU, color, opacity, segs = 160, lift
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setIndex(index);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, fog: false })); // a 25 km ring lies deep in the fog
   mesh.frustumCulled = false;
   function update(cx, cz) {
     const y0 = groundU(cx, cz);
@@ -222,7 +230,7 @@ export function drapedRing(radiusU, thicknessU, color, opacity, segs = 160, lift
 }
 
 // Shaded relief for the plan map: north is up, covering the whole terrain.
-export function makeHillshade(data, size = 320) {
+export function makeHillshade(data, size = Math.round(data.R / 22)) { // about 44 m a pixel, whatever the world's size
   const cv = document.createElement('canvas');
   cv.width = cv.height = size;
   const g = cv.getContext('2d');

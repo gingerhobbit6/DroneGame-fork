@@ -73,8 +73,26 @@ export function makeWorld({ seed, N, cell, R, ground, canopy, bldg, cover, build
     if (!geo || !buildings.length) return true;
     return !!buildingAt(x, z);
   }
+  // Buildings filed by 100 m square on first use: a real map can hold half a million, too many to scan for every point asked about.
+  // Each is filed under every square its footprint can reach, in list order, so the first match is the one a full scan finds.
+  let filed = null;
+  const square = (x, z) => (Math.floor(x / 100) + 1000) * 2000 + Math.floor(z / 100) + 1000;
+  function fileBuildings() {
+    filed = new Map();
+    for (const b of buildings) {
+      const r = Math.hypot(b.w, b.d) / 2 + WALL_GAP;
+      for (let x = Math.floor((b.x - r) / 100); x <= Math.floor((b.x + r) / 100); x++) {
+        for (let z = Math.floor((b.z - r) / 100); z <= Math.floor((b.z + r) / 100); z++) {
+          const k = square(x * 100, z * 100);
+          if (!filed.has(k)) filed.set(k, []);
+          filed.get(k).push(b);
+        }
+      }
+    }
+  }
   function buildingAt(x, z) {
-    return buildings.find((b) => {
+    if (!filed) fileBuildings();
+    return (filed.get(square(x, z)) ?? []).find((b) => {
       const dx = x - b.x, dz = z - b.z, c = Math.cos(b.angle || 0), s = Math.sin(b.angle || 0);
       return Math.abs(dx * c - dz * s) <= b.w / 2 + WALL_GAP && Math.abs(dx * s + dz * c) <= b.d / 2 + WALL_GAP;
     }) || null;

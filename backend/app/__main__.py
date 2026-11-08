@@ -1,4 +1,4 @@
-"""Run the game: uv run python -m app. Bound to this machine only, because there is no sign-in."""
+"""Run the game: uv run python -m app. Bound to this machine only: sign-in runs over plain http, with no TLS."""
 
 import os
 

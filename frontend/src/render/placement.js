@@ -1,14 +1,16 @@
 // Turning the mouse into a point on the ground, and the green or red preview of the system being placed.
 
 import * as THREE from 'three';
-import { DRONES, STRUCTURES, STRUCT_SCALE, WORLD } from '../sim/config/index.js';
+import { DRONES, STRUCTURES, WORLD } from '../sim/config/index.js';
+import { drawnUnit } from './system-parts.js';
 import { BEARINGS, predictRange, usesPath } from '../sim/site-range.js';
 import { standingAt } from '../sim/sensor-model.js';
 import { terrainState } from '../sim/terrain.js';
 import { u, hereU } from '../sim/units.js';
 import { drapedRing } from './terrain-view.js';
 import { view } from './view.js';
-import { LABEL_LIFT, ringThickness } from './structure-view.js';
+import { labelLift, ringThickness } from './structure-view.js';
+import { DRAG_TYPE, readDrop } from '../drag.js';
 
 const PICK_PX = 16;
 const PEOPLE_MARKER = 0.006; // the placement marker's size per scene unit from the camera
@@ -32,7 +34,7 @@ export function pickStructure(structures, camera, px, py, width = innerWidth, he
   let best = null, bd = tolerance;
   for (const s of structures) {
     _base.copy(s.pos).project(camera);
-    _top.copy(s.pos).setY(s.pos.y + LABEL_LIFT).project(camera);
+    _top.copy(s.pos).setY(s.pos.y + labelLift(s.def)).project(camera);
     if (_base.z >= 1 || _top.z >= 1) continue; // behind the camera
     const ax = ((_base.x + 1) / 2) * width, ay = ((1 - _base.y) / 2) * height;
     const dx = ((_top.x + 1) / 2) * width - ax, dy = ((1 - _top.y) / 2) * height - ay;
@@ -52,7 +54,7 @@ export function selectionFrom(tool, tagged, pick) {
 
 // getTool() is a structure id, 'sell', 'zone', 'people' or null. A left click first calls onSelect(screenX, screenY), which returns true if
 // it dealt with the click. Otherwise it calls onGroundClick(x, z).
-export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getTool, defFor = (tool) => STRUCTURES[tool], onGroundClick, onSelect }) {
+export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getTool, defFor = (tool) => STRUCTURES[tool], onGroundClick, onSelect, onDrop = () => {} }) {
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -69,6 +71,20 @@ export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getT
     if (mouseOnGround) mouseGround.y = hereU(mouseGround.x, mouseGround.z);
   }
   canvas.addEventListener('pointermove', updateMouse);
+  // A card dragged from a list: the preview follows it, and letting go places it there
+  canvas.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    updateMouse(e);
+  });
+  canvas.addEventListener('drop', (e) => {
+    const item = readDrop(e.dataTransfer.getData(DRAG_TYPE));
+    if (!item) return;
+    e.preventDefault();
+    updateMouse(e);
+    if (mouseOnGround) onDrop(item, mouseGround.x, mouseGround.z);
+  });
   canvas.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY, b: e.button }; });
   canvas.addEventListener('pointerup', (e) => {
     if (!downPos || downPos.b !== 0) return;
@@ -87,7 +103,7 @@ export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getT
   let ghostAt = { x: NaN, z: NaN }, ghostRadii = null, predictedAt = 0;
   const ghostMat = new THREE.MeshBasicMaterial({ color: 0x66ff66, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
   const ghostMarker = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 1.5, 16), ghostMat);
-  ghostMarker.scale.setScalar(STRUCT_SCALE);
+  ghostMarker.scale.setScalar(drawnUnit());
   ghost.add(ghostMarker);
 
   function refresh() {
@@ -109,17 +125,17 @@ export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getT
     if (ghostRing || tool === 'sell' || tool === 'people') {
       ghost.visible = mouseOnGround && !!tool && sim.state.started;
       ghost.position.set(mouseGround.x, mouseGround.y + 0.1, mouseGround.z);
-      ghostMarker.scale.setScalar(tool === 'people' ? camera.position.distanceTo(ghost.position) * PEOPLE_MARKER : STRUCT_SCALE); // people are tiny, so it must not hide them up close
+      ghostMarker.scale.setScalar(tool === 'people' ? camera.position.distanceTo(ghost.position) * PEOPLE_MARKER : drawnUnit()); // people are tiny, so it must not hide them up close
       if (ghostRing && mouseOnGround && (ghostAt.x !== mouseGround.x || ghostAt.z !== mouseGround.z)) {
-        const now = performance.now();
-        if (ghostRadii && now - predictedAt > PREDICT_EVERY_MS) { // the preview shows the range this spot really gets
+        const now = performance.now(), predicting = ghostRadii && now - predictedAt > PREDICT_EVERY_MS;
+        if (predicting) { // the preview shows the range this spot really gets
           predictedAt = now;
           const m = WORLD.metresPerUnit;
           const def = standingAt(defFor(tool), sim.state.zoneCentre, mouseGround); // facing as it will once placed
           predictRange(def, DRONES.fpv, terrainState.data, mouseGround.x * m, mouseGround.z * m).first.forEach((metres, i) => { ghostRadii[i] = u(metres); });
         }
         ghostRing.update(mouseGround.x, mouseGround.z); // re-drape the ring over the ground under the cursor
-        ghostAt = { x: mouseGround.x, z: mouseGround.z };
+        if (!ghostRadii || predicting) ghostAt = { x: mouseGround.x, z: mouseGround.z }; // a spot skipped to throttle is predicted once the cursor rests
       }
       const ok = tool === 'sell' || (tool === 'people' ? sim.canPlacePeople(mouseGround.x, mouseGround.z, view.people.protection) : sim.canPlace(mouseGround.x, mouseGround.z, STRUCTURES[tool]));
       ghostMat.color.set(tool === 'sell' ? 0xff9800 : ok ? 0x66ff66 : 0xff5252);

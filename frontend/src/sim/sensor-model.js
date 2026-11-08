@@ -13,7 +13,7 @@ export const BANDS = {
   ku: { label: 'Ku band, 16 GHz', f: [[15.7, 17.0]], price: 1.15 },
   k: { label: 'K band, 24.5 GHz', f: [[24.45, 24.65]], price: 1.3 },
 };
-export const ghzOf = (f) => (f[0][0] + f[0][1]) / 2;
+const ghzOf = (f) => (f[0][0] + f[0][1]) / 2;
 export const bandOf = (def) => { const g = ghzOf(def.emits[0].f); return g < 6 ? 's' : g < 12 ? 'x' : g < 20 ? 'ku' : 'k'; };
 const SMALL_TARGET = 1 / 8; // a small drone's radar cross-section rises with frequency (assumed as its square root): range goes with its fourth root
 

@@ -1,21 +1,22 @@
 // Wires the simulation to the 3D view and runs the frame loop. React reads from here through useTick and never owns game state.
 
 import * as THREE from 'three';
-import { DRONES, STRUCTURES, WORLD, firstClass } from './sim/config/index.js';
-import { fieldsFor, setSetting, unitDef } from './sim/unit-config.js';
+import { DRONES, WORLD } from './sim/config/index.js';
+import { cleanSettings, fieldsFor, setSetting, unitDef } from './sim/unit-config.js';
 import { predictRange, usesPath } from './sim/site-range.js';
 import { terrainState } from './sim/terrain.js';
 import { createSimulation, SIM_STEP } from './sim/simulation.js';
+import { onVehicle } from './sim/laydown.js';
 import { createGameView } from './render/game-view.js';
 import { hereU } from './sim/units.js';
 import { PLACING_PICK_PX, createPlacement, pickStructure, selectionFrom, slideToShow } from './render/placement.js';
 import { createReplay } from './render/replay-view.js';
-import { droneTemplate } from './render/models.js';
-import { trackColour } from './render/belief-view.js';
 import { view } from './render/view.js';
 import { createApi } from './api/client.js';
 import { createRunSaver } from './api/run-saver.js';
 import { addZonePoint } from './zone.js';
+import { patrolClicker } from './patrol-draw.js';
+import { createTools } from './tools.js';
 import { createPackStore } from './api/pack-store.js';
 import { parseWorldId } from './sim/world-pack.js';
 
@@ -85,16 +86,21 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   // ---------- filled in once the canvas exists ----------
   let gameView = null, placement = null, replay = null;
   const frameListeners = new Set();
-  let tool = null; // structure id | 'sell' | 'zone' | 'people' | 'patrol' | null
   let refusal = null; // why the last placement was refused
   let selectHinted = false; // the first placement says that systems can be clicked
 
-  const sizes = {}; // kind -> the size last picked, which the toolbar offers next
-  function setTool(t) {
-    tool = tool === t ? null : t;
-    if (STRUCTURES[tool]) sizes[STRUCTURES[tool].kind] = tool;
-    if (placement) placement.refresh();
-    bump();
+  const tools = createTools(() => { if (placement) placement.refresh(); bump(); });
+  const setTool = tools.set;
+  // A card let go over the map: a system is placed like a click with it picked, and a group of people where it fell.
+  function dropAt(item, x, z) {
+    if (item.system) {
+      tools.use(item.system, item.vehicle);
+      groundClick(x, z);
+    } else if (state.started && !state.over) {
+      refusal = commands.placePeople(x, z, item.people.count, item.people.protection);
+      toast(refusal || `Placed ${item.people.count} people`);
+    }
+    tools.endDrag();
   }
 
   // The settings the next system of each type is placed with, chosen in the toolbar's list.
@@ -104,13 +110,17 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     if (fieldsFor(id).includes(field)) setSetting(loadoutFor(id), field, id, value);
     bump();
   }
-  const toolChoice = (group) => sizes[group.kind] || firstClass(group);
-  // A hotkey: the first press picks the kind, and pressing it again moves to the next size. With only one size, it switches off.
-  function cycleTool(group) {
-    const at = group.classes.indexOf(tool);
-    if (at < 0) setTool(toolChoice(group));
-    else setTool(group.classes.length > 1 ? group.classes[(at + 1) % group.classes.length] : tool);
+  // A deployed pack's lines: each system is placed with the settings its line holds, or the catalogue's. With no pack (null), the
+  // systems the last one set go back to the catalogue's settings, and its price.
+  let fromPack = [];
+  function usePackLoadouts(lines) {
+    for (const id of fromPack) delete loadouts[id];
+    fromPack = (lines ?? []).map((l) => l.id);
+    for (const l of lines ?? []) loadouts[l.id] = cleanSettings(l.id, l.settings);
+    bump();
   }
+  // With a pack's kit, a hotkey opens its kind's list of what the pack holds rather than picking a system to place.
+  const cycleTool = (group) => (sim.state.kit ? tools.openCatalogue(group.kind, true) : tools.cycle(group));
 
   // What the system just placed really gets from where it stands, against the open field it is advertised for.
   function placedSummary() {
@@ -126,27 +136,25 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     if (JSON.stringify(points) !== JSON.stringify(sim.state.zone)) commands.setZone(points);
   }
 
-  // A click while drawing a patrol route. A closed route goes to the simulation, which adds the escort. A refused one is wiped.
-  function patrolClick(x, z) {
-    if (sim.designLocked()) { toast('The patrol is locked once the first wave starts'); return; }
-    if (!view.route && sim.getPatrol()) commands.setPatrol(null); // a new route replaces the old one
-    view.route = addZonePoint(view.route, x, z);
-    if (!view.route?.closed) { bump(); return; }
-    const refused = commands.setPatrol(view.route.points);
-    view.route = null;
-    toast(refused || 'Patrol set. It starts walking with the first wave, with a radar ahead and a Rapid Ranger behind');
-    setTool('patrol');
+  let patrolClick = null; // made on first use, once everything it calls exists
+
+  // The picked system, with the settings and vehicle chosen for it, however the spot was given. Returns why it was refused, or null.
+  function placeSystem(x, z) {
+    const tool = tools.get(), loadout = Object.keys(loadoutFor(tool)).length ? { ...loadoutFor(tool) } : undefined, vehicle = tools.vehicle();
+    refusal = vehicle ? commands.place(tool, x, z, loadout, vehicle) : loadout ? commands.place(tool, x, z, loadout) : commands.place(tool, x, z);
+    return refusal;
   }
 
   function groundClick(x, z) {
+    const tool = tools.get();
     if (!tool || state.over || !state.started) return;
     if (tool === 'sell') { commands.sell(x, z); return; }
     if (tool === 'people') {
-      refusal = commands.placePeople(x, z, view.people.count, view.people.protection);
+      refusal = commands.placePeople(x, z, view.people.count, view.people.protection, view.people.role);
       if (refusal) toast(refusal);
       return;
     }
-    if (tool === 'patrol') { patrolClick(x, z); return; }
+    if (tool === 'patrol') { (patrolClick ??= patrolClicker({ sim, commands, view, toast, setTool, bump }))(x, z); return; }
     if (tool === 'zone') {
       if (sim.designLocked()) toast(ZONE_LOCKED);
       else if (sim.getPatrol()) toast(PATROL_FIRST);
@@ -157,13 +165,15 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       }
       return;
     }
-    refusal = Object.keys(loadoutFor(tool)).length ? commands.place(tool, x, z, { ...loadoutFor(tool) }) : commands.place(tool, x, z);
-    if (refusal) toast(refusal);
-    else { toast(`${placedSummary()}${selectHinted ? '' : '. Click a system for details, or press Esc to stop placing'}`); selectHinted = true; }
+    if (placeSystem(x, z)) { toast(refusal); return; }
+    const esc = tools.dragging() ? '' : ', or press Esc to stop placing'; // a drag puts the last tool back itself
+    toast(`${placedSummary()}${selectHinted ? '' : `. Click a system for details${esc}`}`);
+    selectHinted = true;
   }
 
   // The system the Unit panel shows. It is view state, not a command, so it is not logged and cannot change a run.
   function select(s) { view.selected = s; bump(); }
+  function lookFrom(s) { view.eye = s ?? null; bump(); } // the ground view from this system's mast, or back to the map
   function getSelected() { // sold or destroyed systems drop out of the list
     if (view.selected && !sim.structures.includes(view.selected)) view.selected = null;
     return view.selected;
@@ -171,7 +181,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   // Returns true if the click was about a system on the screen, so the ground under it should not be used as well.
   function mapClick(x, y) {
     if (!state.started) return false;
-    const tagged = gameView.structures.labelAt(x, y);
+    const tagged = gameView.structures.labelAt(x, y), tool = tools.get();
     const pick = () => pickStructure(sim.structures, gameView.camera, x, y);
     if (tool === 'sell') { // the command takes a point on the ground, and the system's own position can only mean that system
       const s = !state.over && (tagged || pick());
@@ -198,10 +208,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   }
 
   // Starting wave 1 rebuilds every system, with a new id and perhaps a new callsign. Only its position is sure to be the same.
-  sim.on('reset', () => {
-    const was = view.selected;
-    view.selected = was && sim.structures.find((s) => s.def.id === was.def.id && s.pos.x === was.pos.x && s.pos.z === was.pos.z) || null;
-  });
+  const rebuilt = (was) => was && sim.structures.find((s) => s.def.id === was.def.id && s.pos.x === was.pos.x && s.pos.z === was.pos.z) || null;
 
   // when the fusion node asks the operator to authorise an engagement, stop the clock so there is time to decide
   let pausedForApproval = false, simAcc = 0;
@@ -222,7 +229,10 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       pausedForApproval = false;
     },
   };
+  // One handler, in this order: the selection and ground view move to the rebuilt systems before the views are cleared, and the replay
+  // is left (which can set the speed) before the speed is set for the new run.
   sim.on('reset', ({ kept, begin, loading }) => {
+    view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); // the ground view stays on its system too
     if (replay) replay.reset();
     if (gameView) gameView.clear();
     simAcc = 0; pausedForApproval = false;
@@ -258,10 +268,10 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     gameView = createGameView(canvas, labelLayer, sim, mapSource);
     placement = createPlacement({
       scene: gameView.scene, camera: gameView.camera, canvas, getWorldMesh: gameView.getWorldMesh, sim,
-      getTool: () => tool, defFor: (id) => unitDef(id, loadoutFor(id)), onGroundClick: groundClick, onSelect: mapClick,
+      getTool: tools.get, defFor: (id) => unitDef(id, onVehicle(id, loadoutFor(id), tools.vehicle())), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
     });
     replay = createReplay({
-      scene: gameView.scene, rec: sim.rec, droneTemplate, makeLabel: gameView.labels.make, placeLabel: gameView.labels.place, trackColour,
+      scene: gameView.scene, rec: sim.rec, labels: gameView.labels,
       getStructures: () => sim.structures, labelOf: gameView.structures.labelOf, hideLive: gameView.hideLive,
       getLastSpeed: () => clock.lastSpeed, ...reviewClock,
     });
@@ -271,8 +281,9 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   return {
     packs, loadPack, ensureWorld, mapSource, cursor: () => placement?.cursor() ?? null,
-    sim, commands, clock, setSpeed, reviewClock, subscribe, getTick, bump, attach, debug, api, saver, pageClosing,
-    getTool: () => tool, setTool, toolChoice, cycleTool, loadoutFor, setLoadout, lastRefusal: () => refusal, select, getSelected, reveal,
+    sim, commands, clock, setSpeed, reviewClock, subscribe, getTick, bump, attach, debug, api, saver, storage, pageClosing,
+    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, placeSystem, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
+    catalogue: tools.catalogue, openCatalogue: tools.openCatalogue, pickFromTray: tools.pickFromTray, startDrag: tools.startDrag, endDrag: tools.endDrag, dropAt,
     toast, onToast(fn) { toastListeners.add(fn); return () => toastListeners.delete(fn); },
     onFrame(fn) { frameListeners.add(fn); return () => frameListeners.delete(fn); },
     getReplay: () => replay,
@@ -296,19 +307,20 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (key === 'planView' && gameView) gameView.viewFromAbove(value);
       if (['baseMap', 'mapRoads', 'mapGrid', 'mapContours'].includes(key) && gameView) {
         view.mapLoading = true;
+        const world = sim.state.terrainSeed;
         gameView.refreshMap().then((live) => {
-          if (live?.stale) return;
+          if (live?.stale) { if (sim.state.terrainSeed !== world) { view.mapLoading = false; bump(); } return; } // a newer paint has it, unless the world changed
           view.mapLoading = false;
           bump();
-          if (live?.total && live.failed === live.total) { view.baseMap = 'os'; toast('The live map could not load: it needs an internet connection'); gameView.refreshMap(); bump(); }
+          if (live?.total && live.failed === live.total) { view.baseMap = 'os'; toast('The live map could not load: it needs an internet connection'); gameView.refreshMap().catch(() => {}); bump(); }
           else if (live?.failed) toast(`${live.failed} of ${live.total} map tiles could not load`);
-        });
+        }).catch(() => { view.mapLoading = false; toast('The map could not be drawn'); bump(); });
       }
       bump();
     },
     // Back to the start screen, to choose another world. A point makes it open on that place.
     leaveWorld(point = null) {
-      if (tool) setTool(tool);
+      tools.openCatalogue(null, false);
       Object.assign(view, { startAt: point, zone: null, route: null, me: null, selected: null, mapPanel: false, planView: false });
       if (gameView) gameView.viewFromAbove(false);
       commands.leave();

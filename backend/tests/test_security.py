@@ -5,11 +5,11 @@ import re
 from pathlib import Path
 
 import pytest
-from conftest import SPEC, figure_set, laydown, run
+from conftest import SPEC, figure_set, laydown, run, sign_up
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.schemas import MAX_COMMANDS, MAX_PEOPLE_GROUPS, MAX_PEOPLE_PER_GROUP, MAX_SYSTEMS, CellBand, DroneTypeId, JamBand, Protection, SystemId, Uplink
+from app.schemas import MAX_COMMANDS, MAX_ESCORT_GAP, MAX_ESCORTS, MAX_PEOPLE_GROUPS, MAX_PEOPLE_PER_GROUP, MAX_SYSTEMS, CellBand, DroneTypeId, JamBand, PatrolVehicle, Protection, SystemId, Uplink
 from app.security import MAX_BODY_BYTES
 
 API = "/api/v1"
@@ -32,8 +32,8 @@ def spec_with(**fields):
     ("unknown field", {**laydown(), "admin": True}),
     ("unknown system", laydown(spec=spec_with(id="nuke"))),
     ("unknown field in a system", laydown(spec=spec_with(owner="x"))),
-    ("outside the world", laydown(spec=spec_with(x=351))),
-    ("outside the world, negative", laydown(spec=spec_with(z=-351))),
+    ("outside the world", laydown(spec=spec_with(x=1351))),
+    ("outside the world, negative", laydown(spec=spec_with(z=-1351))),
     ("coordinate as text", laydown(spec=spec_with(x="1; DROP TABLE laydowns"))),
     ("unknown uplink", laydown(spec=spec_with(uplink="wifi"))),
     ("unknown band", laydown(spec=spec_with(cellBand="B99"))),
@@ -190,6 +190,7 @@ class TestServingTheGame:
     @pytest.fixture
     def site(self, game, tmp_path):
         with TestClient(create_app(tmp_path / "data" / "t.db", game=game), base_url="http://localhost") as c:
+            sign_up(c)
             yield c
 
     def test_the_game_and_the_api_share_one_origin(self, site):
@@ -225,6 +226,7 @@ def test_the_database_path_can_come_from_the_environment(tmp_path, monkeypatch):
     path = tmp_path / "from-env.db"
     monkeypatch.setenv("SITE_GUARD_DB", str(path))
     with TestClient(create_app(), base_url="http://localhost") as c:
+        sign_up(c)
         assert c.post(f"{API}/laydowns", json=laydown()).status_code == 201
     assert path.exists()
 
@@ -242,12 +244,19 @@ def test_every_drone_the_waves_can_send_fits_the_shape_a_save_allows():
 def test_the_names_the_api_accepts_match_the_game():
     """The backend does not import the frontend, so check its config directly: this fails if a system or band is added on one side only."""
     config = Path(__file__).parent.parent.parent / "frontend" / "src" / "sim" / "config"
-    systems = "".join((config / name).read_text(encoding="utf-8") for name in ("sensors.js", "effectors.js", "uk-systems.js"))
+    systems = "".join((config / name).read_text(encoding="utf-8") for name in ("sensors.js", "effectors.js", "uk-systems.js", "eu-systems.js", "crew.js"))
     comms = (config / "comms.js").read_text(encoding="utf-8")
     assert set(re.findall(r"^  (\w+): \{$", systems, re.M)) == set(SystemId.__args__)
     assert set(Uplink.__args__) <= set(re.findall(r"^  (\w+): \{$", comms, re.M))
     assert set(CellBand.__args__) == set(re.findall(r"^      (\w+): \{ label: '(?:Band|n)", comms, re.M))
     assert set(JamBand.__args__) == set(re.findall(r"^    (\w+): \{ label: ", comms, re.M))
     people = (config / "people.js").read_text(encoding="utf-8")
-    assert set(Protection.__args__) == set(re.findall(r"^  (\w+): \{ name: ", people, re.M))
+    levels, roles = people.split("export const PEOPLE_ROLES")
+    assert set(Protection.__args__) == set(re.findall(r"^  (\w+): \{ name: ", levels, re.M))
+    assert {"military"} == set(re.findall(r"^  (\w+): \{ name: ", roles, re.M)) - {"civilian"}  # civilians are saved with no role
     assert f"groups: {MAX_PEOPLE_GROUPS}, perGroup: {MAX_PEOPLE_PER_GROUP}" in people
+    assert f"maxSystems: {MAX_SYSTEMS} }}" in (config / "world.js").read_text(encoding="utf-8")  # the game stops placing before a save would be refused
+    patrol = (config / "patrol.js").read_text(encoding="utf-8")
+    vehicles = patrol.split("export const PATROL_VEHICLES")[1].split("};")[0]
+    assert set(PatrolVehicle.__args__) == set(re.findall(r"^  (\w+): \{ name: ", vehicles, re.M))
+    assert f"MAX_ESCORTS = {MAX_ESCORTS};" in patrol and f"MAX_ESCORT_GAP = {MAX_ESCORT_GAP};" in patrol

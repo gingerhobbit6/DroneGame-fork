@@ -4,16 +4,16 @@
 // missile, laser shot) is used. Each system's `ref` says where its numbers come from. Prices marked ASSUMPTION had no verified public figure.
 export const EFFECTORS = {
   jammer: {
-    product: 'DroneShield DroneGun Tactical', size: 'M', name: 'Medium RF jammer', short: 'JAM', cost: 60000, shotCost: 0, color: 0x7c4dff, role: 'effector', kind: 'jammer', published: 1000, mount: 9, fire: 'jam',
+    product: 'Generic portable jammer on a tripod, networked', size: 'M', name: 'Medium RF jammer', short: 'JAM', cost: 60000, shotCost: 0, color: 0x7c4dff, role: 'effector', kind: 'jammer', published: 1000, mount: 1.5, mobile: 'manpack', fire: 'jam',
     health: 30, signature: 1.5, emits: [], bands: ['control24', 'video58'], // which bands it jams (changeable per jammer); loud while jamming
     slow: 0.5, killTime: 5, // jammed drones slow down; after killTime seconds of full jamming they lose link and crash
-    desc: 'RF jammer. Switched on only while tracks are in range. Autonomous/fibre drones ignore it. No cost per use.',
+    desc: 'Portable RF jammer on a tripod, networked, so the fusion node switches it on only while tracks are in range. Autonomous/fibre drones ignore it. No cost per use.',
     sapient: { nodeType: 'NODE_TYPE_JAMMER', subType: ['RF', 'GNSS'], scan: 'SCAN_TYPE_FIXED', modes: ['Standby', 'Jam'] },
     ref: {
-      class: 'Handheld / fixed RF and GNSS jammer',
-      analogues: ['DroneShield DroneGun Tactical', 'DroneGun MkIII (shorter range)'],
+      class: 'Portable networked RF jammer (generic)',
+      analogues: ['DroneShield DroneGun Tactical class, on a tripod'],
       published: 'DroneGun Tactical: up to ~1 km effective (older or promotional figures say 2 km). MkIII is rated ~500 m.',
-      basis: 'Game range is the 1 km figure. Typical jamming bands are 2.4 GHz, 5.8 GHz and GNSS. Crash-after-N-seconds is a game rule.',
+      basis: 'A generic networked jammer with the DroneGun Tactical class figures; the handheld DroneGun itself is listed as a crew system. Game range is the 1 km figure. Typical jamming bands are 2.4 GHz, 5.8 GHz and GNSS. Crash-after-N-seconds is a game rule. Its antenna stands 1.5 m up.',
       confidence: 'Vendor claims; figures conflict across sources',
       sources: [
         { label: 'DroneDJ: DroneGun Tactical', url: 'https://dronedj.com/2021/06/23/dronegun-tactical-jammer-provides-powerful-but-flexible-anti-uav-neutralization/' },
@@ -30,15 +30,15 @@ export const EFFECTORS = {
     },
   },
   jammer_s: {
-    product: 'DroneShield DroneGun MkIII', size: 'S', name: 'Small RF jammer', short: 'JMS', model: 'jammer', modelScale: 0.7, cost: 40000, shotCost: 0, color: 0xb388ff, role: 'effector', kind: 'jammer', published: 500, mount: 9, fire: 'jam',
+    product: 'Generic small jammer on a tripod, networked', size: 'S', name: 'Small RF jammer', short: 'JMS', model: 'jammer', modelScale: 0.7, cost: 40000, shotCost: 0, color: 0xb388ff, role: 'effector', kind: 'jammer', published: 500, mount: 1.5, mobile: 'manpack', fire: 'jam',
     health: 30, signature: 0.8, emits: [], bands: ['control24', 'video58'], slow: 0.5, killTime: 5,
-    desc: 'Handheld RF jammer. Cheaper and quieter than the larger jammers, with half the reach. Autonomous/fibre drones ignore it. No cost per use.',
+    desc: 'Small RF jammer on a tripod, networked. Cheaper and quieter than the larger jammers, with half the reach. Autonomous/fibre drones ignore it. No cost per use.',
     sapient: { nodeType: 'NODE_TYPE_JAMMER', subType: ['RF', 'GNSS'], scan: 'SCAN_TYPE_FIXED', modes: ['Standby', 'Jam'] },
     ref: {
-      class: 'Handheld RF jammer',
-      analogues: ['DroneShield DroneGun MkIII'],
+      class: 'Small networked RF jammer (generic)',
+      analogues: ['DroneShield DroneGun MkIII class, on a tripod'],
       published: 'Effective range up to 500 m. 433 and 915 MHz, 2.4 and 5.8 GHz, with GNSS as an option. An operator manual lists up to 1,000 m in rural conditions.',
-      basis: 'Game range is the 500 m launch figure.',
+      basis: 'A generic networked jammer with the DroneGun MkIII class figures; the handheld MkIII itself is listed as a crew system. Game range is the 500 m launch figure. Its antenna stands 1.5 m up.',
       confidence: 'Vendor figures; the manual conflicts',
       sources: [
         { label: 'DroneShield: 2019 specification', url: 'https://www.asx.com.au/asxpdf/20190715/pdf/446lzqk0qszn9n.pdf' },
@@ -76,12 +76,13 @@ export const EFFECTORS = {
       class: 'Low-cost kinetic interceptor drone',
       analogues: ['Wild Hornets Sting', 'SkyFall P1-SUN'],
       published: 'Sting: range about 25 km, up to 37 km for newer versions. Top speed 280 km/h, with higher test claims. About $2,000–2,500 per unit (outliers up to $15,000); Ukrainian kinetic interceptors generally $2,000–$5,000.',
-      basis: 'It may engage any drone, as the real one is built to hunt Shaheds, and its hit chance falls as the target gets faster. Per-launch cost $5,000 (your figure, the top of the reported $2,000–5,000 band). Range is the 25 km figure, and speed 80 m/s is close to the listed 280 km/h. The maker has not published official specifications. Magazine, storage and reload time are ASSUMPTIONS: no published launcher capacity was found. Hit chance 0.9 is the top of the maker\u2019s claimed 80\u201390%. With evasion and speed it comes to about 66% against an FPV, close to the 68% average President Zelenskyy gave for interceptor drones.',
+      basis: 'It may engage any drone, as the real one is built to hunt Shaheds, and its hit chance falls as the target gets faster. Per-launch cost $5,000 (your figure, the top of the reported $2,000–5,000 band). Range is the 25 km figure, and speed 80 m/s is close to the listed 280 km/h. The maker has not published official specifications. Magazine, storage and reload time are ASSUMPTIONS: no published launcher capacity was found. Hit chance 0.9 is the top of the maker\u2019s claimed 80\u201390%. In play it takes about three rounds to kill a Shahed, and the maker says three interceptors are often needed for each target. The 68% President Zelenskyy gave for interceptor drones is per target, not per interceptor.',
       confidence: 'Press reports of maker\u2019s figures, which conflict',
       sources: [
         { label: 'NV: Sting hit rate', url: 'https://english.nv.ua/nation/the-drone-killer-inside-the-sting-fpv-interceptor-50591418.html' },
         { label: 'United24: 68% average', url: 'https://united24media.com/war-in-ukraine/how-ukraine-started-2026-with-record-anti-shahed-drone-production-and-a-new-era-in-air-defense-14847' },
         { label: 'Wikipedia: Sting (drone)', url: 'https://en.wikipedia.org/wiki/Sting_(drone)' },
+        { label: 'Espreso: three Stings for each target', url: 'https://global.espreso.tv/russia-ukraine-war-ukraines-low-cost-sting-drones-prove-lethal-against-russian-attacks' },
         { label: 'DroneXL: $2,000 Sting vs $50,000 Shahed', url: 'https://dronexl.co/2026/05/21/ukraine-sting-drone-shahed/' },
       ],
       cost: {
@@ -101,7 +102,7 @@ export const EFFECTORS = {
       class: 'Low-cost kinetic interceptor drone',
       analogues: ['SkyFall P1-SUN'],
       published: 'Reported at about $1,000 a drone, or about $3,000 per kill. The maker gives about 310 km/h. Its JetKiller version is listed at 30 km and the Long version at 33 km.',
-      basis: 'Per-launch cost is the $1,000 figure, and range the 30 km listed for a close version. Speed, damage, magazine, storage and reload time are ASSUMPTIONS, copied from the Sting entry, so it is simply cheaper to fire until stage A7 rebalances it. Hit chance 0.5 is worked back from the reported $3,000 per kill at $1,000 a drone: about 1 in 3 after evasion and speed.',
+      basis: 'Per-launch cost is the $1,000 figure, and range the 30 km listed for a close version. Speed, damage, magazine, storage and reload time are ASSUMPTIONS, copied from the Sting entry. Hit chance 0.5 is worked back from the reported $3,000 per kill at $1,000 a drone: about 1 in 3 after evasion and speed.',
       confidence: 'Press figures for price; performance is an assumption',
       sources: [
         { label: 'Oboronka: P1-SUN price', url: 'https://oboronka.mezha.ua/en/skyfall-rozpovila-pro-cinu-na-dron-perehoplyuvach-p1-sun-308453/' },
@@ -114,14 +115,14 @@ export const EFFECTORS = {
     product: 'Raytheon Coyote Block 2', size: 'M', name: 'Missile', short: 'MSL', cost: 1000000, shotCost: 200000, color: 0xff4081, role: 'effector', kind: 'missile', published: 10000, muzzleY: 2.2, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
     engagePolicy: 'fixed-wing', // the fusion node keeps this for fixed-wing tracks (or anything that gets close), to save the expensive rounds
-    pk: 0.85, damage: 70, splash: 40, fuze: 30, cooldown: 4, missileSpeed: 150, magazine: 4, storage: 8, reloadTime: 60,
+    pk: 0.98, damage: 70, splash: 40, fuze: 30, cooldown: 4, missileSpeed: 150, magazine: 4, storage: 8, reloadTime: 60, minRange: 300,
     desc: 'High-end guided missile that can hit the fixed-wing drones. Each round is expensive, so the fusion node saves it for fixed-wing tracks.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Guided'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Guided counter-UAS interceptor missile',
       analogues: ['Raytheon Coyote Block 2'],
       published: 'Range 10–15 km reported; speed figures conflict (about 100–160 m/s).',
-      basis: 'Game range 10 km is the low end of the reported band; speed is 150 m/s. Splash radius and fuze are assumptions. The magazine of 4 follows the four-round FS-LIDS launcher; storage and reload time are ASSUMPTIONS. Hit chance 0.85 is an ASSUMPTION: the US Army reports 170 kills, but no rate was found.',
+      basis: 'Game range 10 km is the low end of the reported band; speed is 150 m/s. Splash radius and fuze are assumptions. The magazine of 4 follows the four-round FS-LIDS launcher; storage and reload time are ASSUMPTIONS. Hit chance 0.98 is set by its class, as no rate was found for it: 2 points below NASAMS, the one missile with a published rate (94% in Ukraine). The US Army reports 170 and later about 600 kills, but no rate. Its 300 m minimum range is an ASSUMPTION, the published Starstreak figure: a missile needs that far to arm and turn onto its target, so a drone closer than that is left to something else.',
       confidence: 'Secondary reporting; no manufacturer numbers',
       sources: [
         { label: 'TWZ: Coyote kills', url: 'https://www.twz.com/air/army-coyote-drone-hunting-drones-have-scored-170-combat-kills' },
@@ -149,13 +150,14 @@ export const EFFECTORS = {
       class: 'High-energy laser directed-energy weapon',
       analogues: ['UK DragonFire'],
       published: 'Range is classified. Trials are reported at about 1 km, which is not a limit. Rafael says a 50 kW version of its laser reaches about 5 km. The MoD gives a precision claim of hitting a £1 coin from 1 km, operating cost under £10 per shot, and downing drones at up to ~400 mph in trials.',
-      basis: 'Game range 3 km is an ASSESSMENT for a reported 50 kW laser, between the 1 km trial figure and the 5 km Rafael gives at that power. Lasers lose range in rain and haze, which the game halves in its rain and haze conditions, an assumption. Beam damage rate is an assumption. The 300 s beam store converts the 200+ stored engagements EOS claims for its Apollo laser at about 1.5 s a kill, which is an assumption, as is the recharge time. Its beam is at full strength out to a quarter of its range, then falls with distance. Dwell doubling with range follows ST Engineering\u2019s published 5 s at 0.5 km and 10 s at 1 km for its 3 kW CDLE laser.',
+      basis: 'Game range 3 km is an ASSESSMENT for a reported 50 kW laser, between the 1 km trial figure and the 5 km Rafael gives at that power. Lasers lose range in rain and haze, which the game halves in its rain and haze conditions, an assumption. Beam damage rate is an assumption. The 300 s beam store converts the 200+ stored engagements EOS claims for its Apollo laser at about 1.5 s a kill, which is an assumption, as is the recharge time. Its beam is at full strength out to a quarter of its range, then falls with distance. Dwell doubling with range follows ST Engineering\u2019s published 5 s at 0.5 km and 10 s at 1 km for its 3 kW CDLE laser. Each new target first takes 4 s to swing onto, an ASSUMPTION below the roughly 6 s a drone implied by Raytheon’s 15 kW laser downing three drones in 34 s with about 5 s of dwell on each.',
       confidence: 'ASSUMPTION for range and power; per-shot cost from the MoD',
       sources: [
         { label: 'ST Engineering: CDLE brochure', url: 'https://www.stengg.com/getmedia/f2bf2478-35e2-4c37-9ff3-e9029811a1ed/CDLE-Online-Brochure.pdf' },
         { label: 'GOV.UK: DragonFire', url: 'https://www.gov.uk/government/news/advanced-future-military-laser-achieves-uk-first' },
         { label: "Tom's Hardware: DragonFire trials", url: 'https://www.tomshardware.com/tech-industry/uk-dragonfire-laser-downs-high-speed-drones' },
         { label: 'Laser Wars: the infinite magazine myth', url: 'https://www.laserwars.net/p/laser-weapon-infinite-magazine-myth' },
+        { label: 'Army Technology: Raytheon laser, three drones in 34 s', url: 'https://www.army-technology.com/news/dsei-2023-wolfhounds-laser-system-takes-out-uavs-for-the-price-of-a-cup-of-coffee/' },
       ],
       cost: {
         capex: 'Game price $2,000,000 (your figure). No unit price is published; the UK development contract with MBDA is £316 million (about $414 million), which includes R&D. Per shot: about £10 ($13).',
@@ -195,14 +197,14 @@ export const EFFECTORS = {
   interceptor_l: {
     product: 'Project Eagle Merops', size: 'L', name: 'Large interceptor', short: 'INL', model: 'interceptor', modelScale: 1.4, cost: 300000, shotCost: 15000, color: 0x00b8d4, role: 'effector', kind: 'interceptor', published: 15000, muzzleY: 1.6, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
-    pk: 0.8, damage: 70, splash: 15, fuze: 15, cooldown: 3, missileSpeed: 78, magazine: 8, storage: 16, reloadTime: 60,
+    pk: 0.88, damage: 70, splash: 15, fuze: 15, cooldown: 3, missileSpeed: 78, magazine: 8, storage: 16, reloadTime: 60,
     desc: 'Long-range interceptor drone with a fragmentation warhead, built to hunt Shahed-type drones. It can catch the fixed-wing drones, at three times the price per launch of the standard one.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Interceptor drone', 'Guided'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Long-range interceptor drone',
       analogues: ['Merops AS3 Surveyor'],
       published: 'About $15,000 per interceptor, possibly under $10,000 at scale. Up to 280 km/h, with a 2 kg fragmentation warhead. Range is roughly 5–20 km in industry data.',
-      basis: 'Game range 15 km sits in the 5–20 km band, and speed is the listed 280 km/h. Magazine, storage, reload time and launch rate are ASSUMPTIONS. Hit chance 0.8 is an ASSUMPTION: no published figure was found.',
+      basis: 'Game range 15 km sits in the 5–20 km band, and speed is the listed 280 km/h. Magazine, storage, reload time and launch rate are ASSUMPTIONS. Hit chance 0.88 is set by its class, as no rate was found for it: 2 points below the Sting, the interceptor drone whose three rounds a Shahed match what Ukrainian crews report.',
       confidence: 'US press reports of official and industry figures',
       sources: [{ label: 'Defense News: US Army and Merops', url: 'https://www.defensenews.com/unmanned/2026/04/20/us-army-turns-to-ukraine-tested-drones-to-counter-iranian-uav-threat' }],
       cost: {
@@ -215,14 +217,14 @@ export const EFFECTORS = {
   missile_s: {
     product: 'Frankenburg Mark I', size: 'S', name: 'Small missile', short: 'MSS', model: 'missile', modelScale: 0.7, cost: 100000, shotCost: 45000, color: 0xff80ab, role: 'effector', kind: 'missile', published: 2000, muzzleY: 2.2, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
-    pk: 0.8, damage: 50, splash: 15, fuze: 15, cooldown: 2, missileSpeed: 200, magazine: 4, storage: 12, reloadTime: 30,
+    pk: 0.98, damage: 50, splash: 15, fuze: 15, cooldown: 2, missileSpeed: 200, magazine: 4, storage: 12, reloadTime: 30, minRange: 300,
     desc: 'Very short-range guided micro-missile, made to be cheap enough to fire at small drones. It will take any drone it can reach.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Guided'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Ultra-short-range guided micro-missile',
       analogues: ['Frankenburg Mark I'],
       published: 'Range around 2 km, length around 65 cm. Reported at about 40,000 euros or francs a missile; the source gives both.',
-      basis: 'Game range is the reported 2 km. Speed, damage, launch rate, magazine, storage and reload time are ASSUMPTIONS: no source read gave them. Hit chance 0.8 is an ASSUMPTION: no published figure was found.',
+      basis: 'Game range is the reported 2 km. Speed, damage, launch rate, magazine, storage and reload time are ASSUMPTIONS: no source read gave them. Hit chance 0.98 is set by its class, as no rate was found for it: 2 points below NASAMS, the one missile with a published rate (94% in Ukraine). Its 300 m minimum range is an ASSUMPTION, the published Starstreak figure: a missile needs that far to arm and turn onto its target, so a drone closer than that is left to something else.',
       confidence: 'Press reports; no manufacturer datasheet read',
       sources: [{ label: 'Blue News: a 65 cm missile', url: 'https://www.bluewin.ch/en/news/international/a-65-centimetre-missile-is-now-supposed-to-stop-putin-li.2959490' }],
       cost: {
@@ -236,16 +238,16 @@ export const EFFECTORS = {
     product: 'NASAMS with AIM-120 AMRAAM', size: 'L', name: 'Large missile', short: 'MLL', model: 'missile', modelScale: 1.4, cost: 5000000, shotCost: 1169000, color: 0xc51162, role: 'effector', kind: 'missile', published: 25000, muzzleY: 2.2, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
     engagePolicy: 'fixed-wing',
-    pk: 0.9, damage: 100, splash: 40, fuze: 30, cooldown: 5, missileSpeed: 400, magazine: 6, storage: 12, reloadTime: 600,
+    pk: 1, damage: 100, splash: 40, fuze: 30, cooldown: 5, missileSpeed: 400, magazine: 6, storage: 12, reloadTime: 600, minRange: 1000,
     desc: 'Medium-range air-defence missile that reaches across the whole map. Each round costs over a million dollars, so the fusion node saves it for fixed-wing tracks.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Guided'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Medium-range surface-to-air missile launcher',
       analogues: ['NASAMS', 'AIM-120 AMRAAM'],
       published: 'Wikipedia gives a horizontal range of up to 25 km for the standard AMRAAM in its text, and 40 km for NASAMS 2 in its summary. A launcher holds six missiles.',
-      basis: 'Game range is the lower 25 km figure, and the magazine the six-round launcher. Speed is held at 400 m/s, below the real missile, so it cannot jump past a target in one simulation step. Storage, reload time and damage are ASSUMPTIONS. Hit chance 0.9 is an ASSUMPTION: no published figure was found.',
+      basis: 'Game range is the lower 25 km figure, and the magazine the six-round launcher. Speed is held at 400 m/s, below the real missile, so it cannot jump past a target in one simulation step. Storage, reload time and damage are ASSUMPTIONS. Hit chance 1.0 makes about 92% of its rounds kill a Shahed in play, close to the 94% the Norwegian Air Force gave for NASAMS in Ukraine over about 900 targets, most of them cruise missiles. What the 94% counts is not stated. Its 1 km minimum range is an ASSUMPTION, the bound reported for CAMM, the other missile of its class.',
       confidence: 'Secondary reporting; the sources conflict on range',
-      sources: [{ label: 'Wikipedia: NASAMS', url: 'https://en.wikipedia.org/wiki/NASAMS' }],
+      sources: [{ label: 'Wikipedia: CAMM, under 1 km minimum', url: 'https://en.wikipedia.org/wiki/CAMM_(missile_family)' }, { label: 'Wikipedia: NASAMS', url: 'https://en.wikipedia.org/wiki/NASAMS' }, { label: 'Militarnyi: NASAMS 94% effective', url: 'https://militarnyi.com/en/news/nasams-air-defense-system-destroys-900-targets-in-ukraine-with-94-efficiency/' }],
       cost: {
         capex: 'Per shot $1.169 million, the FY2026 figure from a US Air Force budget, as reported. Game price $5 million is a placeholder for one launcher alone, so that it fits the budget at all: a whole battery costs far more.',
         confidence: 'Budget figure for the round, read second-hand; launcher is an ASSUMPTION',
@@ -254,7 +256,7 @@ export const EFFECTORS = {
     },
   },
   laser_s: {
-    product: 'AeroVironment LOCUST', size: 'S', name: 'Small laser', short: 'LSS', model: 'laser', modelScale: 0.7, cost: 8000000, shotCost: 5, color: 0xe0e0e0, role: 'effector', kind: 'laser', published: 2000, muzzleY: 2.6, fire: 'beam',
+    product: 'AeroVironment LOCUST', size: 'S', name: 'Small laser', short: 'LSS', model: 'laser', modelScale: 0.7, cost: 8000000, shotCost: 5, color: 0xe0e0e0, role: 'effector', kind: 'laser', published: 2000, mount: 3, mobile: 'vehicle', muzzleY: 2.6, fire: 'beam',
     health: 30, signature: 0.3, emits: [],
     dps: 14, magazine: 150, reloadTime: 150,
     desc: 'Vehicle-sized 20 to 35 kW laser. Costs almost nothing to fire, but its beam is weaker, so each kill takes longer.',
@@ -263,7 +265,7 @@ export const EFFECTORS = {
       class: 'Vehicle-mounted high-energy laser',
       analogues: ['AeroVironment LOCUST'],
       published: '20–35+ kW. The maker claims under $5 to under $10 a shot. Range is classified: reports say "at least several kilometers", and that lasers of this class typically work below 5 km.',
-      basis: 'Game range 2 km is an ASSESSMENT: Rafael\u2019s 5 km at 50 kW, scaled by power to about 20 kW, and below the DragonFire entry. Beam damage is half the DragonFire figure, an assumption from its lower power. The beam store is an assumption. Its beam is at full strength out to a quarter of its range, then falls with distance.',
+      basis: 'Game range 2 km is an ASSESSMENT: Rafael\u2019s 5 km at 50 kW, scaled by power to about 20 kW, and below the DragonFire entry. Beam damage is half the DragonFire figure, an assumption from its lower power. The beam store is an assumption. Its beam is at full strength out to a quarter of its range, then falls with distance. Like the DragonFire, it takes 4 s to swing onto each new target. It is mounted on a vehicle, so its beam starts 3 m up.',
       confidence: 'Maker’s per-shot claim; range and beam effect are assumptions',
       sources: [
         { label: 'Wikipedia: LOCUST', url: 'https://en.wikipedia.org/wiki/Locust_Laser_Weapon_System' },
@@ -286,7 +288,7 @@ export const EFFECTORS = {
       class: 'High-power air-defence laser',
       analogues: ['Rafael Iron Beam'],
       published: 'A 100 kW laser. Globes reports about 10 km, and about half that for a 50 kW version. An older 2020 report says up to 7 km. A former Israeli prime minister put a shot at $3.50; other estimates, from $2 to $2,000, are unverified.',
-      basis: 'Game range is the 10 km figure, and per second the $3.50 figure. Beam damage is twice the DragonFire figure, for twice its reported 50 kW power, an assumption. The beam store is an assumption. Its beam is at full strength out to a quarter of its range, then falls with distance.',
+      basis: 'Game range is the 10 km figure, and per second the $3.50 figure. Beam damage is twice the DragonFire figure, for twice its reported 50 kW power, an assumption. The beam store is an assumption. Its beam is at full strength out to a quarter of its range, then falls with distance. Like the DragonFire, it takes 4 s to swing onto each new target.',
       confidence: 'Press reports; no official range or price',
       sources: [
         { label: 'Task & Purpose: Iron Beam', url: 'https://taskandpurpose.com/military-life/israel-iron-beam-air-defense/' },
@@ -298,6 +300,26 @@ export const EFFECTORS = {
         confidence: 'ASSUMPTION: tune this yourself',
         sources: [{ label: 'Globes: Iron Beam', url: 'https://en.globes.co.il/en/article-1001492671' }],
       },
+    },
+  },
+  gun_hmg: {
+    product: '12.7 mm machine gun on a remote weapon station', size: 'M', name: 'Heavy machine gun', short: 'HMG', model: 'gun', cost: 250000, shotCost: 150, color: 0xffab40, role: 'effector', kind: 'gun', published: 1200, muzzleY: 1.2, fire: 'guided', mobile: 'vehicle',
+    health: 30, signature: 0.1, emits: [],
+    pk: 0.2, rangeLoss: 0.75, damage: 60, splash: 0, fuze: 3, cooldown: 1.5, missileSpeed: 850, magazine: 20, storage: 60, reloadTime: 60,
+    desc: 'A heavy machine gun on a remote weapon station, here on a Hilux: the mobile fire groups that down many Shaheds over Ukraine. Cheap to fire and short-ranged, and its gunner needs to see the drone.',
+    sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Gun'], scan: 'SCAN_TYPE_STEERABLE' },
+    ref: {
+      class: 'Heavy machine gun on a remote weapon station',
+      analogues: ['Kongsberg Protector RS4 with M2 .50', 'mobile fire groups with 12.7 mm guns'],
+      published: 'Ukrainian officials credited mobile fire groups with machine guns with up to 80% of Shahed kills at one point, later about 40%, with experts at about 20%. Machine guns stop being effective above about 2 km. Kongsberg says its Protector stations can be counter-UAS enabled, and Poland is buying 12.7 mm guns for counter-UAS. No hit rate or rounds per kill was found.',
+      basis: 'Game range 1.2 km is an ASSUMPTION within the 2 km reported limit. One shot is a 20-round burst. Hit chance 0.2 a burst (with no airburst, a burst must hit) and the rest are ASSUMPTIONS. Its chance falls to a quarter of that at its limit (rangeLoss), as a gun’s spread grows with distance and its rounds have no airburst to make up for it: an ASSUMPTION.',
+      confidence: 'Reported share of kills; performance is an assumption',
+      sources: [
+        { label: 'Ukraine’s Arms Monitor: stopping Shaheds', url: 'https://ukrainesarmsmonitor.substack.com/p/stopping-shaheds-ukraines-solutions' },
+        { label: 'Euromaidan Press: fire groups down drones in the north', url: 'https://euromaidanpress.com/2024/01/03/firearm-groups-down-large-share-of-russias-drones-missiles-in-ukraines-north-on-2-january' },
+        { label: 'Kongsberg: counter-UAS contract in Poland', url: 'https://www.kongsberg.com/news/news-archive/2026/kongsberg-wins-nok-16-billion-contract-to-deliver-counter-uas-solutions-in-poland/' },
+      ],
+      cost: { capex: 'No public price. Game prices of $250,000 for the station and gun, and $150 a burst, are placeholders.', confidence: 'ASSUMPTION: tune this yourself', sources: [] },
     },
   },
 };

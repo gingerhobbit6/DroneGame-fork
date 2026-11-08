@@ -2,7 +2,7 @@
 // once the first wave starts, so runs are comparable.
 
 import { Vector3 } from 'three';
-import { WORLD, BUILD, COMMS, ECONOMY, STRUCTURES } from './config/index.js';
+import { WORLD, BUILD, COMMS, ECONOMY, PATROL, PATROL_VEHICLES, STRUCTURES, carries } from './config/index.js';
 import { terrainState } from './terrain.js';
 import { SITE_POS, u, hdist, hereU } from './units.js';
 import { cleanZone, reachProblem, siteIsFree, zoneCentre } from './attack-area.js';
@@ -12,16 +12,20 @@ import { ENV, cleanConditions } from './conditions.js';
 import { buyTerminal, money } from './economy.js';
 import { capturePeople, clearPeople, restorePeople } from './people.js';
 import { fillMagazine } from './magazine.js';
-import { setPatrol } from './patrol.js';
+import { LAYDOWN_LOCKED, designLocked } from './lock.js';
+import { DEFAULT_PLAN, planOf, setPatrol } from './patrol.js';
+import { inCorridor } from './route.js';
 import { cleanCallsign, cleanName, cleanSettings, fieldsFor, setSetting, unitCost, unitDef } from './unit-config.js';
 
 // saved holds a unit's settings and custom names, and reserved the callsigns other saved units will need.
 export function addStructure(w, id, x, z, saved = {}, reserved) {
   const def = unitDef(id, cleanSettings(id, saved.settings));
+  if (carries(saved.vehicle, id)) def.vehicle = saved.vehicle; // parked on a vehicle from a pack, and drawn on it
   const y = hereU(x, z);
   const s = { def, health: def.health || 30, pos: new Vector3(x, y, z), cd: 0, aim: 0, beamTarget: null };
   // unless it is told otherwise, it faces away from what is defended, so it follows a drawn area or a walking patrol
-  Object.defineProperty(def, 'facing', { get: () => def.settings.facing ?? outwardFrom(w.state.zoneCentre, s.pos) });
+  // a jammer on a pan-and-tilt head faces where the fusion node last turned it (s.slewTo, tasking.js)
+  Object.defineProperty(def, 'facing', { get: () => s.slewTo ?? def.settings.facing ?? outwardFrom(w.state.zoneCentre, s.pos) });
   const name = cleanName(saved.name), callsign = cleanCallsign(saved.callsign);
   if (name || callsign) s.custom = { name, callsign };
   fillMagazine(s);
@@ -37,33 +41,55 @@ export function removeStructure(w, s) {
 
 // Why a structure can't go here, or null if it can.
 export function placementProblem(w, x, z, def, cost = def.cost) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 'Choose a spot on the map';
   const r = Math.hypot(x, z);
   const xm = x * WORLD.metresPerUnit, zm = z * WORLD.metresPerUnit;
-  if (BUILD.lockAfterStart && w.state.wave > 0) return 'The laydown is locked once the first wave starts';
+  if (designLocked(w)) return LAYDOWN_LOCKED;
+  if (w.structures.length >= BUILD.maxSystems) return `No more than ${BUILD.maxSystems} systems, so the laydown can still be saved`;
   if (!siteIsFree(w) && r < u(BUILD.minDist)) return `Too close to the station (minimum ${BUILD.minDist} m)`;
   const far = reachProblem(w, x, z);
   if (far) return far;
+  if (w.patrol && !inCorridor(w.patrol, x, z)) return 'With a patrol, systems stand inside its corridor';
   if (terrainState.data.onBuilding(xm, zm)) return 'There is a building here';
   if (terrainState.data.coverAt(xm, zm) === 4) return 'You cannot build in water';
   if (terrainState.data.slope(xm, zm) > 0.4) return 'The ground is too steep';
   if (w.structures.some((s) => hdist(s.pos, { x, z }) < u(BUILD.spacing))) return 'Too close to another structure';
-  if (w.state.budget < cost) return `Not enough budget (${money(cost)} needed, ${money(w.state.budget)} left)`;
+  const kit = w.state.kit;
+  if (kit) {
+    const held = kit[def.id] ?? 0, placed = w.structures.filter((s) => s.def.id === def.id).length;
+    if (placed >= held) return held ? `All ${held} ${def.product} in your deployment pack are placed` : `The ${def.product} is not in your deployment pack`;
+  }
+  if (!w.state.packed && w.state.budget < cost) return `Not enough budget (${money(cost)} needed, ${money(w.state.budget)} left)`;
   return null;
 }
 
-// Returns the reason it can't be placed, or null if it was.
-export function place(w, id, x, z, settings) {
+// A deployment pack in use: the budget only counts the cost, and a kit ({ system id: how many }) limits what can be placed.
+// true is a pack with no kit limit, as older run logs have; anything falsy is no pack.
+export function setPacked(w, kit) {
+  w.state.packed = !!kit;
+  w.state.kit = kit && typeof kit === 'object'
+    ? Object.fromEntries(Object.entries(kit).filter(([id, n]) => STRUCTURES[id] && Number.isInteger(n) && n > 0))
+    : null;
+}
+
+// A system on a vehicle stands at the vehicle's mast height, as in a patrol.
+export const onVehicle = (id, settings, vehicle) => (vehicle && STRUCTURES[id].mount != null ? { ...settings, mount: PATROL_VEHICLES[vehicle].mast } : settings);
+
+// Returns the reason it can't be placed, or null if it was. With a vehicle, the system is parked on it.
+export function place(w, id, x, z, settings, vehicle) {
+  if (vehicle != null && !carries(vehicle, id)) return `A ${PATROL_VEHICLES[vehicle]?.name ?? 'vehicle'} cannot carry the ${STRUCTURES[id].name}`;
+  settings = onVehicle(id, settings, vehicle);
   const cost = unitCost(id, cleanSettings(id, settings));
   const problem = placementProblem(w, x, z, STRUCTURES[id], cost);
   if (problem) return problem;
   w.state.budget -= cost; w.ledger.capex += cost;
-  addStructure(w, id, x, z, { settings });
+  addStructure(w, id, x, z, { settings, vehicle });
   return null;
 }
 
 // Sell the nearest system to this point, if one is close enough.
 export function sell(w, x, z) {
-  if (BUILD.lockAfterStart && w.state.wave > 0) { w.emit('toast', 'The laydown is locked once the first wave starts'); return; }
+  if (designLocked(w)) { w.emit('toast', LAYDOWN_LOCKED); return; }
   let best = null, bd = u(150);
   for (const s of w.structures) { const d = hdist(s.pos, { x, z }); if (d < bd && !s.escort) { bd = d; best = s; } } // the escort goes with its patrol
   if (!best) return;
@@ -80,6 +106,7 @@ export function captureLaydown(w) {
       id: s.def.id, x: s.pos.x, z: s.pos.z, uplink: s.uplink || null, cellBand: s.cellBand, jam: s.jamBands ? [...s.jamBands] : null,
       ...(s.jamOn && s.def.trigger === 'manual' ? { on: true } : {}), // switched on by hand
       ...(Object.keys(s.def.settings).length ? { settings: { ...s.def.settings } } : {}),
+      ...(s.def.vehicle ? { vehicle: s.def.vehicle } : {}),
       ...(s.custom?.name ? { name: s.custom.name } : {}),
       ...(s.custom?.callsign ? { callsign: s.custom.callsign } : {}),
     }))
@@ -89,7 +116,7 @@ export function captureLaydown(w) {
     ...(w.state.zone ? { zone: w.state.zone } : {}),
     ...(isDefaultMix(w.state.attack) ? {} : { attack: w.state.attack }),
     ...(w.state.conditions === 'day' ? {} : { conditions: w.state.conditions }),
-    ...(w.patrol ? { patrol: w.patrol.route } : {}),
+    ...(w.patrol ? { patrol: w.patrol.route, patrolColumn: w.patrol.column, patrolPlan: planOf(w.patrol) } : {}),
   };
 }
 
@@ -119,7 +146,7 @@ export function restoreLaydown(w, spec) {
   applyZone(w, cleanZone(spec.zone));
   w.state.attack = cleanMix(spec.attack);
   applyConditions(w, spec.conditions);
-  const refused = spec.patrol && setPatrol(w, spec.patrol); // a saved route comes from outside the game, so it is checked again
+  const refused = spec.patrol && setPatrol(w, spec.patrol, spec.patrolColumn ?? PATROL.foot.column, spec.patrolPlan ?? DEFAULT_PLAN); // a saved route comes from outside the game, so it is checked again
   if (refused) w.emit('toast', `The saved patrol was left out: ${refused}`);
 }
 
@@ -154,13 +181,13 @@ export function setZone(w, points) {
 
 // Change one field on one unit, paying or being refunded the difference. A null value goes back to the standard one. Returns why not, or null.
 export function configureUnit(w, s, key, value) {
-  if (designLocked(w)) return 'The laydown is locked once the first wave starts';
+  if (designLocked(w)) return LAYDOWN_LOCKED;
   const field = fieldsFor(s.def.id).find((f) => f.key === key);
   if (!field) return 'That cannot be changed on this system';
   const before = s.def.cost, was = s.def.settings[key];
   if (!setSetting(s.def.settings, field, s.def.id, value)) return field.invalid ?? `Not a valid ${field.label.toLowerCase()}`;
   const delta = s.def.cost - before;
-  if (delta > w.state.budget) {
+  if (!w.state.packed && delta > w.state.budget) {
     if (was == null) delete s.def.settings[key]; else s.def.settings[key] = was;
     return `Not enough budget (${money(delta)} more needed, ${money(w.state.budget)} left)`;
   }
@@ -171,7 +198,7 @@ export function configureUnit(w, s, key, value) {
 
 // Give a unit its own name and callsign. An empty one goes back to the automatic one. Returns why not, or null.
 export function renameUnit(w, s, name, callsign) {
-  if (designLocked(w)) return 'The laydown is locked once the first wave starts';
+  if (designLocked(w)) return LAYDOWN_LOCKED;
   const cleanN = cleanName(name), cleanC = cleanCallsign(callsign);
   if (callsign && !cleanC) return 'A callsign is up to 12 letters, numbers, spaces or dashes';
   const short = cleanC || s.autoShort;
@@ -185,14 +212,15 @@ export function renameUnit(w, s, name, callsign) {
 // ---------- the network design: terminals, wires and settings ----------
 // Every sensor and effector reaches the fusion node through a terminal (Starlink or cellular) that costs money; the fusion
 // node needs its own.
-export const designLocked = (w) => BUILD.lockAfterStart && w.state.wave > 0;
-const isNode = (s) => (s.def.role === 'sensor' || s.def.role === 'effector') && s.def.id !== 'perimeter';
+// a system the network can wire: not the perimeter, and not one its crew works by hand off the network
+const isNode = (s) => (s.def.role === 'sensor' || s.def.role === 'effector') && s.def.id !== 'perimeter' && s.def.networked !== false;
 const locked = (w) => { if (!designLocked(w)) return false; w.emit('toast', 'The network is locked once the first wave starts'); return true; };
 
 export const unwired = (w) => [...w.net.nodes.values()].filter((s) => isNode(s) && !s.uplink);
 
 // kind: 'starlink' | 'cellular' | null (unplug)
 export function wireNode(w, s, kind) {
+  if (kind && s.def.networked === false) { w.emit('toast', `${s.name} is worked by its crew and cannot be networked`); return false; }
   if (locked(w)) return false;
   if ((s.uplink || null) === kind) return true;
   if (!buyTerminal(w, s.uplink, kind)) return false;

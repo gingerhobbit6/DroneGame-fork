@@ -51,8 +51,15 @@ describe('validation', () => {
 
   it('rejects a broken envelope', () => {
     expect(S.validate({ node_id: 'nope', destination_id: 'nope', alert: { alert_id: ULID } })).toEqual(expect.arrayContaining(['timestamp is mandatory', 'node_id must be a UUID', 'destination_id must be a UUID']));
-    expect(S.validate({ timestamp: 't', node_id: NODE })[0]).toMatch(/exactly one content field/);
-    expect(S.validate({ timestamp: 't', node_id: NODE, alert: {}, task: {} })[0]).toMatch(/found 2/);
+    const t = '2026-01-01T00:00:00.000Z';
+    expect(S.validate({ timestamp: t, node_id: NODE })[0]).toMatch(/exactly one content field/);
+    expect(S.validate({ timestamp: t, node_id: NODE, alert: {}, task: {} })[0]).toMatch(/found 2/);
+    expect(S.validate({ timestamp: 'banana', node_id: NODE, alert: { alert_id: ULID } })).toEqual(['timestamp must be an RFC 3339 time']);
+  });
+
+  it('reports a missing body instead of throwing on it', () => {
+    expect(S.validate(msg('detection_report', null))).toEqual(['detection_report: must be a message, not null']);
+    expect(S.send(msg('task', 5), 'a', 'b', 'mw').ok).toBe(false);
   });
 
   it('sets a destination only when given', () => {

@@ -8,15 +8,15 @@ import { PATROL } from './patrol.js';
 // ---------- tuneable research figures ----------
 // Every number that came from research (or is a labelled assumption) can be edited in the Sources tab. These helpers
 // remember the researched values so each one can be reset, and export/import a set of edits as JSON.
-const STRUCT_KEYS = ['published', 'cost', 'shotCost', 'missileSpeed', 'pk', 'damage', 'splash', 'fuze', 'cooldown', 'magazine', 'storage', 'reloadTime', 'dps', 'falseAlarm', 'lowRange', 'fov', 'dwell', 'slow', 'killTime'];
-const DRONE_KEYS = ['cost', 'speed', 'hp', 'rcs', 'size', 'rfPower', 'sound', 'evade', 'jamResist', 'casualtyRadius'];
+const STRUCT_KEYS = ['published', 'cost', 'shotCost', 'missileSpeed', 'pk', 'damage', 'splash', 'fuze', 'cooldown', 'magazine', 'storage', 'reloadTime', 'dps', 'falseAlarm', 'lowRange', 'fov', 'dwell', 'slow', 'killTime', 'minRange', 'rangeLoss'];
+const DRONE_KEYS = ['cost', 'speed', 'hp', 'rcs', 'size', 'rfPower', 'sound', 'evade', 'jamResist', 'warhead', 'terminal'];
 const PEOPLE_KEYS = ['pCasualty', 'reachScale'];
-const PATROL_KEYS = ['walkSpeed', 'escortGap', 'groupSize'];
+const PATROL_KEYS = ['walkSpeed', 'escortGap', 'groupSize', 'spacing', 'endDelay', 'sightRange', 'strikeSight', 'holdRadius', 'holdTime'];
 
 export const FIGURE_FIELDS = {
   published: { label: 'Range', unit: 'm', step: 100, basis: 'research' },
-  cost: { label: 'Price', unit: '$', step: 1000, basis: 'price' },
-  shotCost: { label: 'Per shot', unit: '$', step: 100, basis: 'price' },
+  cost: { label: 'Price', unit: 'US$', step: 1000, basis: 'price' }, // as the sources quote it; shown elsewhere in pounds (economy.js)
+  shotCost: { label: 'Per shot', unit: 'US$', step: 100, basis: 'price' },
   missileSpeed: { label: 'Speed', unit: 'm/s', step: 10, basis: 'research' },
   pk: { label: 'Hit chance', unit: '0–1', step: 0.05, basis: 'assumption' },
   damage: { label: 'Damage', unit: 'hp', step: 5, basis: 'rule' },
@@ -33,6 +33,8 @@ export const FIGURE_FIELDS = {
   dwell: { label: 'Dwell', unit: 's', step: 0.5, basis: 'rule' },
   slow: { label: 'Slow factor', unit: 'x', step: 0.05, basis: 'rule' },
   killTime: { label: 'Crash after', unit: 's', step: 0.5, basis: 'rule' },
+  minRange: { label: 'Minimum range', unit: 'm', step: 50, basis: 'research' },
+  rangeLoss: { label: 'Hit chance lost at full range', unit: '0–1', step: 0.05, basis: 'assumption' },
   latency: { label: 'Latency', unit: 's', step: 0.005, basis: 'research' },
   capacity: { label: 'Capacity', unit: 'bit/s', step: 1000000, basis: 'research' },
   loss: { label: 'Packet loss', unit: 'fraction', step: 0.005, basis: 'rule' },
@@ -45,12 +47,19 @@ export const FIGURE_FIELDS = {
   sound: { label: 'Loudness', unit: 'x first-person-view drone reach', step: 0.5, basis: 'assumption' },
   evade: { label: 'Evasion', unit: '1=easy', step: 0.05, basis: 'rule' },
   jamResist: { label: 'Jam resistance', unit: '0–1', step: 0.05, basis: 'rule' },
-  casualtyRadius: { label: 'Casualty radius', unit: 'm', step: 5, basis: 'assumption' },
+  terminal: { label: 'Homes by itself over the last', unit: 'm', step: 50, basis: 'research' },
+  warhead: { label: 'Warhead (explosive)', unit: 'kg', step: 0.5, basis: 'research' }, // reported for real drones; its blast sets the casualty radii
   pCasualty: { label: 'Casualty chance at the blast', unit: '0–1', step: 0.05, basis: 'assumption' },
   reachScale: { label: 'Blast reach', unit: 'x radius', step: 0.05, basis: 'assumption' },
   walkSpeed: { label: 'Walking speed', unit: 'm/s', step: 0.1, basis: 'assumption' },
   escortGap: { label: 'Gap to each escort', unit: 'm', step: 5, basis: 'assumption' },
   groupSize: { label: 'People', unit: 'people', step: 1, basis: 'assumption' },
+  spacing: { label: 'Spacing in the formation', unit: 'm', step: 1, basis: 'assumption' },
+  endDelay: { label: 'Wait at the end', unit: 's', step: 10, basis: 'assumption' },
+  sightRange: { label: 'Spotter sees the patrol', unit: 'm', step: 100, basis: 'assumption' },
+  strikeSight: { label: 'Strike drone sees it itself', unit: 'm', step: 50, basis: 'assumption' },
+  holdRadius: { label: 'Strike waits within', unit: 'm', step: 50, basis: 'assumption' },
+  holdTime: { label: 'Strike can wait for', unit: 's', step: 30, basis: 'assumption' },
 };
 
 const grab = (obj, keys) => Object.fromEntries(keys.filter((k) => typeof obj[k] === 'number').map((k) => [k, obj[k]]));
@@ -70,9 +79,14 @@ export const RESEARCHED = {
 const STORE = { structures: STRUCTURES, drones: DRONES, comms: COMMS, people: PEOPLE, patrol: PATROL };
 const KINDS = ['structures', 'drones', 'comms', 'people', 'patrol'];
 
+// Every figure is a size, a price, a time or a count, so never below 0, and a share is never above 1. 1e12 is the server's limit for
+// a shared set too. A typed figure, an imported file and a set another account saved all pass through here.
+const SHARE = new Set(['0–1', 'fraction']);
+const bounded = (key, v) => Math.min(Math.max(v, 0), SHARE.has(FIGURE_FIELDS[key]?.unit) ? 1 : 1e12);
+
 // Set one figure. kind is 'structures', 'drones', 'comms', 'people' or 'patrol'.
 export function setFigure(kind, id, key, value) {
-  STORE[kind][id][key] = value;
+  STORE[kind][id][key] = bounded(key, value);
   if (kind === 'structures' && key === 'published') applyRangeScale();
 }
 export function resetFigure(kind, id, key) {
@@ -99,7 +113,11 @@ export function exportFigures() {
   for (const [k, v] of Object.entries(RESEARCHED.adapt)) if (ADAPT[k] !== v) out.adapt[k] = ADAPT[k];
   return out;
 }
+const isRecord = (x) => x != null && typeof x === 'object' && !Array.isArray(x);
 export function importFigures(json) {
+  // the whole file is checked before anything is applied, so one that cannot be read changes nothing
+  const unreadable = (group) => group != null && (!isRecord(group) || !Object.values(group).every(isRecord));
+  if (!isRecord(json) || KINDS.some((kind) => unreadable(json[kind]))) throw new Error('This is not a figures file.');
   for (const kind of KINDS) {
     for (const [id, vals] of Object.entries(json[kind] || {})) {
       // own properties only: the JSON is untrusted, and "constructor" would otherwise reach the Object function

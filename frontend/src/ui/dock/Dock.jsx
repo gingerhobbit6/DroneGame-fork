@@ -11,10 +11,13 @@ import { CostTab } from './CostTab.jsx';
 import { SourcesTab } from './SourcesTab.jsx';
 import { SavedTab } from './SavedTab.jsx';
 import { RunsTab } from './RunsTab.jsx';
+import { StatsTab } from '../RunStats.jsx';
+import { Movable } from '../Movable.jsx';
 
 // Grouped by what the player is trying to do. Every tab stays one click away, with nothing to expand first.
 const GROUPS = [
   ['Live', [
+    { id: 'stats', label: 'Statistics', Tab: StatsTab, hint: 'Hit rate, kill ranges, costs and more: overall, per wave, sensor, effector and drone type' },
     { id: 'nodes', label: 'Nodes', Tab: NodesTab, hint: 'Every system on the network: what it is doing, its task and its traffic' },
     { id: 'messages', label: 'Messages', Tab: MessagesTab, hint: 'The raw SAPIENT message log, with filters and JSON' },
   ]],
@@ -43,7 +46,7 @@ export function Dock({ open, onClose, tab: shown, onTab }) {
   const tab = shown ?? own, setTab = onTab ?? setOwn;
   const [max, setMax] = useState(false);
   return (
-    <div id="dock" className={`panel${open ? '' : ' hidden'}${max ? ' max' : ''}`}>
+    <Movable id="dock" title="SAPIENT" className={`panel${open ? '' : ' hidden'}${max ? ' max' : ''}`}>
       <div className="dock-head">
         <div className="tabs">
           {GROUPS.map(([name, tabs]) => (
@@ -63,6 +66,6 @@ export function Dock({ open, onClose, tab: shown, onTab }) {
           <Tab active={open && tab === id} />
         </div>
       ))}
-    </div>
+    </Movable>
   );
 }

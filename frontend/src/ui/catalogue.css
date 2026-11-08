@@ -1,0 +1,27 @@
+/* The catalogue's cards to drag onto the map, the deployment pack's tray, and the wizard's numbered steps for placing.
+   Loaded after style.css, so these rules win over its .pick-list ones. */
+/* a card to drag onto the map: a div, as Firefox will not drag a button, so it copies the button look */
+.pick-card { color: #dbe4f0; background: #1b2a45; border: 1px solid #2f4468; border-radius: 6px; cursor: grab; }
+.pick-card:hover { background: #243759; }
+.pick-card:active { cursor: grabbing; }
+.pick-card:focus-visible { outline: 2px solid #8fb4ff; outline-offset: 1px; }
+.pick-card.used { opacity: 0.6; }
+/* a pack's vehicle: which of the pack's systems it carries, above the card to drag */
+.tray-vehicle { display: flex; flex-direction: column; gap: 4px; }
+.tray-vehicle label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a9b8cf; }
+.tray-vehicle select { flex: 1; min-width: 0; }
+.pick-card .tray-left { font: 600 11px ui-monospace, Consolas, monospace; color: #69f0ae; }
+.pick-card.used .tray-left { color: #7f93b2; }
+.pick-hint { margin: 6px 0 0; padding: 6px 8px; border-radius: 6px; border: 1px dashed #3a5280; color: #dbe4f0; }
+.pick-hint b { color: #fff; }
+/* with the wizard open, the list takes the top of the column and the wizard the bottom, so neither hides the other */
+#tool-picker.with-wizard { max-height: calc(45vh - 12px); }
+#tool-picker.with-wizard ~ #wizard { max-height: calc(55vh - 84px); }
+.tool-pack { border-left-color: #c6ff00; }
+.tool-pack .k { color: #c6ff00; }
+/* the wizard's steps for placing a system: the step to do now stands out, and done ones are struck through */
+#wz-place { display: flex; flex-direction: column; gap: 6px; }
+#wz-place li { color: #8193ad; }
+#wz-place li.now { color: #fff; }
+#wz-place li.now::marker { color: #c6ff00; font-weight: 700; }
+#wz-place li.done { color: #69f0ae; text-decoration: line-through; text-decoration-color: rgba(105, 240, 174, 0.5); }

@@ -85,7 +85,7 @@ export function createRegistration(core, raiseAlert) {
     nameNode(s);
     s.mode = def.sapient.modes ? def.sapient.modes[0] : def.role === 'sensor' ? 'Detect' : 'Ready';
     s.reportT = rand() * (def.sapient.interval || 1);
-    s.objIds = new Map();
+    s.objIds = new WeakMap(); // keyed by the drone itself: a removed drone is not kept alive by every sensor that saw it
     if (def.fov) { s.point = { az: rand() * 360, el: 3 }; s.cue = null; s.lookedAt = new Map(); } // a camera has an aim
     s.task = null; s.rejected = new Map(); s.denied = new Set();
     s.uplink = null; s.cellBand = 'B8'; s.offline = false; s.lastHeard = T(); s.modePending = null; // no terminal wired yet
@@ -125,7 +125,7 @@ export function createRegistration(core, raiseAlert) {
     ];
     if (!body.status.length) delete body.status;
     const res = send(S.envelope(s.nodeId, 'status_report', body), s.nodeId, routeTo(s));
-    deliver(res, () => heard(s)); // the fusion node hears the node only if the report gets through
+    deliver(res, () => { if (nodes.has(s.nodeId)) heard(s); }); // only if the report gets through, and not a goodbye from a node now gone
   }
 
   // The fusion node's view of whether a node is reachable. Three missed status reports in a row means contact is lost.
@@ -139,7 +139,7 @@ export function createRegistration(core, raiseAlert) {
   function checkContact() {
     if (!ctx.monitoring || !ctx.monitoring()) return;
     for (const s of nodes.values()) {
-      if ((s.def.role !== 'sensor' && s.def.role !== 'effector') || s.def.id === 'perimeter' || s.offline) continue;
+      if ((s.def.role !== 'sensor' && s.def.role !== 'effector') || s.def.id === 'perimeter' || s.def.networked === false || s.offline) continue; // a crew off the network is never expected
       if (T() - s.lastHeard > FUSION.statusInterval * 3.2) { // three status reports in a row missed
         s.offline = true;
         const why = comms.pathFor(s);

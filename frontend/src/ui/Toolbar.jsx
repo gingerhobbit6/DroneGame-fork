@@ -1,54 +1,59 @@
-// The purchase bar: which system is being placed.
+// The purchase bar: one row per kind of system. A row opens its list of real systems beside the toolbar, to drag onto the map.
 
-import { BUILD, STRUCTURES, TOOLBAR, firstClass, sizeButtons } from '../sim/config/index.js';
+import { BUILD, STRUCTURES, TOOLBAR } from '../sim/config/index.js';
 import { money } from '../sim/economy.js';
 import { hex, useGame, useTick } from './hooks.js';
+import { useAccount } from './account/pack.js';
+import { Movable } from './Movable.jsx';
+
+const cheapest = (group) => Math.min(...group.classes.map((id) => STRUCTURES[id].cost));
+
+function PackRow() {
+  const game = useGame(), unit = useAccount()?.activeUnit;
+  if (!unit) return null;
+  return (
+    <button data-catalogue="unit" className={`tool tool-pack${game.catalogue() === 'unit' ? ' active' : ''}`} aria-expanded={game.catalogue() === 'unit'}
+      title="Your deployment pack: its kit, ready to drag onto the map" onClick={() => game.openCatalogue('unit')}>
+      <div className="n">Deployment pack</div><div className="c" />
+      <div className="k">{unit.callsign ? `${unit.callsign} · ` : ''}{unit.name}</div>
+    </button>
+  );
+}
 
 export function Toolbar() {
   useTick();
   const game = useGame();
-  const tool = game.getTool(), budget = game.sim.state.budget;
+  const tool = game.getTool(), budget = game.sim.state.budget, open = game.catalogue(), kit = game.sim.state.kit;
+  const packed = game.sim.state.packed, refund = Math.round(BUILD.sellRefund * 100); // with a pack there is no budget, so no refund to show
   return (
-    <div id="toolbar" className="panel">
+    <Movable id="toolbar" title="Place systems">
+      <PackRow />
       {TOOLBAR.map((group) => {
-        const def = STRUCTURES[game.toolChoice(group)], sizes = sizeButtons(group), sized = sizes.length > 0;
+        const picked = group.classes.includes(tool) ? STRUCTURES[tool] : null, from = cheapest(group);
         return (
           <div className="tool-row" key={group.kind} data-kind={group.kind}>
             <button
-              data-tool={sized ? undefined : firstClass(group)}
-              className={`tool${sized ? ' sized' : ''}${group.classes.includes(tool) ? ' active' : ''}${budget < def.cost ? ' poor' : ''}`}
-              style={{ borderLeftColor: hex(def.color) }}
-              title={`${def.product}. ${def.desc}\nModelled on: ${def.ref.analogues.join(', ')}\nCost ${money(def.cost)}${def.shotCost ? `, ${money(def.shotCost)} per shot` : ''}${group.classes.length > 1 ? `\nPress ${group.key} again for the next one` : ''}`}
-              onClick={() => game.setTool(def.id)}
+              data-catalogue={group.kind}
+              aria-expanded={open === group.kind}
+              className={`tool${open === group.kind ? ' active' : ''}${budget < from && !game.sim.state.packed ? ' poor' : ''}`}
+              style={{ borderLeftColor: hex(STRUCTURES[game.toolChoice(group)].color) }}
+              title={`${group.name}: click to see the ${group.classes.length} real systems, then drag one onto the map. Key ${group.key}.`}
+              onClick={() => game.openCatalogue(group.kind)}
             >
-              <div className="n">{group.name}</div><div className="c">{money(def.cost)}</div>
-              {def.shotCost > 0 && <div className="s">{money(def.shotCost)}/shot</div>}
-              <div className="k">[{group.key}] {def.product}</div>
+              <div className="n">{group.name}</div><div className="c">{picked ? money(picked.cost) : `from ${money(from)}`}</div>
+              <div className="k">[{group.key}] {picked ? picked.product : kit ? `${group.classes.filter((id) => kit[id]).length} in your pack` : `${group.classes.length} real systems`}</div>
             </button>
-            {sized && (
-              <div className="tool-sizes" role="group" aria-label={`${group.name} size`}>
-                {sizes.map((id) => (
-                  <button
-                    key={id}
-                    data-tool={id}
-                    className={STRUCTURES[id].size === def.size ? 'chosen' : ''}
-                    aria-pressed={STRUCTURES[id].size === def.size}
-                    aria-label={`${STRUCTURES[id].name}: ${STRUCTURES[id].product}`}
-                    title={`${STRUCTURES[id].product}: ${money(STRUCTURES[id].cost)}, ${(STRUCTURES[id].range / 1000).toFixed(1)} km`}
-                    onClick={() => game.setTool(id)}
-                  >{STRUCTURES[id].size}</button>
-                ))}
-              </div>
-            )}
           </div>
         );
       })}
       <button data-tool="people" className={`tool${tool === 'people' ? ' active' : ''}`} title="Place groups of simulated people, to see what an attack would do to them" onClick={() => game.setTool('people')}>
         <div className="n">People</div><div className="c">{game.sim.people.reduce((sum, g) => sum + g.count, 0) || ''}</div><div className="k">[9] simulated</div>
       </button>
-      <button id="tool-sell" className={`tool${tool === 'sell' ? ' active' : ''}`} title="Click a structure to sell it for a refund" onClick={() => game.setTool('sell')}>
-        <div className="n">Sell</div><div className="c">{Math.round(BUILD.sellRefund * 100)}%</div><div className="k">[X]</div>
+      <button id="tool-sell" className={`tool${tool === 'sell' ? ' active' : ''}`} onClick={() => game.setTool('sell')}
+        title={packed ? 'Click a system on the map to take it off, back into your pack' : `Click a system on the map to take it off, with ${refund}% of its price back`}>
+        <div className="n"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>Remove</div>
+        <div className="c">{packed ? '' : `${refund}% back`}</div><div className="k">[X] then click a system</div>
       </button>
-    </div>
+    </Movable>
   );
 }

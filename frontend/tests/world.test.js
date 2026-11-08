@@ -123,6 +123,15 @@ describe('comms', () => {
     sim.state.sandbox = false;
   });
 
+  it('a node that leaves is not reported restored by its goodbye', () => {
+    setUp(sim, { seed: '1', laydown: [['rf', 800, 0]] });
+    const s = sim.structures[0];
+    s.offline = true; // contact had been lost
+    sim.commands.sell(s.pos.x, s.pos.z);
+    sim.run(100);
+    expect(sim.bus.entries.some((e) => e.type === 'alert' && /Contact restored/.test(e.msg.alert.description))).toBe(false);
+  });
+
   it('queues messages and drops them when the link is saturated', () => {
     setUp(sim, { seed: '1', laydown: [['rf', 800, 0]] });
     const s = sim.structures[0], cap = COMMS.queueLimit, capacity = COMMS.starlink.capacity;
@@ -198,6 +207,17 @@ describe('figures from the Sources tab', () => {
     resetAllFigures();
     expect(WORLD.rangeScale).toBe(1);
   });
+
+  it('holds every figure at 0 or more, and a share at 1 or less', () => {
+    resetAllFigures();
+    importFigures({ structures: { radar: { published: -500 }, interceptor: { pk: 3 } }, drones: { fpv: { hp: 1e30 } } });
+    expect(STRUCTURES.radar.published).toBe(0);
+    expect(STRUCTURES.interceptor.pk).toBe(1);
+    expect(DRONES.fpv.hp).toBe(1e12);
+    setFigure('drones', 'fpv', 'jamResist', -0.2);
+    expect(DRONES.fpv.jamResist).toBe(0);
+    resetAllFigures();
+  });
 });
 
 describe('waves', () => {
@@ -228,10 +248,10 @@ describe('recorder', () => {
 
 describe('small helpers', () => {
   it('formats money', () => {
-    expect(money(15000000)).toBe('$15M');
-    expect(money(1250000)).toBe('$1.25M');
-    expect(money(50000)).toBe('$50k');
-    expect(money(1234)).toBe('$1,234');
+    expect(money(15000000)).toBe('£11.3M'); // prices are kept in dollars and shown in pounds at £0.75 to the dollar
+    expect(money(2000000)).toBe('£1.5M');
+    expect(money(50000)).toBe('£38k');
+    expect(money(1234)).toBe('£926');
   });
   it('adds up what an attack cost', () => {
     expect(enemyCost({ fpv: 2, fw: 1 })).toBe(2 * DRONES.fpv.cost + DRONES.fw.cost);
@@ -252,7 +272,7 @@ describe('drones and effectors', () => {
     setUp(sim, { seed: '1', laydown: [['radar', 600, 0], ['jammer', 500, 300]] });
     sim.state.sandbox = true;
     const fo = sim.spawnDrone('fo', 0, { jitter: 0, altFrac: 0.5 });
-    sim.run(4000);
+    sim.run(12000);
     expect(fo.jamT).toBe(0);
     expect(fo.dead || fo.targetStructure).toBeTruthy();
     expect(u(0)).toBe(0);
@@ -276,7 +296,7 @@ describe('drones and effectors', () => {
     setUp(sim, { seed: '1', laydown: [['radar', 600, 0], ['radar_s', -600, 0], ['jammer', 300, 300], ['jammer', -300, -300], ['jammer', 300, -300], ['jammer', -300, 300]] });
     sim.state.sandbox = true;
     for (let i = 0; i < 6; i++) sim.spawnDrone('fpv', i, {});
-    sim.run(6000);
+    sim.run(11000);
     expect(sim.ledger.killedBy.jammer.fpv).toBeGreaterThan(0);
     sim.state.sandbox = false;
   });
@@ -285,7 +305,7 @@ describe('drones and effectors', () => {
     setUp(sim, { seed: '1', laydown: [['radar', 400, 0], ['radar_s', 300, 300], ['radar_s', -300, -300], ['laser', 300, -300], ['laser', -300, 300], ['laser', 420, 130]] });
     sim.state.sandbox = true;
     for (let i = 0; i < 5; i++) sim.spawnDrone('fw', i, {});
-    sim.run(6000);
+    for (let n = 0; n < 20000 && sim.drones.length; n += 500) sim.run(500); // they come in from the map edge
     expect(sim.ledger.shots.laser.n).toBeGreaterThan(0);
     expect(sim.ledger.killedBy.laser).toBeTruthy();
     sim.state.sandbox = false;
@@ -304,7 +324,7 @@ describe('drones and effectors', () => {
     setUp(sim, { seed: '1', laydown: [] });
     sim.state.wave = 1;
     sim.spawnDrone('fw', 0, { jitter: 0, altFrac: 0.5 });
-    sim.run(4000);
+    for (let n = 0; n < 20000 && sim.drones.length; n += 500) sim.run(500); // it comes in from the map edge
     expect(sim.state.leaks).toBe(1);
     expect(sim.state.health).toBe(100 - DRONES.fw.damage);
     expect(sim.ledger.leaked.fw).toBe(1);

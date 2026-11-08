@@ -27,27 +27,37 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [x] A4 part 1: coverage arcs and elevation for every radar, panels and facing on fixed-panel radars, drawn in every view. Small radars now see 120° per panel
 - [x] A4 part 2: tracker timing scaled to each sensor's update interval, so a radar's scan period now goes up to 5 s
 - [x] A4 part 3: 2D radars, band, clutter filter, the beam's low and top edges, blanking arcs and micro-Doppler
-- [ ] A4 left over: a narrower azimuth arc that gains range
+- [x] A4 left over: arc per panel on fixed-panel radars. A narrower arc reaches further: a quarter of the arc gains about 40%
 - [x] A5: conditions (clear day, dusk, night, rain and haze) for cameras by channel, radar by band and lasers, and camera optics: pixels on target, zoom on a cue, channels, resolution, lens, rangefinder, search arc and slew
-- [ ] A5 left over: rain noise for acoustic sensors, thermal diffraction with the F-number, and a camera that names the drone's model when identified, not only its airframe
+- [x] A5 left over: rain noise halves an acoustic sensor's reach, thermal light blurs past the lens (a slower lens or finer pixels gain less), and a camera that identifies a drone names its model, so cameras come back to a classified track once it is near enough. Replays still show the airframe only
 - [x] A6 part 1: radio detection. Drones are heard on the bands of their own links, a detector hears only bands it covers, your own jamming deafens it on the bands it jams, and classifier libraries, sensitivity and direction finding are fields
 - [x] A6 part 2: how far a jammer reaches: bands fitted as paid modules, an omni or sector antenna with its facing, a control link easier to jam the further the drone is from its operator, and a louder jammer for each band it jams
 - [x] A6 part 3: the jammer's own receiver and library, barrage or reactive, what switches it on (the fusion node, its own receiver or you), and receiver blanking
 - [x] A6 left over: monitored bands and instantaneous bandwidth on RF detectors. A sensitivity for a jammer's receiver is not offered: hearing further than it can jam would change nothing
-- [ ] A7: balance pass. This is the place to fix five lasers never losing.
+- [x] A7: balance pass. A laser now takes 4 s to swing onto each new drone, so lasers with all-round radar cover lose too. No unit setting was a free win. Later waves on other bands were left out
 
 **Feature B: magazine depth**
 
 - [x] B1: magazine, storage and reload rules in the simulation. Shots are still paid for from the budget, at the user's request
-- [ ] B2: balance rack size, storage and reload time. The digests are re-baselined; the balance is not done
+- [x] B2: balance rack size, storage and reload time. Measured, and nothing changed: only the Sting's magazine decides anything, about two waves on the mixed laydown
 - [x] Resupply between waves: buy back used rounds, emptiest launcher first. A bought round is paid for once
 - [x] B3: the Cost tab is now Magazine depth, with a row for each launcher and laser. Expanding rows and Refill buttons are not built
 
 **Systems added outside the plan**
 
 - [x] Small and large interceptors, missiles and lasers, and three acoustic sensors, all from public sources
+- [x] Sensofusion Airfence 7 (RF detector, 10 km) and its 800 W jammer, and Kirintec K-CEMA NEO and Jupiter (45 W jammers with their own receiver). No jammer range is published, so each is set from its power, reach going with the square root. Jupiter publishes almost nothing and plays as a NEO on a vehicle. Airfence also finds the pilot, which is not modelled
+- [x] Carried systems stand lower: 1.5 m for manpack (the Wingman, both DroneGuns, K-CEMA NEO) and 3 m for vehicle-mounted (K-CEMA Jupiter, the Sensofusion jammer, Giraffe 1X, RapidDestroyer, LOCUST), against 9 m or more on a fixed mast. On the game's ground that cuts their mean reach by 7 to 17%, more against low flyers. The mast can still be raised, at a price
+- [ ] Ground reflection for low antennas. A radio antenna 1.5 m up loses more to the ground than the path model counts, so short masts are probably still too kind
+- [x] A threat library in the fusion node (`sim/network/threats.js`): what it may believe about each track from what its sensors named, never the real drone. Jammers switch on only for drones they could touch; tracks are ranked by the harm they would do over how soon they arrive; RF detectors name a commercial drone's model, as DJI's DroneID allows; and rounds are held for a drone with a link to break while a jammer has time on its way in, unless it comes close, the jammer has had it 10 s, or jamming keeps failing against that model
+- [ ] Against the Russian mix the mixed laydown lasts 15.4 waves with the threat library against 16.9 before, over twelve seeds. Near chance, but every other laydown and mix gained or held, so it is worth a look
+- [ ] Jammer power is left where you set it. The fusion node turning it down to what each target needed cost about 1.5 waves, because the power that breaks a control link depends on how far the drone is from its operator, which the node cannot know
 - [ ] Review the placeholder prices. The DragonFire's $2M looks low beside about $8M reported for the smaller LOCUST, and the Iron Beam and NASAMS launcher prices are set low only so that they fit the budget
-- [ ] Balance the new systems. Cheap long-range acoustic stations and the Large missile have not been tuned
+- [x] Balance the new systems. Measured on the mixed laydown, and none is too strong, so no figure changed. Six $50k Medium acoustic sensors help (16.5 waves against 15.2). The NASAMS in place of the Coyote costs $4M more for 15.5 waves. Twelve $500 Large acoustic stations in place of the radar last 8 waves. Added to it, they made things worse (11.2 waves) until launchers stopped chasing empty tracks, and now help (16.0)
+- [x] Ghost tracks no longer tie up the launchers. Once an effector finds nothing where a track says a drone is, no effector is sent there for 10 s. With twelve acoustic stations the Stings had a task 5% of the time and the mixed laydown lasted 11.2 waves; now 31% and 16.0. Holding the Coyote until a track came within 2.5 km was tried first and dropped: it fired on tracks no Sting was on, so holding it let bursts through
+- [ ] The Coyote earns little for $1M on the mixed laydown: 9 rounds in 15 waves, and a second radar in its place lasts about two waves longer. Its launcher price is a placeholder
+- [ ] Many bearing-only sensors can hand one drone's classification to another's track: with twelve acoustic stations, 5 of the Coyote's 29 tasks were on quadcopters whose tracks said fixed wing
+- [ ] Most runs end when the one radar is destroyed, as nothing else sees fixed-wing drones far out: the mixed laydown lost its radar in wave 14 and fell in wave 15. Systems cannot be repaired
 
 **Feature C: unit panel** (build this first)
 
@@ -60,10 +70,12 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [x] Setting the site's location on the start card: click a map, use this laptop's location, or type a BNG grid reference, decimal latitude and longitude, or eastings and northings.
 - [x] Choosing the site without the wizard, or with the guide's first part on the start card, with what is on this computer highlighted on the map and what a build would download listed.
 - [x] Real maps of Estonia, starting with Tapa. See "Estonia" in `docs/REAL_MAPPING_PLAN.md`.
-- [ ] Narva. Estonian data stops at the border, so about half of a world around the city counts as water. Test Copernicus 30 m heights for the Russian side.
-- [ ] Place names on Estonian maps. ETAK has none, so they only appear in the map picture, not as the game's own labels.
+- [x] Narva, with real ground past the border: where Estonian heights stop, the builder fills them from Copernicus GLO-30 (30 m, whole 1 degree tiles from AWS) and marks water from its water body mask. It is a surface model, so Russian woods and buildings are in the ground's height, and none are drawn there. See "Estonia" in `docs/REAL_MAPPING_PLAN.md`
+- [x] Names and topography past Narva's border: the basic map is blank there, so the builder outlines that ground (`features.beyond`) and the game shades it from its heights, with labelled contours. Russian settlement names come from GeoNames (CC BY 4.0), in Latin letters, with their own credit. See "Estonia" in `docs/REAL_MAPPING_PLAN.md`
+- [ ] Rebuild the 30 km packs (Savernake, Hunstanton and Tapa) at the new 70 km default; a 54 km world refuses them. Hereford and Narva are rebuilt at 70 km (Hereford took 1 hour 55 minutes, 128 MB). The pack for the area around SO 50 40 covered the same place as Hereford, so it was deleted rather than rebuilt. In England the lidar for a whole world is about 7.1 GB and 2 hours, so ask first
+- [x] Place names on Estonian maps, from the agency's settlement units, as ETAK has none. A pack built before this has none: rebuild it.
 - [ ] Real maps of other countries. Each needs its own open data and grid, as Estonia did. A spot elsewhere is refused.
-- [ ] Typing the site's location as MGRS. Not in the mapping plan, and not small: it needs the lettering of MGRS squares and a UTM conversion that the code does not have.
+- [ ] Typing the site's location, or a Go reference, as MGRS. The lettering of MGRS squares and the UTM conversion are now in `sim/mgrs.js`, so only a parser is missing.
 - [ ] The Ask box, for typing your own questions. Not built, and the one part still to decide: it needs a language model, so it would go through FastAPI, off by default and blocked on real-site worlds.
 
 **Later: named real systems**
@@ -75,7 +87,7 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [ ] More real systems, such as Giraffe AMB and Aveillant Gamekeeper, and replacing the two generic entries. A row for guns and one for RF weapons, which sit under Missile and Laser for now
 - [x] Hit chance for guided rounds, by weapon, evasion, target speed, range and track quality. Launchers shoot, look and shoot while there is time, salvo when there is not, and move to the next target while rounds fly
 - [x] A beam's damage falls with distance, and sensor error grows as the signal weakens
-- [ ] Better figures for hit chance: 8 of 11 are assumptions, because no rate is published. Only the Sting, P1-SUN and DroneHunter have reported figures
+- [ ] Better figures for hit chance. NASAMS (94%, Norwegian Air Force) and the Paladin (Gepard crews' one burst a Shahed) are set to published figures, and the Sting's three rounds a Shahed matches what is reported. Systems with no published rate take their class's, 2 points lower: 0.98 for the Coyote, Frankenburg, Rapid Ranger, Starstreak and Sky Sabre, below NASAMS, and 0.88 for Merops, below the Sting. Replace those with real rates if any are published. Lasers have none either
 - [ ] Jamming strength that falls with distance: inside its reach a jammer works fully, then stops. The drone's distance from its operator sets that reach since A6 part 2
 - [x] Use the bands a detector listens on, and work out each jammed link on its own band (A6 part 1)
 - [x] A radar that classifies by micro-Doppler: standard on the IRIS and A400, and a paid option on the others
@@ -91,19 +103,127 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 
 - [x] Letting the waves send real drones. The Attack button picks any mix of types, real drones included, and it saves with the laydown.
 - [ ] Spelling out the systems' own short names (RDR, RFS, EO/IR, RF) as the threat names now are. They appear on the map, in the node list and in logs.
+- [x] More commercial drones reported with Russian forces: DJI Mavic 3T and Mavic 3 Pro, Autel EVO II Dual 640T, a DJI Mini 4 Pro as a reconnaissance spotter, and 10-inch and 13-inch first-person-view classes. The Agras T50 was left out: no report names it with either side
+- [x] Realistic heights, speeds and agility. Shahed-type drones fly low (50 to 300 m) or high (2 to 4 km), as Ukrainian officials report, and fixed-wing strike drones hold their height, then dive at 45°; multirotors still ease down over their run. Other heights are reported or set from their ceiling and role, and labelled. Agility is set by a stated rule, from airframe and who flies it. The four generic types keep their figures
+- [ ] Heights for most military drones are set by role, as only the Shahed family, Gerbera, Orlan-10 and CH-901 have reported operating heights. Lancet's 500 to 800 m rests on an unverified summary
+- [x] A 3D model for every drone type, built in code from its published span and the outline in press photos (`frontend/src/render/drone-models.js`), drawn bigger the bigger the drone, and saved as .glb files by `npm run models`. Open-licence models exist for about nine of the types on Sketchfab (CC BY), but each needs a sign-in to download and most are 25,000 to 900,000 triangles, so none was used
+- [x] A 3D model for every system, after its real product: what it stands on (a tripod if carried, a truck if on a vehicle, else a mast whose drawn height grows with its real one) and a head that turns: a camera where it looks, fixed radar panels the way they face (one panel each), a weapon where it aims, and only a radar that turns all round spins
+- [x] True size close up. Systems and drones had been drawn 10 to 140 times larger than life at every zoom (a 25 m radar mast stood 164 m tall, a Shahed spanned 346 m). Now they are true size when the camera is close, keep a steady share of the screen farther out (5% of its height for a system, 6% for a Shahed), and are no bigger than before zoomed right out. Masts are their real height close up. The camera comes to 5 m and zooms towards the cursor, so it can close in on a drone in the air
+- [x] Missiles and interceptors leave from their launcher's real height (about 3.5 to 6 m) instead of the drawn one (about 80 m). Over 12 seeds the waves survived did not move beyond the noise
+- [x] People are civilians or soldiers, chosen when placing a group and kept in a saved laydown; soldiers wear MultiCam with helmet, body armour, daysack and rifle, and a patrol walks as soldiers. It changes only the drawing. The K-CEMA NEO is drawn as a soldier carrying it in a bergen
+- [ ] Trees, pylons and houses on generated ground are still drawn twice life size (`TERRAIN.visualScale`), so close up they dwarf the true-size people and systems
+- [ ] The DroneGun and the Wingman are carried by a soldier in reality, but are drawn on tripods
+- [x] Patrol vehicles: a column of 1 to 6, each a Patria 6x6, a Toyota Hilux or a Mule UGV (THeMIS class), carrying a sensor, jammer, missile, gun or interceptor it can take (light, medium or heavy), at a gap ahead of or behind the soldiers. Chosen in the Area panel and saved with the laydown. A 12.7 mm heavy machine gun on a remote weapon station is new, its performance assumed
+- [x] Casualties are killed or injured. Each drone carries its reported warhead, and its lethal and injury radii grow with the cube root of it (9 and 25 m per cube-root kg, anchored on the M67 grenade). The HUD and the debrief count both
+- [ ] The vehicles are not priced and drive at walking pace with the soldiers; sensors on them are assumed to work on the move
+- [ ] The casualty radii are anchored on one small munition; bigger warheads are likely more lethal than K x cube root gives. A second published anchor (a mortar or shell with its fill and radii) would firm them up
+- [x] A Gun row of its own (key 0): a crewed L7A2 GPMG and L111A1 .50 cal on pickups, the 12.7 mm remote weapon station, Terrahawk Paladin, Skyranger 30, Gepard and Skynex. Guns with a radar of their own are networked; the hit chances of the crewed machine guns (8% and 12% a burst) are well below the networked guns'
+- [x] Handheld jammers carried by a soldier, off the network: DroneShield DroneGun Mk4, NT Service EDM4S SkyWiper and Kvertus AD G-6
+- [x] Crews off the network (`networked: false`): they cannot be wired and nothing tasks them. They see a drone by eye by its size (half as far at night; see the realism rules below), and a wearable detector warns them of a drone with a radio link within 400 m, so they are ready when it comes into sight and a jammer can be pointed down its bearing
+- [x] A handheld jammer's beam (30°, published for the Kvertus, assumed for the rest) points at the drone its soldier is jamming. The DroneGun Tactical and MkIII are handheld crew entries of their own; the standard small and medium jammers are now generic networked tripod jammers with the same figures, so saved laydowns and results do not move
+- [ ] Every gun's hit chance, range and price is an assumption; the crews' sight, detector range and reaction time are assumptions too
+- [x] Fast rounds passed through their targets: a GPMG round flies about 42 m a step against a 2 m fuze, so it never burst, and the .50 cal hit about a third as often as its figure. Rounds now burst where their path came closest, and gun rounds leave the muzzle aimed at the target rather than climbing like a missile. The reference digests did not move
+
+**From the figures audit (2026-11-07)**
+
+- [ ] Ammunition: 8 of the 17 systems that fire rounds take their magazine from a published figure; storage is published for Starstreak only, and reload time for the DroneHunter only. The Sting's magazine, storage and reload, which decide play more than any other, are all assumed
+- [ ] Hit chance: 5 of 17 rest on a reported figure (NASAMS, Sting, DroneHunter, P1-SUN, Gepard). The Paladin's 1.0 and the Gepard's 0.4 come from the same Gepard crew reports, which needs a look, and the Paladin's 300 m/s round is about a quarter of the other 30 to 35 mm guns
+- [x] Missiles have a minimum range (`minRange`): Starstreak's published 300 m, CAMM's reported "under 1 km" taken as 1 km, and 300 m or 1 km by class for the rest. A missile leaves a closer drone to something else
+- [ ] No effector has a ceiling: reach is still a sphere round the system, so interceptor drones can climb to a Geran at 2 to 4 km, and the range rings do not show a missile's dead zone inside its minimum range
+- [ ] Starstreak, NASAMS, Rapid Ranger and Sky Sabre are capped at 400 m/s, well below the real missiles. Guns now fly at 840 to 1,175 m/s and hit, so the reason for the cap needs checking
+- [ ] The P1-SUN flies at 80 m/s, copied from the Sting, though its own source gives 310 km/h (about 86 m/s)
+- [ ] Heights are reported for only about 7 of 30 real drones, and warheads are assumed or unverified for the Matrice 30T, Matrice 300, EVO Max 4T, Agras T30, ASN-301 and Skywalker. No range is published for the AUDS jammer or the K-CEMA Jupiter
+- [ ] The Skywalker is drawn at 0.35 m, its type's size, as its own span is not public; a Skywalker X8 is 2.1 m. Lancet-3's 1 m span is assumed and its length taken as 1.65 times that
+
+**Realism rules (2026-11-07)**
+
+- [x] A jammed drone does what its kind does (`lostLink`): one flown by hand comes down; a DJI or Autel drone, or a reconnaissance drone on an autopilot, turns for home, and drifts down only if its satellite navigation is jammed too. Losing video only blinds a drone that flies itself. Drones turned for home are counted in the ledger (`turned`) and leave the map
+- [x] A last-mile homing module (`terminal`, 500 m by the makers' claims) carries a drone through the last stretch, out of a jammer's reach. A new real drone, the last-mile FPV, has one
+- [x] Anti-jam antennas cut GNSS drift. Jam resistance had only touched control and video links, so the Geran-3's antennas did nothing against GNSS jamming
+- [x] A reactive jammer cannot follow a link that hops frequency (`hops`), as reported for the Molniya-2; a barrage still jams it
+- [x] Crews see a drone where its span fills 0.065°, the angle at which half the observers in two field trials saw a small quadcopter: a 7-inch quad at about 290 m and a Shahed at about 2.2 km, not 115 and 200 m. They hear a drone 300 m off per unit of its loudness, half that in rain, so a handheld jammer can turn to a silent Shahed by ear
+- [x] Plain guns (GPMG, .50 cal, the 12.7 mm station and the Gepard) keep a quarter of their hit chance at full range (`rangeLoss`), where airburst guns keep three quarters. The Gepard's close-in chance went from 0.4 to 0.73, so at about 3 km it still gives the reported 20 to 30 rounds a kill
+- [x] Armour (`armour`) halves a strike on the Gepard, the Skyranger 30, the Stormer HVM and any system on a Patria
+- [x] An acoustic sensor's bearing points to where the drone was when the sound left it, 3 s and about 150 m behind a Shahed a kilometre off
+- [ ] The generic first-person-view drones in the waves never carry a homing module. Fitting them from some wave onward would be the realistic form of the enemy adapting, and a balance change
+- [ ] No wind: it would change drone speeds over the ground, how well quadcopters fly, and how far sound carries, upwind and down
+- [ ] Casualty radii, checked against a second anchor: a design paper gives an M107 155 mm shell (6.95 kg of Composition B) a 100% kill radius of about 20 to 30 m, where the rule gives 17 m. A little low, so left as it is
+- [ ] Armour is a flat halving and every armour figure is an assumption; a shaped-charge first-person-view drone can still knock out an armoured vehicle
+- [x] The fusion node judges an unnamed track by the drones the waves send (the attack mix), not the whole catalogue, so adding a real drone no longer shifts play. A drone a camera names is still known by its own figures
+
+**Fusion and jammer tactics (2026-11-07)**
+
+- [x] The fusion node gives no rounds to a track flying away from the site and heading for none of your systems (turned for home by a jammer, or a spotter going), and stops an engagement whose target turns to leave. It also spares rounds on ghost tracks drifting away
+- [x] The soft-kill wait and a jammer's own receiver ask whether a reactive jammer can follow the link (`canFollow`): the fusion node had held fire 10 s for a jammer that could not touch a Molniya
+- [ ] Ranking threats by how fast they close on the site, rather than by speed, was tried and made play worse: 4 of 6 mixed runs let strikes through where none had. Velocities from bearing-only sensors can point anywhere, and emitter-seeking drones go for systems further out. Ranking by predicted time to each defended asset needs better velocity estimates first
+- [x] Free effectors are paired with tracks, most urgent first: each track goes to the effector with the lowest cost per kill among those with at least half the best chance at it, so a laser or gun takes a quadcopter before a missile. A track already engaged is left to that engagement until it is inside the critical zone. An engaged effector still switches to a much more urgent track
+- [x] A track is offered to a launcher only if its round can meet it within reach, flying at where the track will be (`meetTime`), so a slow interceptor drone is not sent after a faster drone going past or away
+- [x] Video links are jammed where the pilot receives them, at the launch point, so a jammer by the site rarely touches them. The fusion node counts only on breaking a control link
+- [x] Two more techniques for any jammer: GNSS spoofing, which turns a navigating drone steadily off course (Ukraine's Pokrova is reported to), and taking over a commercial drone its receiver hears and its library knows, which lands it whole (as D-Fend's EnforceAir claims). The turn's size and rate, and the 25% price, are assumptions
+- [x] A jammer on a pan-and-tilt head (the AUDS) with a sector antenna is turned onto the most urgent drone it could jam. It turns at once, as no slew rate is published
+- [x] Threat distance is measured to a drawn area's outline, not its centre, so a long thin area is as close along its whole length
 
 **Patrol prototype** (see `docs/PATROL_MODE.md`)
 
 - [x] A first playable slice: people walk a looped route with a radar and a launcher, and strike drones attack the patrol
 - [x] Routes, people and systems may go anywhere on the map, and an area and a patrol refuse each other
-- [ ] What the slice leaves out, listed under "Left out of the slice" in `docs/PATROL_MODE.md`: a spotter's fix that goes stale, choosing the escort, sensing penalties on the move, routes along roads, winning by laps, escort positions in replays, a hotkey, and an end card that says the patrol was lost
+- [ ] What the slice leaves out, listed under "Left out of the slice" in `docs/PATROL_MODE.md`: a spotter's fix that goes stale, choosing the escort, sensing penalties on the move, routes along roads, winning by laps, escort positions in replays, and a hotkey
 - [ ] The wizard's "Show me a good spot" still searches round the station when you protect a patrol. It follows a drawn area, but not a patrol
 
 **Real-world mapping** (see `docs/REAL_MAPPING_PLAN.md`)
 
 - [x] M0 to M4, and the map building and live layer from M5
 - [ ] Model site, live OS map and place search (these need an OS API key), Wales and Scotland lidar, sharper aerial photos, and a test on a dense city
-- [ ] Read coordinate limits from the world. The backend still checks against the fixed `WORLD_LIMIT` in `backend/app/schemas.py`, one of the mapping plan's small asks of the rebuild, and it matters once real worlds differ in size.
+- [ ] Read coordinate limits from the world. The backend still checks against the fixed `WORLD_LIMIT` in `backend/app/schemas.py` (1,350 units since worlds grew to 54 km), one of the mapping plan's small asks of the rebuild. Every world is the same size, so it only matters if that changes.
+
+**Accounts and deployment packs** (Feature E)
+
+- [x] Login page with sign-in, sign-up and recovery-code reset, a profile hub, and deployment packs dragged from a tray in the game
+- [x] The toolbar's S, M and L buttons replaced by each kind's list of real systems, dragged or clicked onto the map, with the wizard's numbered steps
+- [x] Place a pack's vehicles on the map: parked with one of the pack's systems on board, and as the patrol's column, which a pack with vehicles limits to its own. One vehicle list, `PATROL_VEHICLES`
+- [x] Delete an account, with its password. Its sessions and packs go with it; shared saves stay
+- [x] Keep the deployed pack across a page reload. Its id is kept in the browser with the owner's username, so only they get it back
+- [x] Sign out without a page reload, so a half-built laydown is not lost. The game stays for whoever signs in next; the last account's pack and tray are cleared
+- [x] A run whose save is refused while signed out says to sign in again, not that the server is down
+- [x] An end-of-deployment report, for a fixed site and a patrol: how it ended, drones launched, intercepted and through, what shot down what, rounds, missiles and beam fired and time spent jamming, the cost, systems lost and casualties. An End deployment button ends a run by choice
+- [x] With a pack deployed, the budget is no limit and only counts the cost, so the pack and magazines are the limits. The HUD hides the budget and site integrity then, apart from in the sandbox
+- [x] A deployed pack is all that can be placed: each toolbar row lists only the pack's systems of its kind, with how many are left, a hotkey opens that list rather than picking a system, and placing beyond the pack is refused
+- [x] Each system line in a pack holds the settings its systems are placed with (the Unit panel's fields), and a pack can be edited from inside the game with Edit this pack, which goes back to the game
+- [x] Large systems (size L, such as NASAMS, Skynex and Gepard) reload from storage only once the wave is over; small and medium ones, such as a GPMG, reload as they fight. Alex chose this over a reserve of rounds per pack
+- [ ] With a pack deployed, resupply between waves still refills every launcher in full
+- [ ] A loaded saved laydown and the patrol column's systems are not checked against the pack's kit
+- [x] The wizard plans with the deployed pack: its sensor step lists only the kinds the pack holds, with the pack's own system, and its effector step suggests only what is left in the pack. Each step is done once nothing left in the pack would help
+- [x] Map controls suit a trackpad: drag pans over the ground, right-drag or Shift, Ctrl or Cmd with a drag turns the view, and a pinch zooms four times faster per step than a wheel notch (`WHEEL_ZOOM` and `PINCH_ZOOM` in `render/game-view.js`, tuned by hand)
+- [x] Transmit power is set in watts, from a tenth of each radar's or jammer's rated RF output up to it (`config/tx-power.js`). 7 of the 15 real systems publish an output, 3 more come from secondary sources, and the rest are labelled assumptions, said so beside the setting. A power saved as a percentage loads as that share of the rated watts
+- [ ] Rated outputs to confirm: EchoGuard (2 W), Giraffe 1X (150 W) and Spexer 2000 3D (100 W) are worked out from their power draw, and the DroneGun Mk4, MkIII and Tactical publish none. The IRIS may be 2 x 12 W
+- [x] Strike drones attacking a drawn area go for what is in it: one of your systems, a group of people or a building, by kind first (45%, 30% and 25% of strikes among the kinds there, an assumption) and then one of that kind. A spot at random only if the area holds none. A strike on a system damages it; one on people or a building lands there. Drones homing on radio still go for the loudest emitter, and a station without a drawn area is still the target
+- [x] A ground view: View from here, in a system's panel, puts the camera at the top of its mast during a wave, turning to the drone it engages or the nearest one your sensors have, with drones and rounds drawn at a size you can see whatever their distance. A drag looks round; Esc or Back to the map returns (`render/eye-view.js`)
+- [ ] Strikes in station mode (no drawn area) still all go for the station; the same choice of systems, people and buildings round it would be a balance change
+- [x] A realistic look: real paint with the map colour as a foot ring, smooth shading, reflections and sun shadows up close, rotor blades, NATO map symbols zoomed out (systems, drones and tracks), people who idle, walk and take cover, and missile smoke, tracer, explosions with smoke, debris and dust, and scorch marks
+- [ ] Real 3D model files (glTF) for systems, drones and people, loaded per pack. Not started: it needs a source and licence for about 85 models
+- [x] Paint colours checked against photos of each real product (`docs/PAINT_SOURCES.md`). Main corrections: the Blighter radars, EchoGuard, AUDS, Coyote, LOCUST and Iron Beam are tan, the Spexer and Giraffe 1X green, the Discovair charcoal, and the Geran-2 and generic Shahed-type black, and the KVN yellow
+- [ ] Colours still low confidence: the Elysion direction finder, the generic camera and jammers, the remote weapon station, and the larger FPV sizes. Two-colour finishes (Boxer and Patria camouflage, Dedrone's blue band, the Agras T30's black arms) are drawn in one colour
+- [x] Laser beams are red, a white-hot core in a red glow, from the muzzle up close or the symbol zoomed out (a real high-energy laser is infrared and unseen; the RF weapon is a wide faint band in its own colour). Missiles and interceptors in flight carry a glow a fixed size on the screen, and gun rounds are red tracer streaks a few pixels wide
+- [ ] The models' reflection does not dim at dusk or night
+- [ ] People's meshes are sized for the most people the game allows, about 26 MB of buffers; size them to the people placed if memory matters
+- [x] Ground clutter hides a low flyer from radar only when it moves slower than 5 m/s (`SENSING.clutterSpeed`, an assumption): drone radars are Doppler radars, and line of sight already hides a drone behind trees and hills. Before, every drone below 30 to 40 m was lost beyond 300 to 800 m, which counted the same low flight twice: a fibre-optic drone was seen over 3 to 5% of a radar's area on test ground, and is now seen over 49 to 57%. Reference runs moved (mixed seed 1: 67 kills and no leaks, against 56 and 2) and `GAME_VERSION` is 0.16.0
+- [x] Long ranges can be seen at their true size: rings are drawn outside the distance fog, the camera zooms out to 60 km (it stopped at 24 km), the haze starts beyond what the camera looks at, and the Plan tab zooms out to 30 km. A NASAMS or Sky Sabre's full 25 km ring shows round the 14 km map; its range is unchanged
+- [x] The map is twice as wide: worlds are 28 km across (`WORLD.radius` 14 km), four times the area, and drones start 13 km out. Generated ground spreads its hamlets and power lines to the new edge, the map builder makes 44 km packs with lidar across the whole world in England, and the backend accepts positions out to 14 km. Packs built at 30 km still load. Reference runs moved (mixed seed 1: 56 kills, 3 leaks and the site at 10%, against 67, 0 and 100%) and `GAME_VERSION` is 0.17.0
+- [x] Worlds are 54 km across (`WORLD.radius` 27 km), so drones can start as far as 26 km out. The builder makes 70 km packs, the backend accepts positions out to 27 km (`WORLD_LIMIT` 1,350 units), and the last ground generated is kept, as it takes about 4 s. Reference runs moved (mixed seed 1: 69 kills, 2 leaks and the site at 40%, against 56, 3 and 10%) and `GAME_VERSION` is 0.18.0
+- [x] Drones start at different distances as well as bearings: a quadcopter 12 to 15 km out and a fixed-wing drone 12 to 26 km (`WORLD.launchBand`), each wave's launch areas rolling their own share. A drone's `launch` field can name another band: the Lancet-3 flies the long one and the CH-901 the short one
+- [x] The Shahed class (Shahed, Geran, Gerbera, Feilong-300D, Sunflower-200, ASN-301 and the generic fixed-wing strike drone) comes in from off the map, at its edge (`launch: 'edge'`). A strike drone now counts as gone only when it leaves the map, or when GNSS jamming has turned it more than 27 km from the area
+- [x] MGRS on every real map, as well as its national grid (OS or L-EST97), chosen in the map panel; G steps through them. The cursor reads out in the grid that is showing (`sim/mgrs.js`). It draws the zone of the map's middle across the whole map, as no pack yet straddles a zone edge
+- [x] The coverage map on its own: three colours (not seen, one sensor, two or more) with small markers and a key, and the share of the area seen. Unticking it shows the full plan with ranges, links and tracks
+- [x] The start screen has a Deployment pack choice after where to defend: one of your packs, deployed at once, or none to buy systems on a budget, with a link to build or edit packs (`ui/account/PackPicker.jsx`)
+- [x] The HUD shows kills, leaks, people killed and injured, and ammunition (rounds left of all carried, and how many are loaded), with the spend below in smaller, quieter text. Site integrity and the budget bar show only in the sandbox
+- [x] The K-CEMA Jupiter is rated at up to 600 W (Alex; one trade report gives 450 W), so by the same square-root rule as the other jammers it reaches 3.9 km, against 1.1 km for the NEO
+- [x] The game's page is sent with `Cache-Control: no-cache`, so a browser checks for a new build each time it loads (`security.py`)
+- [x] Range rings: a selected system's ring is its bright line-of-sight ring again, not a faint white copy, and rings on generated ground are stronger (55% against 35%) and thicker
+- [x] Run statistics, the same in and out of the wizard (`sim/stats.js`, `ui/RunStats.jsx`): kill rate, hit rate (rounds that reached their target), rounds per kill, the mean, spread and extremes of how far out drones were downed (from the site and from the shooter) with a kill-range chart, first detection range, time from first seen to engaged and to downed, false alarms, and costs; then per effector (fired, hits, hit rate, kills, cost, cost per kill, kill range, rounds left, jamming time), per sensor (drones seen, seen first, first-seen range, time to engagement, false alarms) and per drone type. For the whole run or any one wave. The HUD and the wizard show the same headline with All statistics, which opens the new Statistics tab in the SAPIENT panel; the end card shows all of it. Each drone's flight is logged (`sim/flight-log.js`), left out of the run's fingerprint, so reference digests did not change
+- [x] Prices show in pounds everywhere, at £0.75 to the dollar (`GBP_PER_USD` in `sim/economy.js`, an assumption, Alex's choice). Figures stay in dollars as their sources quote them, and the Sources tab edits them in US$
+- [x] Every box can be dragged by its title bar and shrunk to it (`ui/Movable.jsx`): the HUD, the toolbar, the controls, the overview map, the timeline, the SAPIENT panel, the unit panel, the map panel and note, the area panel, the attack mix, the system lists, the ground view bar, Tuning, the legend (starts shrunk), engagement requests and the end card. With its button focused, the arrow keys move it, Shift for bigger steps, and Home puts it back, as a double-click does. The wizard and the sandbox kept their own
+- [x] Drone trails, a switch in the controls: every drone draws a line of where it has flown, the real drone with the truth overlay on, its track without, so the switch shows nothing the system does not know (`render/trail.js`)
+- [ ] Jamming time in the statistics is for the whole run, even when one wave is chosen; jamming kills are credited to the jammer type that would crash the drone soonest; a laser has no hit rate
 
 ## Known limits to fix if they start to matter
 
@@ -117,4 +237,4 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 
 ## Only if this is ever hosted
 
-- [ ] Work through "Before hosting" in `docs/SECURITY_NOTES.md`: sign-in, ownership checks, rate limits, HTTPS, a move off SQLite and a new security review.
+- [ ] Work through "Before hosting" in `docs/SECURITY_NOTES.md`: ownership of shared saves, rate limits, HTTPS and `Secure` cookies, a move off SQLite and a new security review.

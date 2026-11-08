@@ -4,6 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.services import accounts
+
+PASSWORD = "correct horse battery"
 
 SPEC = {
     "structures": [
@@ -38,7 +41,25 @@ def db_path(tmp_path):
     return tmp_path / "data" / "test.db"
 
 
+@pytest.fixture(autouse=True)
+def quick_hashing(monkeypatch):
+    # the real cost makes each hash take ~50 ms; tests only need the same code path
+    monkeypatch.setitem(accounts.SCRYPT, "n", 2**8)
+
+
+def sign_up(c, username="operator", password=PASSWORD, display_name="Test Operator"):
+    return c.post("/api/v1/auth/register", json={"username": username, "display_name": display_name, "password": password})
+
+
 @pytest.fixture
-def client(db_path):
+def anon(db_path):
+    """A browser that has not signed in."""
     with TestClient(create_app(db_path, game=db_path.parent / "no-game"), base_url="http://localhost") as c:
         yield c
+
+
+@pytest.fixture
+def client(anon):
+    """A browser signed in to a new account, which is what every page of the game is once past the login screen."""
+    assert sign_up(anon).status_code == 201
+    return anon

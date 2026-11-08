@@ -109,6 +109,7 @@ button.danger:not(:disabled) { border-color: #e57373; color: #ffab91; }
 #health-fill { height: 100%; width: 100%; background: #4caf50; transition: width 0.2s, background 0.2s; }
 .stats { display: flex; justify-content: space-between; margin-top: 8px; color: #9fb2cf; }
 .stats b { color: #fff; }
+.hud-spend { margin-top: 6px; font-size: 11px; color: #7d8fa9; } /* below the counts, and quieter than them */
 
 #hud-top-right { top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; width: 190px; }
 #hud-top-right .row { display: flex; gap: 4px; }
@@ -120,8 +121,6 @@ button:hover { background: #243759; }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: #1565c0; border-color: #1e88e5; color: #fff; font-weight: 600; }
 button.primary:hover:not(:disabled) { background: #1976d2; }
-button.speed { flex: 1; padding: 4px 0; }
-button.speed.active { background: #2f4468; border-color: #5c7bb0; }
 
 #tuning { top: 12px; left: 262px; width: 270px; max-height: calc(100vh - 24px); overflow-y: auto; font-size: 12px; }
 
@@ -216,7 +215,14 @@ table.mini i { display: inline-block; width: 9px; height: 9px; border-radius: 50
 #status .warn { color: #ffb74d; }
 
 #toolbar { display: flex; flex-direction: column; gap: 3px; padding: 6px; flex: 0 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-#tool-sell { position: sticky; bottom: -6px; flex-shrink: 0; background: #1a2740; z-index: 1; }
+/* Remove stands apart from the kit above it: a gap and a rule, and red, as it takes a system off the map */
+#tool-sell { position: sticky; bottom: -6px; flex-shrink: 0; z-index: 1; margin-top: 10px; background: #2a1820; border-color: #5e3440; border-left-color: #e57373;
+  box-shadow: 0 -10px 0 rgba(12, 20, 34, 0.96); }
+#tool-sell::before { content: ''; position: absolute; left: 2px; right: 2px; top: -6px; border-top: 1px solid #2f4468; }
+#tool-sell .n { color: #ff9e8f; display: flex; align-items: center; gap: 5px; }
+#tool-sell .c { color: #c9a0a0; }
+#tool-sell:hover { background: #3a1d27; }
+#tool-sell.active { background: #4a1f29; border-color: #ff8a80; box-shadow: 0 -10px 0 rgba(12, 20, 34, 0.96), 0 0 0 1px #ff8a80 inset; }
 .tool { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "n c" "k s"; align-items: baseline; column-gap: 8px; text-align: left; padding: 3px 8px 3px 9px; border-left-width: 4px; border-top-width: 1px; }
 .tool .n { grid-area: n; font-weight: 600; font-size: 13px; white-space: nowrap; }
 .tool .c { grid-area: c; font-size: 12px; color: #ffd54f; text-align: right; }
@@ -226,13 +232,7 @@ table.mini i { display: inline-block; width: 9px; height: 9px; border-radius: 50
 .tool.poor .c { color: #ef5350; }
 .tool-row { position: relative; }
 .tool-row .tool { width: 100%; }
-.tool.sized { padding-bottom: 6px; }
-.tool.sized .k { display: block; }
 .tool .k { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 200px; }
-.tool.sized .k { max-width: 105px; }
-.tool-sizes { position: absolute; right: 6px; bottom: 3px; display: flex; gap: 2px; }
-.tool-sizes button { width: 24px; height: 18px; padding: 0; font-size: 10px; line-height: 1; }
-.tool-sizes button.chosen { background: #5c7bb0; border-color: #8fb4ff; color: #fff; font-weight: 700; }
 
 #toast { position: fixed; z-index: 6; top: 70px; left: 50%; transform: translateX(-50%); padding: 8px 16px;
   background: rgba(12, 20, 34, 0.9); border: 1px solid #3a5280; border-radius: 6px;
@@ -307,11 +307,11 @@ body.track-hi .tlabel { color: #ffcc66; font-size: 11px; opacity: 1; }
 .slabel.selected { outline: 2px solid #fff; z-index: 1; }
 #tool-picker { left: 256px; top: 12px; width: clamp(220px, calc(100vw - 778px), 300px); max-height: calc(100vh - 24px); overflow-y: auto; z-index: 5; font-size: 12px; line-height: 16px; color: #b9c7dc; }
 .pick-list { display: flex; flex-direction: column; gap: 3px; margin: 8px 0; }
-.pick-list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 4px 8px; text-align: left; font-size: 12px; line-height: 16px; }
-.pick-list button > span { grid-column: 1 / -1; }
-.pick-list button > .pick-price { grid-column: 2; grid-row: 1; color: #ffd54f; }
-.pick-list button.poor > .pick-price { color: #ef5350; }
-.pick-list button[aria-pressed="true"] { background: #2f4468; border-color: #8fb4ff; box-shadow: 0 0 0 1px #8fb4ff inset; }
+.pick-list button, .pick-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 4px 8px; text-align: left; font-size: 12px; line-height: 16px; }
+.pick-list button > span, .pick-card > span { grid-column: 1 / -1; }
+.pick-list button > .pick-price, .pick-card > .pick-price { grid-column: 2; grid-row: 1; color: #ffd54f; }
+.pick-card.poor > .pick-price { color: #ef5350; }
+.pick-list button[aria-pressed="true"], .pick-card[aria-pressed="true"] { background: #2f4468; border-color: #8fb4ff; box-shadow: 0 0 0 1px #8fb4ff inset; }
 .pick-list b { color: #fff; }
 .up-sides { display: flex; gap: 4px; margin: 6px 0; }
 .up-sides button { flex: 1; padding: 3px 0; font-size: 12px; }
@@ -395,11 +395,19 @@ button.wz-go:hover:not(:disabled) { background: #d4ff4d; }
 .stages div { display: flex; flex-direction: column; gap: 4px; padding: 10px; font-size: 13px; line-height: 18px; color: #b9c7dc; border: 1px solid #2f4468; border-radius: 6px; }
 .stages b { color: #fff; }
 .seeds { margin: 12px 0; font-size: 13px; color: #9fb2cf; }
+.start-pack { margin: 12px 0; font-size: 13px; color: #dbe4f0; }
+.start-pack select { display: block; width: 100%; margin: 6px 0 4px; padding: 6px 8px; background: #0b1424; color: #fff; border: 1px solid #2f4468; border-radius: 6px; font-size: 13px; }
+.start-pack p { margin: 2px 0; }
+.start-pack button.quiet { margin: 0; padding: 0 2px; background: transparent; border: 0; color: #7fd0ff; text-decoration: underline; cursor: pointer; }
 .seeds summary { cursor: pointer; margin-bottom: 6px; }
 .start-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .card .start-actions button { margin-top: 0; min-height: 44px; }
 .start-actions button.quiet { background: transparent; border-color: transparent; color: #9fb2cf; }
-.card.game-over { max-width: 880px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.card.game-over { max-width: 880px; max-height: calc(100vh - 32px); overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+#deployment-report h2 { margin: 14px 0 4px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #9fb2cf; }
+#deployment-report p, #deployment-report ul { margin: 4px 0; font-size: 13px; line-height: 19px; }
+#deployment-report ul { padding-left: 18px; color: #dbe4f0; }
+#deployment-report table { width: 100%; }
 #debrief { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: #0e1726; border: 1.5px solid #c6ff00; border-radius: 8px; font-size: 13px; line-height: 19px; color: #b9c7dc; }
 #debrief h2 { margin: 0; font-size: 17px; color: #fff; }
 #debrief p { margin: 0; }
@@ -421,4 +429,16 @@ button.wz-go:hover:not(:disabled) { background: #d4ff4d; }
 .people-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .people-list li { display: flex; align-items: center; gap: 4px; }
 .people-list li > span { flex: 1; min-width: 0; }
+/* the patrol column: vehicle and system side by side, the gap and remove button beside them */
+.patrol-column select { flex: 1 1 0; min-width: 0; }
+.patrol-column input { width: 4em; flex: none; }
+.patrol-plan label { display: block; margin: 4px 0; }
+.patrol-plan input { width: 5em; }
 .people-list button { padding: 0 6px; font-size: 12px; line-height: 18px; }
+.cov-key { font-size: 12px; color: #9fb2cf; }
+.cov-key span { margin-left: 10px; white-space: nowrap; }
+.cov-key i { display: inline-block; width: 11px; height: 11px; margin-right: 4px; border-radius: 2px; vertical-align: -1px; border: 1px solid #ffffff33; }
+.cov-key b { color: #dbe4f0; font-weight: 600; }
+.up-head button.up-eye { margin-top: 1px; padding: 2px 8px; font-size: 11px; border: 1px solid #3a527e; border-radius: 4px; color: #7fd0ff; }
+#eye-bar { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px; color: #dbe4f0; }
+#eye-bar button { padding: 4px 10px; }

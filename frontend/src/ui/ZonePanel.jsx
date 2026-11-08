@@ -4,6 +4,9 @@ import { closeZone, undoZonePoint } from '../zone.js';
 import { view } from '../render/view.js';
 import { zoneScores } from './coverage.js';
 import { useGame } from './hooks.js';
+import { PatrolColumn } from './PatrolColumn.jsx';
+import { Movable } from './Movable.jsx';
+import { PatrolPlan } from './PatrolPlan.jsx';
 
 // How much of the area is seen, for each drone type, with the strongest first.
 export function CoverageBars({ scores, gap }) {
@@ -35,7 +38,7 @@ export function ZonePanel({ onClose }) {
   const clearPatrol = () => { game.commands.setPatrol(null); game.bump(); };
 
   return (
-    <div id="zone-panel" className="panel" role="dialog" aria-label="Area to defend">
+    <Movable id="zone-panel" title="Area to defend" role="dialog" aria-label="Area to defend">
       <button id="zone-panel-close" aria-label="Close" onClick={onClose}>×</button>
       <b>Area to defend</b>
       {drawing && <p>Click the map to mark each corner, then double-click to close it.{count > 0 && ` ${count} point${count > 1 ? 's' : ''} so far.`}</p>}
@@ -51,11 +54,13 @@ export function ZonePanel({ onClose }) {
       </div>}
       <p className="muted">{locked ? 'Locked until you reset the run.' : ATTACK_NOTE}</p>
       <b>Or protect a patrol</b>
-      <p>{walking ? 'Click the map for each waypoint, then double-click to close the loop.' : patrol ? `${patrol.group.count} people walk the blue route, with a radar ahead and a Rapid Ranger behind.` : 'People walk a looped route with a mobile radar and launcher, and the drones hunt them.'}</p>
+      <p>{walking ? 'Click the map for each waypoint from the start, then double-click to finish at the end.' : patrol ? `${patrol.group.count} soldiers walk the blue route from the first wave, escorted by:` : 'Soldiers walk a route to its end and back, escorted by vehicles you choose, carrying sensors and weapons, and the drones hunt them.'}</p>
+      {patrol && !walking && <PatrolColumn patrol={patrol} locked={locked} />}
+      {patrol && !walking && <PatrolPlan patrol={patrol} locked={locked} />}
       {!locked && <div className="wz-actions">
         <button id="patrol-draw" onClick={drawRoute}>{walking ? 'Stop drawing' : patrol ? 'Redraw the route' : 'Draw a patrol route'}</button>
         {patrol && <button id="patrol-clear" onClick={clearPatrol}>Clear the patrol</button>}
       </div>}
-    </div>
+    </Movable>
   );
 }

@@ -9,7 +9,9 @@ import { createSimulation } from '../src/sim/simulation.js';
 import { terrainState } from '../src/sim/terrain.js';
 import { hereU } from '../src/sim/units.js';
 import { bus, location } from '../src/sim/sapient.js';
-import { resetAllFigures } from '../src/sim/config/index.js';
+import { resetAllFigures, WORLD } from '../src/sim/config/index.js';
+import * as THREE from 'three';
+import { buildWorldView } from '../src/render/terrain-view.js';
 import { CENTRE, fixtureParts, gridsHash } from './support/fixture-pack.js';
 import { MIXED, setUp } from './support/scenarios.js';
 
@@ -144,21 +146,29 @@ describe('checking a pack', () => {
     ['an even size', { N: 800 }], ['a huge size', { N: 90001 }], ['another cell size', { cell: 10 }], ['a mismatched span', { half: 9000 }],
     ['an off-grid middle', { east: E + 1 }], ['no fingerprint', { gridsSha256: 'x' }], ['no fit', { lonFit: [1] }], ['an infinite fit', { latFit: [Infinity, 0, 0, 0, 0, 0] }],
   ])('refuses %s', (_, change) => { expect(() => parsePack({ ...header(), ...change }, parts.grids, parts.features)).toThrow(); });
+  it('takes a 70 km pack, as the builder now makes, and refuses one over 80 km', () => {
+    expect(() => parsePack({ ...header(), N: 3501, half: 35000 }, parts.grids, parts.features)).toThrow(/wrong length/); // past the size check
+    expect(() => parsePack({ ...header(), N: 4003, half: 40020 }, parts.grids, parts.features)).toThrow(/unexpected size/);
+  });
   it('refuses grids of the wrong length, and unreadable features', () => {
     expect(() => parsePack(header(), { ...parts.grids, bldg: new Uint8Array(3) }, parts.features)).toThrow(/wrong length/);
     expect(() => parsePack(header(), parts.grids, { lines: [] })).toThrow(/features/);
   });
-  it('refuses a height that is not a number, which would silently report clear sight lines', () => {
+  it.each([NaN, Infinity, 1e6])('refuses a height of %s, which would silently report clear sight lines', (bad) => {
     const ground = parts.grids.ground.slice();
-    ground[1234] = NaN;
-    expect(() => parsePack(header(), { ...parts.grids, ground }, parts.features)).toThrow(/not a number/);
+    ground[1234] = bad;
+    expect(() => parsePack(header(), { ...parts.grids, ground }, parts.features)).toThrow(/not a real one/);
   });
+  it.each([
+    ['a building with a missing number', { buildings: [[1, 2, 3, 4, 5]] }], ['a building that is not numbers', { buildings: [[1, 2, 3, 4, 5, 'x']] }],
+    ['a line point that is not numbers', { lines: [[[0, 0], [null, 1]]] }], ['a line that is not a list', { lines: [5] }],
+  ])('refuses %s', (_, change) => { expect(() => parsePack(header(), parts.grids, { ...parts.features, ...change })).toThrow(/features/); });
 });
 
 describe('cutting a world', () => {
   it('puts the site at height zero and the grid in the right place', () => {
     const w = cutWorld(pack(), E, N);
-    expect(w.N).toBe(701);
+    expect(w.N).toBe(2701);
     expect(w.groundAt(0, 0)).toBe(0);
     expect(w.geo).toMatchObject({ e0: E, n0: N, H0: 100, tier: 'lidar' });
     expect(w.groundAt(0, -4000)).toBeCloseTo(0.3 * 1000); // north is -z, and the hill is to the north
@@ -180,7 +190,7 @@ describe('cutting a world', () => {
     expect(siteProblem(p, E + 10, N)).toMatch(/20 m/);
     expect(siteProblem(p, E, N)).toBeNull();
     const wet = { ...p, grids: { ...p.grids, cover: p.grids.cover.slice() } };
-    wet.grids.cover[400 * 801 + 400] = 4;
+    wet.grids.cover[1400 * 2801 + 1400] = 4;
     expect(siteProblem(wet, E, N)).toMatch(/water/);
     expect(() => cutWorld(p, E + 2000, N)).toThrow(/edge/);
     expect(snap(422013)).toBe(422020);
@@ -190,6 +200,18 @@ describe('cutting a world', () => {
     expect(a.towers).toEqual(b.towers);
     expect(a.towers.length).toBeGreaterThan(0);
     for (const t of a.towers) expect(t.x).toBeLessThan(5000);
+  });
+  it('draws one tree on each tree cell, centred on it, so the picture is the grid the rules use', () => {
+    const w = cutWorld(pack(), E, N);
+    const [trees, houses] = buildWorldView(new THREE.Scene(), w, new THREE.MeshStandardMaterial()).scenery;
+    expect(trees.count).toBe(39 * 49); // the fixture wood's cells: x 820 to 1580, z 520 to 1480
+    expect(houses.count).toBe(w.buildings.length);
+    const m4 = new THREE.Matrix4(), p = new THREE.Vector3(), cell = 20 / WORLD.metresPerUnit;
+    for (let n = 0; n < trees.count; n++) {
+      p.setFromMatrixPosition((trees.getMatrixAt(n, m4), m4));
+      expect(Math.abs(p.x / cell - Math.round(p.x / cell))).toBeLessThan(1e-6);
+      expect(Math.abs(p.z / cell - Math.round(p.z / cell))).toBeLessThan(1e-6);
+    }
   });
   it('works out positions from the pack fit', () => {
     const w = cutWorld(pack(), E, N);

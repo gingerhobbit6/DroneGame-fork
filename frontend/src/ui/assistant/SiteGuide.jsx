@@ -2,11 +2,12 @@
 // which work the same without it, and what it says is worked out from what has been chosen so far.
 
 import { useEffect } from 'react';
+import { WORLD_KM } from '../../sim/config/index.js';
 import { gridRef } from '../../sim/grids.js';
 import { Spotlight } from './Spotlight.jsx';
 
 function advice(site, wanted, packName) {
-  if (site) return { spot: '#btn-guide', title: `Ready at ${gridRef(site.e, site.n)}`, text: `${packName || 'This map'} is on this computer, so nothing needs downloading. The red square is the 14 km world you will defend. To go somewhere else, use any of the three ways below. Otherwise, press Defend here and carry on.` };
+  if (site) return { spot: '#btn-guide', title: `Ready at ${gridRef(site.e, site.n)}`, text: `${packName || 'This map'} is on this computer, so nothing needs downloading. The red square is the ${WORLD_KM} km world you will defend. To go somewhere else, use any of the three ways below. Otherwise, press Defend here and carry on.` };
   if (wanted) return { spot: '#pack-build-go', title: `No map at ${gridRef(wanted.e, wanted.n)} yet`, text: 'The list below shows what building one would download. Press Build this map, or choose somewhere inside a blue square to play straight away.' };
   return { spot: '#site-ways', title: 'Where do you want to defend?', text: 'Near you? Press Use my location. Know roughly where? Drag and zoom the map, then click the spot. Have exact coordinates? Type them in.' };
 }

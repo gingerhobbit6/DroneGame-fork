@@ -1,4 +1,6 @@
 node_modules/
+# drone models saved by npm run models; the source is src/render/drone-models.js
+frontend/models/
 dist/
 .venv/
 __pycache__/

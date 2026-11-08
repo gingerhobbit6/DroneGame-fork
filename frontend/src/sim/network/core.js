@@ -5,13 +5,13 @@ import { WORLD, FUSION_DEF } from '../config/index.js';
 import { createTracker } from '../tracker.js';
 import { createComms } from '../comms.js';
 import { terrainState } from '../terrain.js';
+import { distToZone } from '../attack-area.js';
 
 export const RB_UNITS = 'RANGE_BEARING_COORDINATE_SYSTEM_DEGREES_M';
 // A real world's scene is aligned to the national grid, so its bearings are measured from grid north.
 export const rbDatum = () => (terrainState.data?.geo ? 'RANGE_BEARING_DATUM_GRID' : 'RANGE_BEARING_DATUM_TRUE');
-export const deg = (r) => (r * 180) / Math.PI;
-export const round = (x, n = 3) => Number(x.toFixed(n));
-export const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
+const deg = (r) => (r * 180) / Math.PI;
+export { round } from '../sapient.js';
 export const dur = (value) => ({ units: 'TIME_UNITS_SECONDS', value });
 
 export const classDepth = (cls) => {
@@ -70,10 +70,15 @@ export function createCore(ctx) {
     const m = mpu();
     return Math.hypot(tr.est.east - s.pos.x * m, tr.est.north + s.pos.z * m, tr.flat ? 0 : tr.est.up - (s.pos.y || 0) * m); // no measured height: across the ground
   };
-  // where a track is from what is being defended: the drawn area's centre if there is one, or the station
-  // shortcut: distance is to the area's centre, not its edge, so a long thin area ranks threats unevenly; measure to the outline if that shows in play.
+  // where a track is from what is being defended, as a direction: from the drawn area's centre if there is one, or the station
   const fromSite = (tr) => { const c = ctx.siteCentre(), m = mpu(); return { east: tr.est.east - c.x * m, north: tr.est.north + c.z * m }; };
-  const siteDist = (tr) => { const { east, north } = fromSite(tr); return Math.hypot(east, north); };
+  // and how far: to a drawn area's outline, so nothing inside it, as a long thin area is as close along its whole length; else to the station
+  const siteDist = (tr) => {
+    const zone = ctx.zone?.(), m = mpu();
+    if (zone) return distToZone(zone, tr.est.east / m, -tr.est.north / m) * m;
+    const { east, north } = fromSite(tr);
+    return Math.hypot(east, north);
+  };
 
   return { ctx, mpu, T, nodes, tracker, names, nameOf, fusion, gui, routeTo, scheduled, comms, send, deliver, antennaM, rel, bearingOf, distToTrack, fromSite, siteDist };
 }

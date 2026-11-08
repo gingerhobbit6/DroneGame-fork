@@ -54,6 +54,14 @@ describe('what the conditions change', () => {
       expect(weatherRange(unitDef('laser'))).toBe(0.5);
       expect(weatherRange(unitDef('laser_rfdew'))).toBe(1); // an RF weapon
       expect(weatherRange(unitDef('rf'))).toBe(1);
+      expect(unitDef('acoustic').range).toBe(250); // rain noise drowns half its reach
+    });
+    at('night', () => expect(weatherRange(unitDef('acoustic'))).toBe(1));
+  });
+  it('at night, give a thermal camera nothing for pixels finer than its lens resolves', () => {
+    at('night', () => {
+      expect(unitDef('camera', { pixels: 'fhd' }).range).toBe(650); // 8 µm pixels under a 20 µm spot at f/2
+      expect(unitDef('camera_s', { pixels: 'hd' }).range).toBe(Math.round(260 * 2 * (6 / 10))); // f/1 resolves 10 µm, not 6
     });
   });
   it('turn anything unknown into a clear day', () => {

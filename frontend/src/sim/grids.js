@@ -3,6 +3,7 @@
 
 import { bngToWgs84, gridRef as bngRef, onGrid as onBng, parseGridRef, wgs84ToBng } from './bng.js';
 import { lest97Ref, lest97ToWgs84, onLest97, wgs84ToLest97 } from './lest97.js';
+import { mgrsRef } from './mgrs.js';
 
 const EAST_NORTH = /^\s*E?\s*(\d{4,7}(?:\.\d+)?)\s*E?\s*[,\s]\s*N?\s*(\d{4,7}(?:\.\d+)?)\s*N?\s*$/i;
 const LAT_LON = /^\s*(-?\d{1,2}(?:\.\d+)?)\s*°?\s*([NS]?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*°?\s*([EW]?)\s*$/i;
@@ -12,6 +13,8 @@ export const isEstonian = (n) => n >= FIRST_ESTONIAN_NORTH;
 export const onGrid = (e, n) => (isEstonian(n) ? onLest97(e, n) : onBng(e, n));
 export const gridRef = (e, n, figures = 6) => (isEstonian(n) ? lest97Ref(e, n, figures) : bngRef(e, n, figures));
 export const toLatLon = (e, n) => (isEstonian(n) ? lest97ToWgs84(e, n) : bngToWgs84(e, n));
+// The same place as an MGRS reference, which works anywhere.
+export const mgrsAt = (e, n, figures = 6) => { const { lat, lon } = toLatLon(e, n); return mgrsRef(lat, lon, figures); };
 
 // The grid a world is on, for positions that may fall just past the part of it a site can use, as tile corners at a border do.
 export const gridFor = (n) => (isEstonian(n) ? wgs84ToLest97 : wgs84ToBng);

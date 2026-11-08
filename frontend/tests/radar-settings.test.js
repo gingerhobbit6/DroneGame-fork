@@ -28,7 +28,7 @@ function probeFrom(s, bearing, metres, agl = 60, vel = null) {
   return probe;
 }
 const seen = (s, probe) => sim.net.pd(s, probe, { pointing: false });
-function untilTrack(test, steps = 3000) { // play the first wave until some track passes the test
+function untilTrack(test, steps = 10000) { // play the first wave until some track passes the test. Drones start 13 km out
   sim.state.warnedWire = true;
   sim.commands.startWave();
   for (let n = 0; n < steps; n++) { sim.step(); const tr = [...sim.net.tracks.values()].find(test); if (tr) return tr; }
@@ -163,9 +163,9 @@ describe('micro-Doppler', () => {
   });
   it('classifies tracks with no camera on the site, and without it nothing is classified', () => {
     setUp(sim, { seed: '1', laydown: [['radar', 600, 0]] });
-    expect(untilTrack((t) => t.airframe && t.airframe !== 'Unknown', 4000)).not.toBeNull(); // wave 1 is inside 1.5 km by then
+    expect(untilTrack((t) => t.airframe && t.airframe !== 'Unknown', 12000)).not.toBeNull(); // wave 1 is inside 1.5 km by then
     setUp(sim, { seed: '1', laydown: [['radar', 600, 0]] });
     sim.commands.configureUnit(sim.structures[0], 'microDoppler', 'no');
-    expect(untilTrack((t) => t.airframe && t.airframe !== 'Unknown', 4000)).toBeNull();
+    expect(untilTrack((t) => t.airframe && t.airframe !== 'Unknown', 12000)).toBeNull();
   });
 });

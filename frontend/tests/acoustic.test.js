@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DRONES, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
-import { reachFor } from '../src/sim/network/sensors.js';
+import { heardAt, reachFor } from '../src/sim/network/sensors.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { terrainState } from '../src/sim/terrain.js';
 
@@ -97,5 +97,14 @@ describe('every size of every weapon', () => {
       expect(STRUCTURES[`${kind}_s`].modelScale).toBeLessThan(STRUCTURES[kind].modelScale || 1);
       expect(STRUCTURES[`${kind}_l`].modelScale).toBeGreaterThan(STRUCTURES[kind].modelScale || 1);
     }
+  });
+});
+
+describe('the speed of sound', () => {
+  it('puts a drone where it was when the sound left it: a Shahed a kilometre off, about 146 m back along its path', () => {
+    const was = heardAt({ x: 1000, y: 300, z: 0 }, { x: 0, y: 0, z: 50 }, 1000);
+    expect(was.x).toBe(1000); expect(was.y).toBe(300);
+    expect(was.z).toBeCloseTo(-145.8, 1);
+    expect(heardAt({ x: 5, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, 1000)).toEqual({ x: 5, y: 0, z: 0 }); // a still drone is where it is heard
   });
 });

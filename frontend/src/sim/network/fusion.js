@@ -10,7 +10,7 @@ export function createFusion(core, { raiseAlert }) {
   let trackSeq = 0, fusedT = 0;
 
   function feed(s, f) {
-    const tr = tracker.ingest(f.meas, T());
+    const tr = tracker.ingest(f.meas, f.meas.t); // at the moment it was measured: a report that queued on a busy link describes the past
     if (!tr) return;
     tr.sources.set(s.nodeId, { ...f.source, lastT: T() });
     if (!tr.cls || classDepth(f.source.cls) >= classDepth(tr.cls)) tr.cls = f.source.cls; // classification is remembered
@@ -24,8 +24,11 @@ export function createFusion(core, { raiseAlert }) {
       tr.est = { east: e.east, north: e.north, up: e.up };
       tr.estErr = e.err;
       tr.speed = Math.hypot(e.vel[0], e.vel[1], e.vel[2]);
-      if (tr.cls) tr.airframe = classDepth(tr.cls) >= 2 ? tr.cls[0].sub_class[0].sub_class[0].type : 'Unknown';
-      else tr.airframe = 'Unknown';
+      const { east, north } = fromSite(tr), dist = Math.hypot(east, north);
+      tr.closing = dist ? -(east * e.vel[0] + north * e.vel[1]) / dist : 0; // m/s towards the site over the ground; below 0 it is leaving
+      const named = tr.cls && classDepth(tr.cls) >= 2 && tr.cls[0].sub_class[0].sub_class[0];
+      tr.airframe = named ? named.type : 'Unknown';
+      tr.model = named?.sub_class?.[0]?.type ?? null; // a camera that identified it names the drone's model
     }
     for (const d of ctx.drones) d.track = null;
     for (const tr of tracker.tracks.values()) {
@@ -49,10 +52,9 @@ export function createFusion(core, { raiseAlert }) {
 
   // Moving, but neither closing on the site nor leaving it: what a spotter on station looks like to the fusion node.
   function isCircling(tr) {
-    const dist = siteDist(tr);
-    if (!dist || tr.speed < FUSION.loiterMinSpeed) return false;
+    if (!siteDist(tr) || tr.speed < FUSION.loiterMinSpeed) return false; // inside a drawn area is not circling it
     const e = tracker.estimate(tr, T());
-    const { east, north } = fromSite(tr);
+    const { east, north } = fromSite(tr), dist = Math.hypot(east, north);
     const radial = (east * e.vel[0] + north * e.vel[1]) / dist;
     return Math.abs(radial) < FUSION.loiterRadial * tr.speed;
   }
@@ -76,7 +78,7 @@ export function createFusion(core, { raiseAlert }) {
     for (const tr of [...tracker.tracks.values()]) {
       if (!tr.killWatch || T() - tr.killWatch.t < FUSION.killConfirmDelay * slowestSensor(tr)) continue; // a slow radar gets time to look again
       if (tr.lastT <= tr.killWatch.lastT + 1e-6) {
-        raiseAlert('information', `Kill confirmed: ${tr.short} (${tr.airframe === 'Unknown' ? 'unclassified' : tr.airframe}), reported by ${tr.killWatch.by}`, null, 'DISCRETE_PRIORITY_LOW', tr);
+        raiseAlert('information', `Kill confirmed: ${tr.short} (${tr.model ?? (tr.airframe === 'Unknown' ? 'unclassified' : tr.airframe)}), reported by ${tr.killWatch.by}`, null, 'DISCRETE_PRIORITY_LOW', tr);
         if (ctx.onKillConfirmed) ctx.onKillConfirmed(tr);
         tracker.tracks.delete(tr.id);
       } else {

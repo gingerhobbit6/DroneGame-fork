@@ -46,7 +46,8 @@ describe('HUD', () => {
     expect($('#status img')).toBeNull();
     expect($('#status').textContent).toContain('<img src=x onerror=alert(1)>');
     expect($('#status').textContent).toContain('<b>t</b>');
-    expect($('#budget').textContent).toBe('$15M');
+    expect($('#budget')).toBeNull(); // the budget shows only in the sandbox
+    expect($('#hud-spend').textContent).toBe('Spent £0: systems £0, shots and rounds £0');
   });
   it('reports spotters and the cost exchange during a run', () => {
     armed();
@@ -57,24 +58,33 @@ describe('HUD', () => {
     setUpSpotter();
     refresh();
     expect($('#status .warn').textContent).toMatch(/spotter on station/);
-    expect($('#status').textContent).toMatch(/per \$1 destroyed/);
+    expect($('#status').textContent).toMatch(/per £1 destroyed/);
+    expect($('#hud-ammo').textContent).toMatch(/Ammunition \d+ of \d+ left · \d+ loaded/);
+    act(() => { game.sim.state.sandbox = true; game.bump(); });
     expect($('#health-fill').style.background).toMatch(/229|e53935/);
   }, 30000);
 });
 
 describe('toolbar', () => {
-  it('selects, deselects and marks what you cannot afford', () => {
+  it('opens and closes a list, and marks what you cannot afford', () => {
     show(<Toolbar />);
     fireEvent.click(screen.getByText('Laser'));
-    expect(game.getTool()).toBe('laser');
+    expect(game.catalogue()).toBe('laser');
     expect($('.tool.active').textContent).toContain('Laser');
+    expect($('.tool.active').getAttribute('aria-expanded')).toBe('true');
     fireEvent.click(screen.getByText('Laser'));
+    expect(game.catalogue()).toBeNull();
     expect(game.getTool()).toBeNull();
-    fireEvent.click(screen.getByText('Sell'));
-    expect($('.tool.active').textContent).toContain('Sell');
+    fireEvent.click(screen.getByText('Remove'));
+    expect($('.tool.active').textContent).toContain('Remove');
+    expect($('#tool-sell').textContent).toContain('% back'); // buying on a budget, so a refund
     game.sim.state.budget = 10;
     refresh();
     expect(document.querySelectorAll('.tool.poor').length).toBe(TOOLBAR.length);
+    game.sim.state.packed = true; // a deployed pack has no budget, so Remove offers no refund
+    refresh();
+    expect($('#tool-sell').textContent).not.toContain('% back');
+    game.sim.state.packed = false;
   });
 });
 
@@ -89,11 +99,18 @@ describe('control panel', () => {
     expect(game.sim.state.wave).toBe(1);
     expect($('#btn-wave').disabled).toBe(true);
     expect($('#btn-wave').textContent).toBe('Wave 1 in progress');
+    expect([...document.querySelectorAll('[data-speed]')].map((b) => b.textContent)).toEqual(['1×', '2×', '3×', '4×', '5×', '10×']);
     fireEvent.click($('[data-speed="3"]'));
     expect(game.clock).toMatchObject({ speed: 3, lastSpeed: 3 });
     expect($('[data-speed="3"]').className).toContain('active');
-    fireEvent.click($('[data-speed="0"]'));
+    fireEvent.click($('#speed-play'));
     expect(game.clock).toMatchObject({ speed: 0, lastSpeed: 3 });
+    expect($('#speed-control').className).toBe('paused');
+    expect($('#speed-play').getAttribute('aria-label')).toBe('Play at 3x');
+    fireEvent.click($('#speed-play'));
+    expect(game.clock.speed).toBe(3);
+    fireEvent.click($('[data-speed="10"]'));
+    expect(game.clock).toMatchObject({ speed: 10, lastSpeed: 10 });
   });
 
   it('toggles the view options, including the page class for tracks', () => {
@@ -262,6 +279,7 @@ describe('sandbox panel', () => {
 describe('overlay', () => {
   it('deploys with the seeds typed in, and defaults blanks', () => {
     show(<Overlay />);
+    expect([...document.querySelectorAll('.card .mv-title')].map((t) => t.textContent)).toEqual(['Start']); // movable like every box
     fireEvent.click($('#btn-seed-random'));
     expect($('#seed-input').value).toMatch(/^\d{6}$/);
     fireEvent.change($('#seed-input'), { target: { value: ' 99 ' } });
@@ -277,6 +295,7 @@ describe('overlay', () => {
     play(game.sim, 8);
     refresh();
     expect($('.card h1').textContent).toBe('SITE LOST');
+    expect($('.card .mv-title').textContent).toBe('Results');
     fireEvent.click($('#btn-restart'));
     expect(game.sim.state.over).toBe(false);
     expect($('#overlay')).toBeNull();

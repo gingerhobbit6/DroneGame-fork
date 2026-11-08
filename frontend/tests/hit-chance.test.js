@@ -11,7 +11,7 @@ import { SITE_POS, u } from '../src/sim/units.js';
 import { setUp } from './support/scenarios.js';
 
 const sim = createSimulation();
-const { interceptor: sting, interceptor_p1: p1, interceptor_s: hunter, interceptor_l: merops, missile, laser } = STRUCTURES;
+const { interceptor: sting, interceptor_p1: p1, interceptor_s: hunter, interceptor_l: merops, missile, missile_l: nasams, missile_paladin: gun, laser } = STRUCTURES;
 const { fpv, fo, fw } = DRONES;
 const near = (x, y, tolerance = 0.03) => expect(Math.abs(x - y)).toBeLessThan(tolerance);
 
@@ -34,13 +34,22 @@ describe('the chance a shot hits', () => {
   });
 
   it('matches what was reported, where something was', () => {
-    near(hitChance(sting, { speed: 51, evade: 0.8 }, 5000), 0.68, 0.06); // the reported average, against a Shahed
+    near(hitChance(sting, { speed: 51, evade: 0.8 }, 5000), 0.68, 0.06); // one round on a Shahed: with the track, about three a kill in play, as reported
+    expect(hitChance(nasams, { speed: 50, evade: 0.6 }, 5000)).toBeGreaterThan(0.9); // the 94% given for NASAMS in Ukraine
+    expect(gun.damage).toBeGreaterThanOrEqual(DRONES.shahed136.hp); // Gepard crews down a Shahed with one brief burst
+    expect(hitChance(gun, { speed: 50, evade: 0.6 }, 1000)).toBeGreaterThan(0.75);
     near(hitChance(p1, fpv, 5000), 1 / 3, 0.06); // $3,000 a kill at $1,000 a drone
     expect(hitChance(hunter, { speed: 5, evade: 1 }, 0)).toBeGreaterThan(0.8); // the maker's 85%, on an easy target
   });
 
   it('falls against an evasive target', () => {
     expect(hitChance(sting, { ...fpv, evade: 0.3 }, 1000)).toBeLessThan(hitChance(sting, { ...fpv, evade: 0.9 }, 1000));
+  });
+
+  it('loses less to evasion the faster the round is than its target', () => {
+    const kept = (def) => hitChance(def, { speed: 50, evade: 0.6 }, 1000) / hitChance(def, { speed: 50, evade: 1 }, 1000);
+    near(kept(sting), 0.8, 0.001); // 80 m/s: it has to match every turn
+    expect(kept(nasams)).toBeGreaterThan(0.9); // 400 m/s: it barely notices
   });
 
   it('falls with range', () => {
@@ -142,7 +151,7 @@ describe('a launcher with rounds in the air', () => {
     sim.spawnDrone('fpv', 0.5, {});
     sim.spawnDrone('fpv', 2.5, {});
     let most = 0;
-    for (let i = 0; i < 4000 && most < 2; i++) {
+    for (let i = 0; i < 10000 && most < 2; i++) {
       sim.step();
       most = Math.max(most, new Set(sim.missiles.map((m) => m.target)).size);
     }

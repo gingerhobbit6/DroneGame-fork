@@ -30,10 +30,33 @@ describe('placing and selling', () => {
     expect(sim.canPlace(u(100), 0, STRUCTURES.radar)).toBe(false);
   });
 
+  it('refuses a spot that is not a number, for systems and people', () => {
+    fresh();
+    const before = sim.state.budget;
+    expect(sim.commands.place('radar', NaN, NaN)).toBe('Choose a spot on the map');
+    expect(sim.commands.placePeople(u(500), Infinity, 10, 'open')).toBe('Choose a spot on the map');
+    expect(sim.structures.length).toBe(0);
+    expect(sim.people.length).toBe(0);
+    expect(sim.state.budget).toBe(before);
+  });
+
   it('refuses what cannot be afforded', () => {
     fresh();
     sim.state.budget = 10;
     expect(sim.commands.place('laser', u(500), 0)).toMatch(/Not enough budget/);
+  });
+
+  it('stops at as many systems as a save can hold', () => {
+    fresh();
+    sim.state.budget = 1e9;
+    const free = [];
+    for (let r = 300; free.length < BUILD.maxSystems + 1 && r < BUILD.maxDist; r += 70) {
+      const n = Math.floor((2 * Math.PI * r) / 70); // evenly round the ring, so the last spot is as far from the first as any other
+      for (let k = 0, a = 0; k < n; a = (2 * Math.PI * ++k) / n) if (sim.canPlace(u(r * Math.cos(a)), u(r * Math.sin(a)), STRUCTURES.acoustic_l)) free.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    for (const [x, z] of free.slice(0, BUILD.maxSystems)) expect(sim.commands.place('acoustic_l', u(x), u(z))).toBeNull();
+    const [x, z] = free[BUILD.maxSystems];
+    expect(sim.commands.place('acoustic_l', u(x), u(z))).toMatch(/No more than 200 systems/);
   });
 
   it('refunds a sale, including the terminal, and ignores a click on nothing', () => {
@@ -196,7 +219,7 @@ describe('auto-start', () => {
     sim.state.warnedWire = true;
     sim.commands.setAutoStart(true);
     sim.commands.startWave();
-    for (let i = 0; i < 40 && sim.state.wave < 2; i++) sim.run(200);
+    for (let i = 0; i < 100 && sim.state.wave < 2; i++) sim.run(200);
     sim.commands.setAutoStart(false);
     expect(sim.state.wave).toBe(2);
   }, 30000);
@@ -210,16 +233,20 @@ describe('sandbox', () => {
     const budget = sim.state.budget;
     sim.commands.setSandboxLevel(4);
     sim.commands.launchSandboxWave();
-    sim.commands.launchSandboxAttack({ type: 'fw', count: 3, bearingDeg: 'rand', gap: 1 });
+    sim.commands.launchSandboxAttack({ type: 'fw', count: 8, bearingDeg: 'rand', gap: 0 }); // more than the missile's magazine, so some reach the site
     sim.commands.launchSandboxAttack({ type: 'fo', count: 2, bearingDeg: 90, gap: 0 });
-    sim.run(6000);
+    for (let n = 0; n < 30000 && (sim.drones.length || sim.state.sbQueue.length); n += 500) sim.run(500); // the fixed-wing come from the map edge
     expect(sim.state.health).toBe(100);
     expect(sim.structures.length).toBe(3);
     expect(sim.state.budget).toBe(budget);
     expect(sim.state.leaks).toBeGreaterThan(0);
     expect(sim.state.sbSpent).toBeGreaterThan(0);
+    sim.commands.launchSandboxAttack({ type: 'fo', count: 2, bearingDeg: 90, gap: 0 });
+    sim.run(40);
+    expect(sim.drones.length).toBeGreaterThan(0);
     sim.commands.clearSandboxDrones();
     expect(sim.drones.length).toBe(0);
+    expect(sim.ledger.flights.filter((f) => !f.end)).toHaveLength(0); // cleared away, so none stays airborne in the figures
     sim.commands.startWave();
     expect(sim.state.wave).toBe(0);
     sim.commands.exitSandbox();
@@ -271,6 +298,19 @@ describe('engagement authority', () => {
       sim.step();
       for (const r of sim.net.pendingRequests) expect(r.s.def.shotCost).toBeGreaterThanOrEqual(FUSION.authorityThreshold);
     }
+  }, 30000);
+
+  it('does not act on an approval once the launcher can no longer take the shot', () => {
+    FUSION.authority = 'all';
+    armed();
+    const req = pendingAfter(6000)[0], s = req.s;
+    const engaged = () => sim.bus.entries.filter((e) => e.type === 'task' && e.to === s.nodeId && e.msg.task.command?.request === 'Engage').length;
+    const before = engaged();
+    expect(s.def.magazine).toBeGreaterThan(0);
+    s.rounds = 0; // emptied while the operator decided
+    sim.commands.decide(req.id, true);
+    expect(engaged()).toBe(before);
+    expect(s.task).toBeNull();
   }, 30000);
 
   it('lets an unanswered request lapse', () => {

@@ -22,8 +22,12 @@ export const BEARINGS = 90;      // directions a prediction looks in
 const STEPS = 32;                // points checked along each direction
 
 const isRadio = (def) => def.kind === 'radar' || def.kind === 'rf' || def.kind === 'jammer';
-export const usesPath = (def) => def.fire !== 'guided';
-export const typicalAltitude = (droneDef) => (droneDef.alt[0] + droneDef.alt[1]) / 2;
+// A weapon whose round or interceptor flies to the target. It is cued over the terrain, so it needs no sight line and reaches as far
+// anywhere, but its round must be able to catch what it is sent at. Every other system works along a clear path from where it stands.
+export const flies = (def) => def.fire === 'guided';
+export const usesPath = (def) => !flies(def);
+// A drone's usual height: the middle of its height band, or the average of the middles of its bands if it flies more than one.
+export const typicalAltitude = (droneDef) => { const bands = droneDef.altModes ?? [droneDef.alt]; return bands.reduce((sum, [lo, hi]) => sum + (lo + hi) / 2, 0) / bands.length; };
 export const antennaHeight = (def) => def.mount ?? (def.fire === 'beam' ? 4 : 0);
 
 // How far this sensor reaches for this type of drone in an open field, before terrain and clutter. 0 means it can never detect it.
@@ -67,8 +71,9 @@ export function errorScale(def, range, reach) {
 }
 export const ERROR_AT_LIMIT = Math.hypot(1, EDGE_ERROR);
 
-// Is a low flyer at this spot lost in ground clutter, for a radar this far away?
-export const inClutter = (def, world, x, z, agl, horizontal) => !!def.lowAlt && agl < def.lowAlt && horizontal > def.lowRange * COVER_CLUTTER[world.coverAt(x, z)];
+// Is a low flyer at this spot lost in ground clutter, for a radar this far away? Only one moving slower than a radar's Doppler filter
+// can tell from the still ground (speed in m/s); hills, trees and buildings hide the rest through line of sight.
+export const inClutter = (def, world, x, z, agl, horizontal, speed) => !!def.lowAlt && speed < SENSING.clutterSpeed && agl < def.lowAlt && horizontal > def.lowRange * COVER_CLUTTER[world.coverAt(x, z)];
 
 const predictions = new WeakMap(); // world -> results, because the same spot is asked for by the ring, the panel and the cursor
 
@@ -106,7 +111,7 @@ function calculate(def, droneDef, world, x, z, alt, open) {
       if (Math.abs(b.x) > world.R || Math.abs(b.z) > world.R) { limited = true; break; }
       b.y = world.groundAt(b.x, b.z) + alt;
       const inBand = inCover(def, (i * 360) / BEARINGS, (Math.atan2(b.y - a.y, r) * 180) / Math.PI);
-      const ok = inBand && Math.hypot(r, b.y - a.y) <= reachOnPath(def, droneDef, world, a, b) * 1.001 && !inClutter(def, world, b.x, b.z, alt, r);
+      const ok = inBand && Math.hypot(r, b.y - a.y) <= reachOnPath(def, droneDef, world, a, b) * 1.001 && !inClutter(def, world, b.x, b.z, alt, r, droneDef.speed);
       total += r;
       if (ok) { seen += r; started = true; } else if (started || inBand) unbroken = false; // close in, over or under the beam is a gap, not the edge
       if (unbroken && ok) first[i] = r;

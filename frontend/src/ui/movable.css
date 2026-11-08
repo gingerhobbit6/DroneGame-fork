@@ -1,0 +1,19 @@
+/* Movable.jsx: the title bar every box is dragged by, and the box shrunk to it. */
+.mv-bar { display: flex; align-items: center; gap: 6px; margin: -6px -8px 4px -2px; min-height: 16px; cursor: grab; user-select: none; touch-action: none; }
+.mv-bar:active { cursor: grabbing; }
+.mv-title { flex: 1; min-width: 0; font-size: 10px; line-height: 16px; letter-spacing: 0.12em; text-transform: uppercase; color: #5f7391; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-min { flex: none; border: 0; background: transparent; padding: 0 6px; font-size: 14px; line-height: 16px; color: #7f93b2; }
+.mv-min::before { content: '\2013'; }
+.minimised .mv-min::before { content: '+'; }
+.mv-min:focus-visible { outline: 2px solid #4fc3f7; outline-offset: 1px; }
+.minimised > :not(.mv-bar) { display: none !important; }
+.minimised { height: auto !important; min-height: 0 !important; overflow: hidden !important; padding-top: 6px; padding-bottom: 4px; }
+.minimised > .mv-bar { margin-bottom: 0; }
+#dock > .mv-bar { margin: 0; padding: 4px 4px 0 10px; } /* the dock has no padding of its own */
+#dock.minimised { bottom: auto; }
+#minimap { height: auto; }
+#minimap > .mv-bar { margin: -2px -2px 2px 2px; }
+.card > .mv-bar { margin: -12px -16px 0; }
+.card.game-over > .mv-bar { grid-column: 1 / -1; }
+#overlay:has(> .minimised) { background: transparent; pointer-events: none; } /* a shrunk start or end card lets the map be used */
+#overlay > .minimised { pointer-events: auto; }

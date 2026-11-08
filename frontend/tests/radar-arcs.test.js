@@ -73,6 +73,14 @@ describe('which way a placed radar faces', () => {
     expect(fieldsFor('radar').map((f) => f.key)).not.toContain('panels');
     expect(fieldsFor('radar_giraffe').map((f) => f.key)).not.toContain('facing');
   });
+  it('reaches further through a narrower arc per panel, at no price, and only fixed panels have one', () => {
+    const narrow = unitDef('radar_s', { arc: 30, panels: 2 });
+    expect(coverArc(narrow)).toBe(60);
+    expect(narrow.range).toBe(Math.round(unitDef('radar_s').range * Math.SQRT2)); // a quarter of the arc: fourth root of 4
+    expect(unitCost('radar_s', { arc: 30 })).toBe(STRUCTURES.radar_s.cost);
+    expect(fieldsFor('radar').map((f) => f.key)).not.toContain('arc');
+    expect(fieldsFor('jammer').map((f) => f.key)).not.toContain('arc');
+  });
 });
 
 describe('detection and prediction', () => {
@@ -80,6 +88,15 @@ describe('detection and prediction', () => {
     const s = sim.addStructure('radar_s', u(800), 0); // faces east, away from the station
     expect(sim.net.pd(s, probeFrom(s, 90, 500), { pointing: false })).toBeGreaterThan(0.5);
     expect(sim.net.pd(s, probeFrom(s, 270, 500), { pointing: false })).toBe(0);
+  });
+  it('trades a narrower arc for reach: further in front, blind at the old edges', () => {
+    const s = sim.addStructure('radar_s', u(800), 0); // faces east
+    const far = probeFrom(s, 90, 1200), side = probeFrom(s, 130, 500);
+    const wide = { far: sim.net.pd(s, far, { pointing: false }), side: sim.net.pd(s, side, { pointing: false }) };
+    expect(sim.commands.configureUnit(s, 'arc', 30)).toBeNull();
+    expect(sim.net.pd(s, far, { pointing: false })).toBeGreaterThan(wide.far);
+    expect(wide.side).toBeGreaterThan(0.5);
+    expect(sim.net.pd(s, side, { pointing: false })).toBe(0);
   });
   it('misses a drone too high overhead, even for a radar that rotates', () => {
     const s = sim.addStructure('radar', u(800), 0);

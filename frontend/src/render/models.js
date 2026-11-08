@@ -1,88 +1,54 @@
-// 3D models for the systems and the drones.
+// 3D models for the systems and the drones: the shapes are in system-parts.js, sensor-models.js, effector-models.js and drone-models.js.
 
 import * as THREE from 'three';
 import { DRONES } from '../sim/config/index.js';
+import { buildDrone, kit } from './drone-models.js';
+import { MAX_K, systemMats } from './system-parts.js';
+import { modelMat, paintOf } from './paint.js';
+import { radar, rf, camera, acoustic, jammer } from './sensor-models.js';
+import { interceptor, missile, laser } from './effector-models.js';
+import { gun } from './gun-models.js';
+import { VEHICLES } from './vehicle-models.js';
+import { SYSTEM_UNIT_M } from '../sim/config/index.js';
 
+// A system's model: what it stands on, a head that the view turns to aim (or spins, for a rotating radar), and for a sensor
+// or jammer the mast or legs it is raised on. parts.raise(k) sets those for a system drawn k times larger than life. One riding
+// in a patrol (def.vehicle) sits on its vehicle instead, a sensor on a pole to its mast height.
+const SYSTEM_SHAPES = { radar, rf, camera, acoustic, jammer, interceptor, missile, gun, laser };
 export function buildModel(def) {
-  const g = new THREE.Group();
-  const parts = {};
-  const mat = (c, e = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0.3, emissive: c, emissiveIntensity: e });
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 0.6, 16), mat(0x3a4048));
-  base.position.y = 0.3; g.add(base);
-  const mast = (h) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, h, 10), mat(0x6b7480)); m.position.y = 0.6 + h / 2; g.add(m); };
-  const head = new THREE.Group(); parts.head = head; g.add(head);
-
-  switch (def.model || def.id) {
-    case 'radar': {
-      mast(3); head.position.y = 3.8;
-      head.add(new THREE.Mesh(new THREE.BoxGeometry(3, 1.2, 0.15), mat(def.color, 0.3)));
-      parts.spin = head; break;
-    }
-    case 'acoustic': { // a microphone ball on a short mast
-      mast(2); head.position.y = 2.8;
-      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 10), mat(def.color, 0.3)));
-      break;
-    }
-    case 'rf': {
-      mast(3); head.position.y = 3.8;
-      for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * Math.PI * 2;
-        const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.4, 0.15), mat(def.color, 0.3));
-        p.position.set(Math.cos(a) * 0.7, 0, Math.sin(a) * 0.7); p.rotation.y = -a; head.add(p);
-      }
-      parts.spin = head; break;
-    }
-    case 'camera': {
-      mast(2.6); head.position.y = 3.5;
-      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), mat(def.color, 0.3)));
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 10).rotateX(Math.PI / 2), mat(0x111111));
-      lens.position.z = 0.7; head.add(lens);
-      parts.spin = head; break;
-    }
-    case 'radar_s': {
-      mast(2); head.position.y = 2.8;
-      head.add(new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 0.15), mat(def.color, 0.3)));
-      parts.spin = head; break;
-    }
-    case 'jammer': {
-      mast(3);
-      head.position.y = 3.8;
-      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), mat(def.color, 0.5)));
-      for (let i = 0; i < 3; i++) {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.6, 0.1), mat(def.color, 0.3));
-        const a = (i / 3) * Math.PI * 2;
-        p.position.set(Math.cos(a) * 0.7, 0.5, Math.sin(a) * 0.7);
-        p.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4);
-        head.add(p);
-      }
-      parts.spin = head; break;
-    }
-    case 'interceptor': { // a rack of launch tubes
-      head.position.y = 1.0;
-      for (let i = 0; i < 4; i++) {
-        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.6, 8).rotateX(Math.PI / 2), mat(def.color, 0.25));
-        tube.position.set((i % 2) * 0.6 - 0.3, 0.5 + Math.floor(i / 2) * 0.6, 0.2); tube.rotation.x = -0.6; head.add(tube);
-      }
-      break;
-    }
-    case 'missile': {
-      head.position.y = 1.2;
-      const l = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 2.8), mat(def.color, 0.15));
-      l.position.set(0, 0.6, 0.3); l.rotation.x = -0.7; head.add(l); break;
-    }
-    case 'laser': {
-      mast(1.4); head.position.y = 2.4;
-      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), mat(def.color, 0.35)));
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.8, 10).rotateX(Math.PI / 2), mat(0xffffff, 0.6));
-      lens.position.z = 0.7; head.add(lens); break;
-    }
+  const base = kit(), head = kit(), riser = kit(), mats = systemMats(def), carrier = VEHICLES[def.vehicle];
+  const own = carrier ? [kit(), kit()] : [base, riser]; // a mounted system's own stand is not drawn
+  let { headY = 0, headZ = 0, spin = false, rise } = SYSTEM_SHAPES[def.kind](own[0], head, def, own[1]);
+  if (carrier) {
+    ({ roof: headY, z: headZ } = carrier(base));
+    if (rise) { riser.cyl('metal', 0.08, 1, 0, 0.5, 0, { r2: 0.06 }); rise = { y0: headY, height: def.mount / SYSTEM_UNIT_M - headY, min: 0.3 }; }
   }
-  return { group: g, parts };
+  const g = base.finish(mats), h = head.finish(mats), r = riser.finish(mats);
+  h.position.set(0, headY, headZ); r.position.set(0, rise?.y0 ?? 0, headZ);
+  g.add(h, r);
+  const raise = (k) => {
+    if (!rise) return;
+    const m = Math.max(rise.min, rise.height / Math.sqrt(k));
+    r.scale.y = m; h.position.y = rise.y0 + m;
+  };
+  raise(MAX_K);
+  g.add(foot(g, def.color));
+  g.traverse((o) => { if (o.isMesh) o.castShadow = !o.material.transparent; }); // a see-through part would cast a solid shadow
+  return { group: g, parts: { head: h, spin: spin ? h : null, raise } };
 }
 
-const rotorMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
-const darkMat = new THREE.MeshStandardMaterial({ color: 0x333840, roughness: 0.7 });
-const unseenMat = new THREE.MeshBasicMaterial({ color: 0x8a94a3, transparent: true, opacity: 0.4, depthWrite: false });
+// A thin ring in the system's map colour round the foot of its model, so its kind still shows now the model wears real paint.
+function foot(g, color) {
+  const box = new THREE.Box3().setFromObject(g), r = Math.max(0.5, Math.hypot(Math.max(-box.min.x, box.max.x), Math.max(-box.min.z, box.max.z))) + 0.1;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.1, r, 48).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+  ring.position.y = 0.04; ring.name = 'foot';
+  return ring;
+}
+
+const rotorMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide });
+let darkMat = null; // made with the first drone, after game-view.js has made the models' reflection
+const unseenMat = new THREE.MeshBasicMaterial({ color: 0x8a94a3, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
 
 // One shared model per drone type, plus a grey copy for drones that no sensor has (shown when the truth overlay is on).
 const droneTemplates = {};
@@ -90,26 +56,10 @@ export function droneTemplate(type, unseen) {
   const key = type + (unseen ? ':unseen' : '');
   if (droneTemplates[key]) return droneTemplates[key];
   const def = DRONES[type];
-  const mat = unseen ? unseenMat : new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.4, roughness: 0.5 });
-  const dark = unseen ? unseenMat : darkMat;
-  const spin = unseen ? unseenMat : rotorMat;
-  const g = new THREE.Group();
-  const box = (w, h, d, x = 0, y = 0, z = 0, m = mat) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    mesh.position.set(x, y, z); g.add(mesh); return mesh;
-  };
-  const rotor = (x, y, z, len, axis = 'y') => {
-    const r = box(len, 0.04, 0.14, x, y, z, spin);
-    r.name = 'rotor'; r.userData.axis = axis;
-  };
-  const quadRotors = (arm, len) => { for (const sx of [-1, 1]) for (const sz of [-1, 1]) rotor(sx * arm, 0.25, sz * arm, len); };
-  if (def.model === 'fw') {
-    box(0.3, 0.3, 2.4); box(3.4, 0.06, 0.55, 0, 0.05, 0.15); box(1.1, 0.05, 0.35, 0, 0.1, -1.0);
-    box(0.05, 0.45, 0.35, 0, 0.3, -1.0); rotor(0, 0, 1.25, 0.9, 'z');
-  } else { // quadcopter airframe, shared by the FPV and FO strikes
-    box(0.6, 0.25, 1.0); quadRotors(0.6, 0.7);
-    if (def.fibre) box(0.25, 0.25, 0.4, 0, -0.05, -0.55, dark); // fibre spool
-  }
+  darkMat ??= modelMat(0x26282c, 0.6, 0.2); // carbon frames, motors and blades
+  const body = unseen ? unseenMat : modelMat(paintOf(def), 0.5);
+  const g = buildDrone(def, unseen ? { body, dark: body, spin: body } : { body, dark: darkMat, spin: rotorMat });
+  if (!unseen) g.traverse((o) => { if (o.isMesh) o.castShadow = !o.material.transparent; });
   droneTemplates[key] = g;
   return g;
 }

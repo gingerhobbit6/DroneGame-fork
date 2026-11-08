@@ -3,6 +3,7 @@
 import { BUILD, DRONES, DRONE_CLASSES, WORLD, exportFigures } from '../sim/config/index.js';
 import { coverKey } from '../sim/sensor-model.js';
 import { terrainState } from '../sim/terrain.js';
+import { typicalAltitude } from '../sim/site-range.js';
 import { inZone } from '../zone.js';
 
 const caches = new WeakMap(); // sim -> drone type -> the last grid worked out
@@ -11,7 +12,7 @@ const caches = new WeakMap(); // sim -> drone type -> the last grid worked out
 export function coverageGrid(sim, threat) {
   const { net } = sim;
   const def = DRONES[threat];
-  const agl = (def.alt[0] + def.alt[1]) / 2;
+  const agl = typicalAltitude(def);
   // everything the answer depends on: node ids repeat after a reload, so they cannot tell two laydowns apart
   const key = [threat, sim.state.terrainSeed, JSON.stringify(exportFigures()), ...[...net.nodes.values()].map((n) => `${n.nodeId}:${n.pos.x}:${n.pos.z}:${n.def.range}:${n.def.mount}:${n.def.fov}:${coverKey(n.def)}`)].join('|');
   if (!caches.has(sim)) caches.set(sim, new Map());
@@ -28,6 +29,14 @@ export function coverageGrid(sim, threat) {
 // The share of the zone at least one sensor can see (0 to 1). With no zone drawn, it scores everything inside the build limit.
 export function zoneShare(sim, threat, zone) {
   const g = coverageGrid(sim, threat), mpu = WORLD.metresPerUnit;
+  // panels ask on every refresh, and the scan tests every cell against the outline, so it is kept with the grid it was made from
+  const area = zone && zone.closed ? JSON.stringify(zone.points) : `within ${BUILD.maxDist}`;
+  g.shares ??= new Map();
+  if (!g.shares.has(area)) g.shares.set(area, scanShare(g, zone, mpu));
+  return g.shares.get(area);
+}
+
+function scanShare(g, zone, mpu) {
   const inside = zone && zone.closed ? (xm, zm) => inZone(zone.points, xm / mpu, zm / mpu) : (xm, zm) => Math.hypot(xm, zm) <= BUILD.maxDist;
   let cells = 0, seen = 0;
   for (let j = 0; j < g.n; j++) for (let i = 0; i < g.n; i++) {
@@ -41,6 +50,6 @@ export function zoneShare(sim, threat, zone) {
 // Each of the four types, with its height and how much of the zone is seen, with the weakest first.
 export function zoneScores(sim, zone) {
   return DRONE_CLASSES
-    .map((def) => ({ id: def.id, name: def.name, height: Math.round((def.alt[0] + def.alt[1]) / 2), share: zoneShare(sim, def.id, zone) }))
+    .map((def) => ({ id: def.id, name: def.name, height: Math.round(typicalAltitude(def)), share: zoneShare(sim, def.id, zone) }))
     .sort((a, b) => a.share - b.share);
 }

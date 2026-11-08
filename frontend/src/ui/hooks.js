@@ -63,7 +63,17 @@ export function useArmed(ms = 3000) {
 }
 
 export const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-export const usd = (v) => '$' + Math.round(v).toLocaleString('en-US');
+export const km = (metres, trim = false) => `${(metres / 1000).toFixed(1).replace(trim ? /\.0$/ : '', '')} km`; // trim: 3 km, not 3.0 km
+
+// Run one request and show its outcome in a note, so a refusal or a dead server is never silent. done: the note, or one made from the result.
+export const attemptWith = (setNote, reload) => async (fn, done) => {
+  try {
+    const result = await fn();
+    setNote(typeof done === 'function' ? done(result) : done);
+    await reload();
+    return true;
+  } catch (e) { setNote(e.message); return false; }
+};
 export const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 // Offer a file to the player to save.

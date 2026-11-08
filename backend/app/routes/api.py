@@ -47,11 +47,6 @@ FigureSets = Annotated[FigureSetService, Depends(figure_sets)]
 NO_CONTENT = status.HTTP_204_NO_CONTENT
 
 
-@router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
 @router.get("/laydowns")
 def list_laydowns(service: Laydowns) -> list[LaydownSummary]:
     return service.list()

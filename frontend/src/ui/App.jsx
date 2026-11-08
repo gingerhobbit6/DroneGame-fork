@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { GameContext, useGame, useTick } from './hooks.js';
 import { useHotkeys } from './useHotkeys.js';
+import { EyeBar } from './EyeBar.jsx';
 import { Hud } from './Hud.jsx';
 import { Toolbar } from './Toolbar.jsx';
 import { ControlPanel } from './ControlPanel.jsx';
@@ -47,7 +48,7 @@ function Screen() {
     <>
       <GameCanvas />
       <div id="left-col">
-        <Hud />
+        <Hud openDock={openDock} />
         <Toolbar />
       </div>
       <Minimap />
@@ -58,6 +59,7 @@ function Screen() {
       <WizardButton />
       <Dock open={dockOpen} onClose={() => setDockOpen(false)} tab={dockTab} onTab={setDockTab} />
       <UnitPanel />
+      <EyeBar />
       <ToolPicker />
       <Sandbox />
       <Legend />

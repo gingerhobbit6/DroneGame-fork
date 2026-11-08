@@ -1,8 +1,9 @@
 // The wire diagram. Click a system to configure it, click Starlink or Cellular to wire it, click a wire to tap it.
 
+import { pounds } from '../../sim/economy.js';
 import { useEffect, useRef, useState } from 'react';
 import { COMMS } from '../../sim/config/index.js';
-import { useAnimation, useGame, usd, useTick } from '../hooks.js';
+import { useAnimation, useGame, useTick } from '../hooks.js';
 import { BAD_COLOUR, createNetworkCanvas, nodeList } from './network-canvas.js';
 import { NetworkSide } from './NetworkSide.jsx';
 
@@ -67,7 +68,7 @@ export function NetworkTab({ active }) {
         <button id="net-step" title="Run the simulation until the next packet is sent, then pause (on the selected wire, if one is selected)" onClick={stepToPacket}>Step to next packet</button>
         <label className="muted">Pulse speed <input type="range" id="net-pace" min="0.3" max="3" step="0.1" value={pace} onChange={(e) => setPace(Number(e.target.value))} /></label>
         <span id="net-cost" className="muted">
-          Terminals: {s} Starlink + {c} cellular = <b>{usd(s * COMMS.starlink.cost + c * COMMS.cellular.cost)}</b>
+          Terminals: {s} Starlink + {c} cellular = <b>{pounds(s * COMMS.starlink.cost + c * COMMS.cellular.cost)}</b>
           {loose > 0 && <> · <span style={{ color: BAD_COLOUR }}>{loose} system{loose > 1 ? 's' : ''} unwired</span></>}
         </span>
       </div>

@@ -3,8 +3,8 @@
 import { GAME_VERSION } from './config/index.js';
 import { enemyCost } from './economy.js';
 
-// A run lost during a wave did not complete that wave.
-const wavesCompleted = ({ wave, waveActive, over }) => (waveActive || over ? Math.max(wave - 1, 0) : wave);
+// A run lost or ended during a wave did not complete that wave; one ended between waves completed the last.
+export const wavesCompleted = ({ wave, waveActive, over, ended }) => (waveActive || (over && !ended) ? Math.max(wave - 1, 0) : wave);
 
 // The last entry marks where the run stopped, so replaying the log reaches the same digest.
 export function runRecord(w, log, steps, digest) {

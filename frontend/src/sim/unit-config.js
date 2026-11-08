@@ -2,14 +2,14 @@
 // Every field changes the simulation, and every gain has a cost: price, older data, a louder signature or more false alarms.
 // The limits, prices and threshold factors are assumptions: tune them here. Saved values are untrusted, so only keys in this table are read.
 
-import { STRUCTURES } from './config/index.js';
+import { STRUCTURES, TX_POWER } from './config/index.js';
 import { BANDS, CLUTTER, arcsText, bandOf, bandRange, bandSharpness, beamGain, lowestEdge, parseArcs } from './sensor-model.js';
 import { CHANNELS, PIXELS } from './camera-model.js';
 import { weatherRange } from './conditions.js';
 import { JAM_BANDS, LIBRARIES, covers, parseBands } from './rf-model.js';
 
 const each = (ids, limits) => Object.fromEntries(ids.map((id) => [id, limits]));
-const RADARS = ['radar_s', 'radar_a400', 'radar', 'radar_a800', 'radar_giraffe', 'radar_l'], RFS = ['rf_s', 'rf', 'rf_elysion', 'rf_l'], CAMERAS = ['camera_s', 'camera', 'camera_l'], JAMMERS = ['jammer_s', 'jammer', 'jammer_auds', 'jammer_l'], ACOUSTICS = ['acoustic_s', 'acoustic', 'acoustic_l'];
+const RADARS = ['radar_s', 'radar_a400', 'radar', 'radar_a800', 'radar_giraffe', 'radar_l'], RFS = ['rf_s', 'rf', 'rf_elysion', 'rf_airfence', 'rf_l'], CAMERAS = ['camera_s', 'camera', 'camera_l'], JAMMERS = ['jammer_s', 'jammer', 'jammer_neo', 'jammer_jupiter', 'jammer_auds', 'jammer_l', 'jammer_sf', 'jammer_mk4', 'jammer_skywiper', 'jammer_kvertus', 'jammer_dgmk3', 'jammer_dgtac'], ACOUSTICS = ['acoustic_s', 'acoustic', 'acoustic_l'];
 const PANELLED = { radar_s: [1, 3], radar_l: [1, 3], radar_a800: [1, 4], radar_a400: [1, 4] }; // fixed-panel radars: up to all round
 const MEDIUM_UP = RADARS.filter((id) => STRUCTURES[id].size !== 'S'); // 2D is offered on Medium and Large radars
 const TOP_EDGE = Object.fromEntries(RADARS.filter((id) => STRUCTURES[id].elevation + lowestEdge > 15).map((id) => [id, [15, STRUCTURES[id].elevation + lowestEdge]])); // a narrow beam keeps its top
@@ -26,21 +26,33 @@ const SECTOR = { arc: 60, gain: 10, price: 0.2 };
 // A jammer's receiver costs what a Small RF detector does with the same library, and reactive jamming, sending only while a link it
 // follows is up, is this much quieter to emitter-seeking drones. Both assumptions.
 const RECEIVER_LIKE = 'rf_s', REACTIVE_QUIET = 0.5;
+const TECHNIQUE_PRICE = 0.25; // share of a jammer's price added for spoofing or taking drones over: an assumption
+const receiverPrice = (v) => (v === 'off' ? 0 : STRUCTURES[RECEIVER_LIKE].cost * (1 + LIBRARIES[v].price));
 const choicesOf = (table) => Object.fromEntries(Object.entries(table).map(([k, v]) => [k, v.label]));
 const MAST_PRICE = 0.015, RELOAD_PRICE = 0.1; // share of the system's price, per metre and per second
 const THRESHOLD = { low: { range: 1.1, falseAlarm: 2 }, high: { range: 0.9, falseAlarm: 0.5 } };
+// Transmit power in watts, from a tenth of the rated output up to it, in steps of about a twentieth: 1, 2 or 5 of a power of ten.
+const watts = (id) => TX_POWER[id].watts;
+function wattStep(id) {
+  const s = watts(id) / 20, p = 10 ** Math.floor(Math.log10(s)), m = s / p;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+}
+const POWERED = [...RADARS, ...JAMMERS];
+const wattLimits = (id) => [Math.max(wattStep(id), Math.round(watts(id) / 10 / wattStep(id)) * wattStep(id)), watts(id)];
 
 export const UNIT_FIELDS = [
   {
-    key: 'mount', label: 'Mast height', unit: 'm', step: 1, base: (c) => c.mount, direct: 'mount',
-    limits: { radar_s: [5, 25], radar: [5, 35], radar_a800: [5, 35], radar_a400: [5, 35], radar_giraffe: [5, 20], radar_l: [10, 40], rf_s: [2, 10], rf: [2, 15], rf_elysion: [2, 15], rf_l: [2, 20], camera_s: [5, 20], camera: [5, 25], camera_l: [5, 30], ...each(JAMMERS, [2, 20]), acoustic_s: [2, 6], acoustic: [2, 6], acoustic_l: [2, 10] },
+    key: 'mount', label: 'Mast height', unit: 'm', step: 0.5, base: (c) => c.mount, direct: 'mount',
+    limits: { radar_s: [5, 25], radar: [5, 35], radar_a800: [5, 35], radar_a400: [5, 35], radar_giraffe: [2, 20], radar_l: [10, 40], rf_s: [1, 10], rf: [2, 15], rf_elysion: [2, 15], rf_l: [2, 20], camera_s: [5, 20], camera: [5, 25], camera_l: [5, 30], ...each(JAMMERS, [1, 20]), acoustic_s: [2, 6], acoustic: [2, 6], acoustic_l: [2, 10] },
     price: (v, c) => (v - c.mount) * MAST_PRICE * c.cost,
     help: 'Higher sees over more trees and terrain, at a price.',
   },
   {
-    key: 'power', label: 'Transmit power', unit: '%', step: 5, base: () => 100, limits: { ...each(RADARS, [10, 100]), ...each(JAMMERS, [10, 100]) },
-    range: (v, c) => (c.kind === 'radar' ? Math.pow(v / 100, 0.25) : Math.sqrt(v / 100)), signature: (v) => v / 100,
+    key: 'watts', label: 'Transmit power', unit: 'W', step: Object.fromEntries(POWERED.map((id) => [id, wattStep(id)])), base: (c) => watts(c.id),
+    limits: Object.fromEntries(POWERED.map((id) => [id, wattLimits(id)])),
+    range: (v, c) => (c.kind === 'radar' ? Math.pow(v / watts(c.id), 0.25) : Math.sqrt(v / watts(c.id))), signature: (v, c) => v / watts(c.id),
     help: 'Less power means less range, and is quieter to emitter-seeking drones.',
+    note: (id) => `Rated ${watts(id)} W: ${TX_POWER[id].confidence === 'assumption' ? 'an assumption, none published' : `${TX_POWER[id].confidence}, ${TX_POWER[id].basis}`}.`,
   },
   {
     // The tracker stretches its timeouts by each sensor's update interval (tracker.js), so a slow scan holds its tracks.
@@ -52,6 +64,13 @@ export const UNIT_FIELDS = [
     key: 'panels', label: 'Panels', unit: '', step: 1, base: () => 1, direct: 'panels', limits: PANELLED,
     price: (v, c) => (v - 1) * c.cost,
     help: 'Each panel adds its arc beside the others, at the price of another radar head.',
+  },
+  {
+    // A panel steers its beam, so a narrower arc spends the same scan on less sky: range goes with the fourth root (search radar
+    // equation). A rotating radar's dish turns all round whatever it is told, so only fixed panels have this.
+    key: 'arc', label: 'Arc per panel', unit: '°', step: 5, base: (c) => c.arc, direct: 'arc', limits: Object.fromEntries(Object.keys(PANELLED).map((id) => [id, [30, STRUCTURES[id].arc]])),
+    range: (v, c) => Math.pow(c.arc / v, 0.25),
+    help: 'Narrower searches less, so it reaches further: a quarter of the arc gains about 40%. It sees nothing outside it.',
   },
   {
     // No standard value: left unset, it faces away from what is being defended, wherever that is (laydown.js).
@@ -69,15 +88,17 @@ export const UNIT_FIELDS = [
     help: 'A sector antenna reaches about three times as far, but only through its arc, which faces away from what you defend unless turned.',
   },
   {
-    key: 'receiver', label: 'Receiver', base: () => 'off', limits: each(JAMMERS, true),
+    key: 'receiver', label: 'Receiver', base: (c) => c.receiver ?? 'off', limits: each(JAMMERS, true), // some come with one
     choices: { off: 'None', ...Object.fromEntries(Object.entries(LIBRARIES).map(([k, v]) => [k, `Fitted, ${v.name} library`])) },
-    price: (v) => (v === 'off' ? 0 : STRUCTURES[RECEIVER_LIKE].cost * (1 + LIBRARIES[v].price)),
+    price: (v, c) => receiverPrice(v) - receiverPrice(c.receiver ?? 'off'),
     help: 'Hears drones on the bands it is fitted for, as far as it can jam them, but not through its own barrage. Needed to jam reactively or switch itself on.',
   },
   {
-    key: 'technique', label: 'Technique', base: () => 'barrage', direct: 'technique', limits: each(JAMMERS, true), choices: { barrage: 'Barrage', reactive: 'Reactive' },
-    signature: (v) => (v === 'reactive' ? REACTIVE_QUIET : 1),
-    help: 'Barrage fills its bands for every drone. Reactive follows only the links its receiver hears and its library knows: it breaks them twice as fast at half the noise, and leaves GNSS and every other drone alone.',
+    key: 'technique', label: 'Technique', base: () => 'barrage', direct: 'technique', limits: each(JAMMERS, true),
+    choices: { barrage: 'Barrage', reactive: 'Reactive', spoof: 'GNSS spoofing', takeover: 'Take over commercial drones' },
+    signature: (v) => (v === 'barrage' ? 1 : REACTIVE_QUIET),
+    price: (v, c) => (v === 'spoof' || v === 'takeover' ? TECHNIQUE_PRICE * c.cost : 0),
+    help: 'Barrage fills its bands for every drone. Reactive follows only the links its receiver hears and its library knows: it breaks them twice as fast at half the noise, and leaves GNSS and every other drone alone. GNSS spoofing, on its GNSS band, feeds false positions that turn a navigating drone off course, and jams nothing else. Taking over sends a commercial drone its maker’s commands and lands it whole, if its receiver hears it and its library knows the link.',
   },
   {
     key: 'trigger', label: 'Switched on by', base: () => 'track', direct: 'trigger', limits: each(JAMMERS, true),
@@ -170,12 +191,12 @@ export const UNIT_FIELDS = [
   {
     key: 'pixels', label: 'Resolution', base: (c) => c.pixels, limits: each(CAMERAS, true), choices: choicesOf(PIXELS),
     range: (v, c) => PIXELS[v].px / PIXELS[c.pixels].px, price: (v, c) => Math.log2(PIXELS[v].px / PIXELS[c.pixels].px) * RES_PRICE * c.cost,
-    help: 'More pixels put more on the drone, so it is seen, recognised and identified further away, at a price.',
+    help: 'More pixels put more on the drone, so it is seen, recognised and identified further away, at a price. On thermal, not past what the lens can resolve.',
   },
   {
     key: 'fnumber', label: 'Lens F-number', step: 0.1, base: (c) => c.fnumber, direct: 'fnumber', limits: { camera_s: [1, 2], camera: [1.4, 4], camera_l: [4, 5.6] },
     price: (v, c) => ((c.fnumber / v) ** 2 - 1) * LENS_PRICE * c.cost,
-    help: 'A faster lens, with a lower number, gathers more light, so it keeps more of its range at dusk, at night and in haze, at a price.',
+    help: 'A faster lens, with a lower number, gathers more light, so it keeps more of its range at dusk, at night and in haze, and on thermal it blurs less, at a price.',
   },
   {
     key: 'rangefinder', label: 'Laser rangefinder', base: (c) => c.rangefinder ?? 'no', direct: 'rangefinder', limits: each(CAMERAS, true), choices: { no: 'No', yes: 'Yes' },
@@ -200,7 +221,7 @@ export const UNIT_FIELDS = [
     help: 'Longer holds a track for more looks, and leaves other tracks waiting.',
   },
   {
-    key: 'reload', label: 'Time between shots', unit: 's', step: 0.5, base: (c) => c.cooldown, direct: 'cooldown', limits: { interceptor_s: [2, 8], interceptor: [1.5, 6], interceptor_p1: [1.5, 6], interceptor_l: [1.5, 6], missile_rr: [2, 8], missile_hvm: [2, 8], missile_paladin: [0.5, 3], missile_skysabre: [3, 10], missile_s: [1, 4], missile: [2, 8], missile_l: [3, 10] },
+    key: 'reload', label: 'Time between shots', unit: 's', step: 0.5, base: (c) => c.cooldown, direct: 'cooldown', limits: { interceptor_s: [2, 8], interceptor: [1.5, 6], interceptor_p1: [1.5, 6], interceptor_l: [1.5, 6], missile_rr: [2, 8], missile_hvm: [2, 8], missile_paladin: [0.5, 3], gun_hmg: [0.5, 4], gun_s: [0.5, 4], gun_50: [0.5, 4], gun_l: [0.5, 3], gun_skyranger: [0.5, 3], gun_gepard: [0.5, 3], missile_skysabre: [3, 10], missile_s: [1, 4], missile: [2, 8], missile_l: [3, 10] },
     price: (v, c) => (c.cooldown - v) * RELOAD_PRICE * c.cost,
     help: 'Faster launchers cost more.',
   },
@@ -218,8 +239,8 @@ function cleanValue(field, id, value) {
   if (field.arcs || field.bands) return field.parse(value, id);
   if (field.choices) return Object.hasOwn(field.choices, value) ? value : undefined;
   if (!Number.isFinite(value)) return undefined;
-  const [min, max] = field.limits[id];
-  return Math.min(max, Math.max(min, Number((min + Math.round((value - min) / field.step) * field.step).toFixed(2))));
+  const [min, max] = field.limits[id], step = stepOf(field, id);
+  return Math.min(max, Math.max(min, Number((min + Math.round((value - min) / step) * step).toFixed(2))));
 }
 
 // Only what differs from the catalogue is kept, so a unit with no changes saves and plays exactly as before.
@@ -232,8 +253,13 @@ export function setSetting(settings, field, id, value) {
   return true;
 }
 
+// A field's step: one for every system, or each its own, as transmit power in watts is.
+export const stepOf = (field, id) => (typeof field.step === 'object' ? field.step[id] : field.step);
+
 export function cleanSettings(id, saved) {
   const settings = {};
+  // saved before transmit power was in watts: a share of the rated output, in per cent
+  if (saved && typeof saved === 'object' && Number.isFinite(saved.power) && !Object.hasOwn(saved, 'watts') && TX_POWER[id]) saved = { ...saved, watts: (saved.power / 100) * watts(id) };
   if (saved && typeof saved === 'object') for (const f of fieldsFor(id)) if (Object.hasOwn(saved, f.key)) setSetting(settings, f, id, saved[f.key]);
   return settings;
 }
@@ -273,7 +299,7 @@ export function unitDef(id, settings = {}) {
   }
   if (c.kind === 'jammer') { // only fitted bands can be jammed, a sector antenna covers its arc only, and a receiver carries a library
     Object.defineProperty(def, 'fitted', { get: () => settings.fitted ?? JAM_BANDS });
-    Object.defineProperty(def, 'library', { get: () => settings.receiver }); // none fitted is the standard, so never saved
+    Object.defineProperty(def, 'library', { get: () => { const v = settings.receiver ?? c.receiver; return v === 'off' ? undefined : v; } }); // off is saved only on one that comes with a receiver
     Object.defineProperty(def, 'bands', { get: () => c.bands.filter((b) => def.fitted.includes(b)) });
     Object.defineProperty(def, 'arc', { get: () => (def.antenna === 'sector' ? SECTOR.arc : undefined) });
   }

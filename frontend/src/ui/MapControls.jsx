@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { terrainState } from '../sim/terrain.js';
 import { STRUCTURES, WORLD } from '../sim/config/index.js';
-import { gridRef, isEstonian, onGrid, parsePosition } from '../sim/grids.js';
+import { gridRef, isEstonian, mgrsAt, onGrid, parsePosition } from '../sim/grids.js';
 import { parseWorldId } from '../sim/world-pack.js';
 import { contourStep, heightRange } from '../render/topo.js';
 import { view } from '../render/view.js';
@@ -14,6 +14,7 @@ import { useArmed, useGame, useTick } from './hooks.js';
 import { accuracyText, locateMe } from './locate.js';
 import { ZonePanel } from './ZonePanel.jsx';
 import './map-panel.css';
+import { Movable } from './Movable.jsx';
 
 const REAL_MAPS = [
   ['os', 'OS map', 'Roads, woods and towns'],
@@ -33,8 +34,15 @@ const GENERATED_MAPS = [
 const OVERLAYS = [
   ['mapRoads', 'Roads and names', 'Also what makes satellite a hybrid view'],
   ['mapContours', 'Contours (C)', 'Height lines from this world\'s own ground'],
-  ['mapGrid', 'National grid (G)', 'Labelled 1 km squares'],
+  ['scenery', 'Trees and buildings', 'The 3D trees and buildings. Hide them to place against the map picture: they still block sight lines'],
 ];
+// The grids a real map can show. MGRS covers the world, so every map has it as well as its own national grid.
+const gridChoices = (estonian) => [
+  ['national', `${estonian ? 'L-EST97' : 'OS'} grid`, `Labelled 1 km squares of the ${estonian ? 'Estonian' : 'British'} national grid`],
+  ['mgrs', 'MGRS grid', 'Labelled 1 km squares of the Military Grid Reference System, which covers the world'],
+];
+// The G key steps through them, then turns the grid off.
+export const nextGrid = (grid) => (grid === 'national' ? 'mgrs' : grid === 'mgrs' ? false : 'national');
 const CLOSE_ZOOM = 200; // how far the camera sits, at most, after centring on the player: about 4 km of ground in view
 
 const usable = (id, source) => {
@@ -56,6 +64,8 @@ function Credits({ geo, source, here }) {
     view.baseMap === 'satellite' || view.baseMap === 'hybrid' ? credits.satellite : null,
     view.baseMap !== 'satellite' ? credits.osmap : null,
     geo.tier === 'lidar' ? credits.lidar : null,
+    credits.heights, // heights from another source, which its licence asks to credit whatever is shown
+    credits.names, // names from another source past a border, likewise
   ];
   return createPortal( // always on screen, outside any panel
     <div id="map-credit" className="muted map-note">
@@ -111,7 +121,7 @@ export function MapControls() {
   useEffect(() => {
     let live = true;
     setPictures({});
-    gameView?.mapPreviews?.(maps.map(([id]) => id)).then((found) => { if (live) setPictures(found); });
+    gameView?.mapPreviews?.(maps.map(([id]) => id)).then((found) => { if (live) setPictures(found); }).catch(() => {}); // no pictures: the switcher still works by name
     return () => { live = false; };
   }, [gameView, seed]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -120,7 +130,8 @@ export function MapControls() {
   const toScene = (e, n) => ({ x: (e - geo.e0) / m, z: (geo.n0 - n) / m });
   const inWorld = ({ x, z }) => Math.abs(x) * m <= data.R && Math.abs(z) * m <= data.R;
   const cursor = geo ? game.cursor() : null;
-  const here = cursor && inWorld(cursor) ? `${gridRef(geo.e0 + cursor.x * m, geo.n0 - cursor.z * m)}, ${Math.round(geo.H0 + data.groundAt(cursor.x * m, cursor.z * m))} m` : '';
+  const refAt = view.mapGrid === 'mgrs' ? mgrsAt : gridRef; // the cursor reads out on the grid that is showing
+  const here = cursor && inWorld(cursor) ? `${refAt(geo.e0 + cursor.x * m, geo.n0 - cursor.z * m)}, ${Math.round(geo.H0 + data.groundAt(cursor.x * m, cursor.z * m))} m` : '';
   const say = (text, elsewhere = null) => { setNote(text); setOffer(elsewhere); };
 
   const centreOnMe = async () => {
@@ -141,7 +152,7 @@ export function MapControls() {
         view.me = null;
         const text = geo ? `outside this world` : 'and this is generated ground';
         if (onGrid(fix.e, fix.n)) say(`You are at ${where}, ${text}.`, { e: fix.e, n: fix.n, note: `Your location, ${quality}.` });
-        else say('You appear to be outside Great Britain, which these maps cover.');
+        else say('You appear to be outside Great Britain and Estonia, which these maps cover.');
       }
     } catch (problem) { say(problem.message); }
     setLocating(false);
@@ -153,7 +164,7 @@ export function MapControls() {
     const at = toScene(point.e, point.n), tool = game.getTool();
     if (!inWorld(at)) { say('That grid reference is outside this world.', point); return; }
     if (STRUCTURES[tool]) {
-      const problem = game.commands.place(tool, at.x, at.z);
+      const problem = game.placeSystem(at.x, at.z); // with its chosen settings and vehicle, as a click would
       say(problem || `Placed at ${gridRef(point.e, point.n)}.`);
     } else {
       gameView?.centreOn(at.x, at.z);
@@ -193,7 +204,7 @@ export function MapControls() {
       </div>
 
       {view.mapPanel && (
-        <div id="map-panel" className="panel" role="dialog" aria-label="Map">
+        <Movable id="map-panel" title="Map" role="dialog" aria-label="Map">
           <div className="map-panel-head"><b>Map</b><span className="muted">M changes it</span><button id="map-close" aria-label="Close the map panel" onClick={() => game.setViewOption('mapPanel', false)}>×</button></div>
           <div id="map-types" role="radiogroup" aria-label="Map type">
             {maps.map(([id, label, about]) => {
@@ -213,23 +224,26 @@ export function MapControls() {
               {OVERLAYS.map(([key, label, about]) => (
                 <button key={key} id={`map-overlay-${key}`} className={`map-chip${view[key] || forced(key) ? ' on' : ''}`} aria-pressed={view[key] || forced(key)} disabled={forced(key)} title={forced(key) ? 'Part of this map' : about} onClick={() => game.setViewOption(key, !view[key])}>{label}</button>
               ))}
+              {gridChoices(isEstonian(geo.n0)).map(([id, label, about]) => (
+                <button key={id} id={`map-grid-${id}`} className={`map-chip${view.mapGrid === id ? ' on' : ''}`} aria-pressed={view.mapGrid === id} title={`${about}. G steps through the grids`} onClick={() => game.setViewOption('mapGrid', view.mapGrid === id ? false : id)}>{label}</button>
+              ))}
             </div>
           )}
           {showContours && <TopoLegend data={data} />}
           {geo && (
             <form id="map-goto" onSubmit={placeHere}>
-              <input id="map-ref" type="text" spellCheck="false" maxLength={20} placeholder="Grid ref, e.g. SU 220 660" title="Move there, or place the selected system there" value={typed} onChange={(e) => setTyped(e.target.value)} />
+              <input id="map-ref" type="text" spellCheck="false" maxLength={20} placeholder={`Grid ref, e.g. ${gridRef(geo.e0, geo.n0)}`} title="Move there, or place the selected system there" value={typed} onChange={(e) => setTyped(e.target.value)} />
               <button type="submit">Go</button>
             </form>
           )}
           {message}
           {view.baseMap === 'live' && geo && <div className="muted map-note">Live tiles tell OpenStreetMap which area you are viewing.</div>}
-          {geo && geo.lidarHalf < WORLD.radius && <div className="muted map-note">Terrain 50 ground: tree and building heights are assumed.</div>}
+          {geo && geo.lidarHalf < WORLD.radius && <div className="muted map-note">No lidar on part of this map, so tree and building heights there are assumed.</div>}
           <button id="map-change-world" title="Go back to the start screen to pick generated ground or another real map. This clears your laydown." onClick={change.confirm('world', () => game.leaveWorld())}>{change.armed ? 'Sure? This clears your laydown' : 'Change world'}</button>
-        </div>
+        </Movable>
       )}
       {zoneOpen && !view.mapPanel && <ZonePanel onClose={toggleZone} />}
-      {!view.mapPanel && !zoneOpen && message && <div id="map-bubble" className="panel"><button id="map-bubble-close" aria-label="Dismiss" onClick={() => say('')}>×</button>{message}</div>}
+      {!view.mapPanel && !zoneOpen && message && <Movable id="map-bubble" title="Map note"><button id="map-bubble-close" aria-label="Dismiss" onClick={() => say('')}>×</button>{message}</Movable>}
       {geo ? <Credits geo={geo} source={source} here={here} /> : view.osm && <OsmCredit />}
     </>
   );

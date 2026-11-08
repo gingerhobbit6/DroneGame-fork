@@ -8,7 +8,7 @@ export function ConditionsPicker({ id = 'conditions' }) {
   const { sim, commands } = game;
   const change = (e) => { const problem = commands.setConditions(e.target.value); if (problem) game.toast(problem); };
   return (
-    <label title="Visible cameras fade at dusk and night. Rain and haze cut cameras, lasers and the higher radar bands. Locked once the first wave starts.">
+    <label title="Visible cameras fade at dusk and night. Rain and haze cut cameras, lasers and the higher radar bands, and drown acoustic sensors. Locked once the first wave starts.">
       Conditions{' '}
       <select id={id} value={sim.state.conditions} disabled={sim.designLocked()} onChange={change}>
         {Object.entries(CONDITIONS).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}

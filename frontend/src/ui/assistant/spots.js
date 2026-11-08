@@ -5,6 +5,7 @@
 import { BUILD, DRONE_CLASSES, WORLD } from '../../sim/config/index.js';
 import { opticalLos } from '../../sim/effectors.js';
 import { reachFor } from '../../sim/network/sensors.js';
+import { typicalAltitude } from '../../sim/site-range.js';
 import { terrainState } from '../../sim/terrain.js';
 import { hereU } from '../../sim/units.js';
 import { inZone } from '../../zone.js';
@@ -47,7 +48,7 @@ function threatsFor(def) {
 
 // A drone of this type over a point, at its usual height.
 function probeAt(point, drone) {
-  const mpu = WORLD.metresPerUnit, agl = (drone.alt[0] + drone.alt[1]) / 2;
+  const mpu = WORLD.metresPerUnit, agl = typicalAltitude(drone);
   return { pos: { x: point.x / mpu, y: (terrainState.data.groundAt(point.x, point.z) + agl) / mpu, z: point.z / mpu }, def: drone };
 }
 

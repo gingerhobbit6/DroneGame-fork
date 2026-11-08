@@ -21,9 +21,11 @@ export function gridRef(e, n, figures = 6) {
   if (!onGrid(e, n)) return 'off the grid';
   const a = Math.floor((19 - Math.floor(n / 100000)) / 5) * 5 + Math.floor((Math.floor(e / 100000) + 10) / 5);
   const b = ((19 - Math.floor(n / 100000)) * 5) % 25 + Math.floor(e / 100000) % 5;
-  const part = (v) => String(Math.floor((v % 100000) / 10 ** (5 - figures / 2))).padStart(figures / 2, '0');
-  return `${LETTERS[a]}${LETTERS[b]} ${part(e)} ${part(n)}`;
+  return `${LETTERS[a]}${LETTERS[b]} ${digitsIn(e, figures)} ${digitsIn(n, figures)}`;
 }
+
+// Half a reference's figures: where in its 100 km square a point lies. MGRS writes them the same way (mgrs.js).
+export const digitsIn = (v, figures) => String(Math.floor((v % 100000) / 10 ** (5 - figures / 2))).padStart(figures / 2, '0');
 
 // GPS (WGS 84) to the grid, by the published Helmert shift. Good to about 5 m, which is finer than a laptop's location.
 export function wgs84ToBng(latDeg, lonDeg) {
@@ -37,26 +39,30 @@ export function wgs84ToBng(latDeg, lonDeg) {
   const a = 6377563.396, b = 6356256.909, e2 = 1 - (b * b) / (a * a), p = Math.hypot(X, Y);
   let phi = Math.atan2(Z, p * (1 - e2));
   for (let i = 0; i < 8; i++) phi = Math.atan2(Z + (e2 * a * Math.sin(phi)) / Math.sqrt(1 - e2 * Math.sin(phi) ** 2), p);
-  const lambda = Math.atan2(Y, X);
+  return transverseMercator(phi, Math.atan2(Y, X), { a, b, f0: 0.9996012717, phi0: 49 * rad, lam0: -2 * rad, e0: 400000, n0: -100000 }); // the national grid's own origin
+}
 
-  // Transverse Mercator, on the national grid's own origin
-  const f0 = 0.9996012717, phi0 = 49 * rad, lam0 = -2 * rad, n = (a - b) / (a + b), sinP = Math.sin(phi), cosP = Math.cos(phi), tanP = Math.tan(phi);
+// Transverse Mercator by the series OS publishes, on any ellipsoid (a, b) and origin. Angles in radians. MGRS uses it too (mgrs.js).
+export function transverseMercator(phi, lambda, { a, b, f0, phi0, lam0, e0, n0 }) {
+  const e2 = 1 - (b * b) / (a * a), n = (a - b) / (a + b), sinP = Math.sin(phi), cosP = Math.cos(phi), tanP = Math.tan(phi);
   const nu = (a * f0) / Math.sqrt(1 - e2 * sinP * sinP), rho = (a * f0 * (1 - e2)) / (1 - e2 * sinP * sinP) ** 1.5, eta2 = nu / rho - 1;
   const dp = phi - phi0, sp = phi + phi0;
   const M = b * f0 * ((1 + n + 1.25 * n * n + 1.25 * n ** 3) * dp - (3 * n + 3 * n * n + 2.625 * n ** 3) * Math.sin(dp) * Math.cos(sp)
     + (1.875 * n * n + 1.875 * n ** 3) * Math.sin(2 * dp) * Math.cos(2 * sp) - (35 / 24) * n ** 3 * Math.sin(3 * dp) * Math.cos(3 * sp));
   const dl = lambda - lam0, t2 = tanP * tanP;
-  const northing = M - 100000 + (nu / 2) * sinP * cosP * dl ** 2 + (nu / 24) * sinP * cosP ** 3 * (5 - t2 + 9 * eta2) * dl ** 4 + (nu / 720) * sinP * cosP ** 5 * (61 - 58 * t2 + t2 * t2) * dl ** 6;
-  const easting = 400000 + nu * cosP * dl + (nu / 6) * cosP ** 3 * (nu / rho - t2) * dl ** 3 + (nu / 120) * cosP ** 5 * (5 - 18 * t2 + t2 * t2 + 14 * eta2 - 58 * t2 * eta2) * dl ** 5;
+  const northing = M + n0 + (nu / 2) * sinP * cosP * dl ** 2 + (nu / 24) * sinP * cosP ** 3 * (5 - t2 + 9 * eta2) * dl ** 4 + (nu / 720) * sinP * cosP ** 5 * (61 - 58 * t2 + t2 * t2) * dl ** 6;
+  const easting = e0 + nu * cosP * dl + (nu / 6) * cosP ** 3 * (nu / rho - t2) * dl ** 3 + (nu / 120) * cosP ** 5 * (5 - 18 * t2 + t2 * t2 + 14 * eta2 - 58 * t2 * eta2) * dl ** 5;
   return { e: easting, n: northing };
 }
 
 // The grid back to GPS, by stepping towards the answer through wgs84ToBng, so the two always agree. Only used to draw on a map.
-export function bngToWgs84(e, n) {
+export const bngToWgs84 = (e, n) => fromGrid(wgs84ToBng, e, n, 49 + n / 111000, -2 + (e - 400000) / 70000);
+
+// Steps a first guess (lat, lon) towards the point that toGrid maps to (e, n). MGRS goes back the same way (mgrs.js).
+export function fromGrid(toGrid, e, n, lat, lon) {
   const STEP = 0.001;
-  let lat = 49 + n / 111000, lon = -2 + (e - 400000) / 70000;
   for (let i = 0; i < 5; i++) {
-    const here = wgs84ToBng(lat, lon), east = wgs84ToBng(lat, lon + STEP), north = wgs84ToBng(lat + STEP, lon);
+    const here = toGrid(lat, lon), east = toGrid(lat, lon + STEP), north = toGrid(lat + STEP, lon);
     const a = (east.e - here.e) / STEP, b = (north.e - here.e) / STEP, c = (east.n - here.n) / STEP, d = (north.n - here.n) / STEP;
     const det = a * d - b * c, de = e - here.e, dn = n - here.n;
     lon += (d * de - b * dn) / det;

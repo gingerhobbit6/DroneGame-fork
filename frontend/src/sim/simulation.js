@@ -4,7 +4,7 @@
 //  - on(event, fn): moments the rendering and UI need to hear about (explosion, toast, siteHit, gameOver, reset, terrain, sandbox...)
 
 import { ADAPT, ECONOMY, FUSION, RESEARCHED, SITE, WAVES, WORLD, applyRangeScale, exportFigures, importFigures, resetAllFigures, resetFigure, setFigure } from './config/index.js';
-import { seedAll } from './rng.js';
+import { hashSeed, seedAll } from './rng.js';
 import { generateTerrain, terrainState } from './terrain.js';
 import { cutWorld, parseWorldId, siteProblem } from './world-pack.js';
 import { bus } from './sapient.js';
@@ -13,8 +13,9 @@ import { createRecorder, takeSnapshot, SNAPSHOT_EVERY } from './recorder.js';
 import { runRecord } from './run-record.js';
 import { SITE_POS, u } from './units.js';
 import { DEFAULT_MIX } from './attack-mix.js';
-import { affordable, createLedger, resetLedger } from './economy.js';
+import { affordable, createLedger, resetLedger, tally } from './economy.js';
 import * as laydown from './laydown.js';
+import { designLocked } from './lock.js';
 import { siteIsFree } from './attack-area.js';
 import * as people from './people.js';
 import { setPatrol, updatePatrol } from './patrol.js';
@@ -22,11 +23,20 @@ import { spawnDrone, removeDrone, updateDrones, spotterBonus } from './drones.js
 import { opticalLos, updateStructures, updateMissiles, enoughInAir } from './effectors.js';
 import { canFire, resupply } from './magazine.js';
 import { startWave, updateWaves } from './waves.js';
+import { deploymentReport } from './report.js';
 import { enterSandbox, launchSandboxWave, launchSandboxAttack, clearSandboxDrones } from './sandbox.js';
 
 export const SIM_STEP = 0.05; // fixed simulation step in game seconds, so a run does not depend on frame rate
 
 // shortcut: bus, clock, terrainState and the random streams are module-level singletons, so only one simulation can exist at a time. Pass them in if parallel runs are ever needed.
+// What a run starts with, and a reset goes back to. The seeds, the start, the conditions and the pack stay across a reset.
+const freshRun = () => ({
+  health: SITE.maxHealth, budget: ECONOMY.budget, wave: 0, kills: 0, leaks: 0, hits: 0, casualties: 0, killed: 0, injured: 0, time: 0, warnedWire: false, over: false,
+  waveActive: false, queue: [], waveTime: 0, autoTimer: -1, zone: null, zoneCentre: SITE_POS, attack: DEFAULT_MIX,
+  sandbox: false, sbLevel: 1, sbQueue: [], sbTime: 0, sbSpent: 0, // sandbox: attacks without consequences, before the first wave
+  ended: false, // the operator ended the deployment
+});
+
 export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
   const listeners = new Map();
   const packs = new Map(); // real-world map packs the rules can cut from, by hash
@@ -38,10 +48,8 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
   terrainState.data = generateTerrain(terrainSeed);
 
   const state = {
-    seed, terrainSeed, health: SITE.maxHealth, budget: ECONOMY.budget, wave: 0, kills: 0, leaks: 0, hits: 0, casualties: 0, time: 0, warnedWire: false,
-    started: false, over: false, autoStart: false, zone: null, zoneCentre: SITE_POS, attack: DEFAULT_MIX, conditions: 'day',
-    waveActive: false, queue: [], waveTime: 0, autoTimer: -1,
-    sandbox: false, sbLevel: 1, sbQueue: [], sbTime: 0, sbSpent: 0, // sandbox: attacks without consequences, before the first wave
+    seed, terrainSeed, ...freshRun(), started: false, autoStart: false, conditions: 'day',
+    packed: false, kit: null, // packed: a deployment pack is in use, so the budget only counts; kit: how many of each system it holds
   };
   const w = { state, drones: [], structures: [], missiles: [], people: [], peopleUid: 0, peopleRev: 0, patrol: null, ledger: createLedger(), emit, droneUid: 0, startLaydown: null, startFigures: null, runEnded: false };
   laydown.applyConditions(w, 'day'); // the conditions are module state that physics reads: a new simulation starts on a clear day
@@ -50,6 +58,9 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     drones: w.drones,
     getTime: () => state.time,
     siteCentre: () => state.zoneCentre,
+    onFalseAlarm(id) { tally((w.ledger.falseAlarms[state.wave] ||= {}), id); },
+    zone: () => state.zone, // the drawn area's outline, or null
+    expected: () => state.attack, // the drones the waves send: what an unnamed track is judged to be
     monitoring: () => state.wave > 0 || state.sandbox, // the fusion node only chases lost contact once the attack has started
     onApprovalRequest() { emit('approvalRequest'); emit('toast', 'Engagement request: your decision is needed'); },
     onApprovalDecided() { emit('approvalDecided'); },
@@ -57,7 +68,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     roundsCover: (s, d) => !!d && !d.dead && enoughInAir(w, s, d), // enough on the way that this launcher can look for another target
     // An effector decides whether it can take a task from the fusion node.
     acceptTask(s, d) {
-      if (!d || d.dead) return { ok: false, reasons: ['nothing found at the cued position'] };
+      if (!d || d.dead) return { ok: false, empty: true, reasons: ['nothing found at the cued position'] };
       if (s.pos.distanceTo(d.pos) > u(s.def.range)) return { ok: false, reasons: ['target outside effector range'] };
       if (!opticalLos(s, d)) return { ok: false, reasons: ['no line of sight to target'] };
       if (s.def.engages && !s.def.engages.includes(d.def.variantOf ?? d.type)) return { ok: false, permanent: true, reasons: ['target outside engagement envelope (too fast or too high for this interceptor)'] };
@@ -78,6 +89,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     updateMissiles(w, dt);
     updateDrones(w, dt);
     if (++stepCount % SNAPSHOT_EVERY === 0) w.rec.push(takeSnapshot(w));
+    if (state.over) endRun(); // the site falls during a step, so the record waits for it to finish and replays reach the same state
   }
 
   // Start the run again from the beginning, on the same seed. 'keep' rebuilds the laydown the run started with (or the
@@ -91,10 +103,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     w.missiles.length = 0;
     people.clearPeople(w);
     w.patrol = null; // its escort and people went with the rest
-    Object.assign(state, {
-      health: SITE.maxHealth, budget: ECONOMY.budget, wave: 0, kills: 0, leaks: 0, hits: 0, casualties: 0, time: 0, warnedWire: false, over: false,
-      waveActive: false, queue: [], waveTime: 0, autoTimer: -1, sandbox: false, sbLevel: 1, sbQueue: [], sbTime: 0, sbSpent: 0, zone: null, zoneCentre: SITE_POS, attack: DEFAULT_MIX,
-    });
+    Object.assign(state, freshRun());
     laydown.applyConditions(w, 'day'); // a kept laydown brings its own back
     resetLedger(w.ledger);
     w.rec.clear(); stepCount = 0; w.droneUid = 0;
@@ -114,6 +123,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     w.startFigures = exportFigures();
     // settings from before the rebuild that still apply, so the log alone can reproduce the run
     log.push({ step: 0, name: 'setAuthority', args: [FUSION.authority] }, { step: 0, name: 'setAutoStart', args: [state.autoStart] });
+    if (state.packed) log.push({ step: 0, name: 'setPacked', args: [state.kit ?? true] });
   }
 
   // A run that has started is reported once, however it ends.
@@ -122,11 +132,18 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     w.runEnded = true;
     emit('runEnded', runRecord(w, log, stepCount, digest()));
   }
-  on('gameOver', endRun);
+
+  // The operator stands the deployment down: the run ends as if lost, and the report shows.
+  function endDeployment() {
+    if (state.wave === 0 || state.over || state.sandbox) return;
+    state.over = true; state.ended = true;
+    endRun();
+    emit('gameOver');
+  }
 
   // Replace the current run with a saved laydown, on the ground it was made for. Returns the reason if it can't.
   function loadLaydown(spec, world) {
-    const problem = worldProblem(world) || laydown.costProblem(spec);
+    const problem = worldProblem(world) || (state.packed ? null : laydown.costProblem(spec));
     if (problem) return problem;
     endRun();
     setWorld(world);
@@ -175,17 +192,19 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     deploy,
     leave,
     setZone: (points) => laydown.setZone(w, points),
-    setPatrol: (points) => setPatrol(w, points),
+    setPatrol: (points, column, plan) => setPatrol(w, points, column, plan),
     setAttack: (ids) => laydown.setAttack(w, ids),
     setConditions: (name) => laydown.setConditions(w, name),
-    place: (id, x, z, settings) => laydown.place(w, id, x, z, settings),
+    place: (id, x, z, settings, vehicle) => laydown.place(w, id, x, z, settings, vehicle),
     sell: (x, z) => laydown.sell(w, x, z),
-    placePeople: (x, z, count, protection) => people.placePeople(w, x, z, count, protection),
+    placePeople: (x, z, count, protection, role) => people.placePeople(w, x, z, count, protection, role),
     removePeople: (id) => people.removePeople(w, id),
     resupply: () => resupply(w),
     startWave: () => startWave(w, beginRun),
     reset: (mode) => resetRun(mode),
     setAutoStart: (on) => { state.autoStart = on; },
+    setPacked: (kit) => laydown.setPacked(w, kit),
+    endDeployment,
     setAuthority: (mode) => { FUSION.authority = mode; },
     decide: (id, approve) => w.net.decide(id, approve),
     injectFault: () => w.net.injectFault(),
@@ -220,13 +239,11 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
 
   // FNV-1a over the messages still kept (the newest bus.max at most), plus the headline numbers: a fingerprint of a run.
   function digest() {
-    let h = 0x811c9dc5;
-    const feed = (s) => { for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } };
-    for (const e of bus.entries) feed(JSON.stringify(e.msg));
-    feed(JSON.stringify([state.kills, state.health, state.budget, state.leaks, state.time, bus.seq, w.ledger]));
+    const parts = bus.entries.map((e) => JSON.stringify(e.msg)), feed = (s) => parts.push(s);
+    feed(JSON.stringify([state.kills, state.health, state.budget, state.leaks, state.time, bus.seq, { ...w.ledger, jamTime: undefined, flights: undefined, falseAlarms: undefined }])); // these came later: left out so recorded digests still match
     if (w.people.length) feed(JSON.stringify(w.people.map((g) => g.hits))); // with no people, a run's digest stays as it was
-    if (w.patrol) feed(String(w.patrol.dist));
-    return (h >>> 0).toString(16);
+    if (w.patrol) feed(JSON.stringify([w.patrol.dist, w.patrol.phase, w.patrol.trips, w.patrol.fix]));
+    return hashSeed(parts.join('')).toString(16); // one FNV-1a over everything, as feeding it piece by piece once did
   }
 
   return {
@@ -239,9 +256,10 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     run(steps) { state.started = true; for (let i = 0; i < steps && !state.over; i++) step(); },
     canPlace: (x, z, def) => !laydown.placementProblem(w, x, z, def),
     canPlacePeople: (x, z, protection) => !people.peopleProblem(w, x, z, protection),
-    designLocked: () => laydown.designLocked(w),
+    designLocked: () => designLocked(w),
     unwired: () => laydown.unwired(w),
     spotterBonus: () => spotterBonus(w),
+    report: () => deploymentReport(w),
     // for scripted experiments and tests: no budget or placement checks
     addStructure: (id, x, z) => laydown.addStructure(w, id, x, z),
     spawnDrone: (type, bearing, rolls) => spawnDrone(w, type, bearing, rolls),

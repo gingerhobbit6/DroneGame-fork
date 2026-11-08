@@ -2,8 +2,8 @@
 // cue, and channels, resolution, lens, rangefinder, search arc and slew are fields that change play, each at a cost.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DRONES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
-import { airframeConfidence, pixelsOn, zoomMax } from '../src/sim/camera-model.js';
+import { DRONES, STRUCTURES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
+import { airframeConfidence, pixelsOn, thermalSharpness, zoomMax } from '../src/sim/camera-model.js';
 import { outwardFrom } from '../src/sim/sensor-model.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { terrainState } from '../src/sim/terrain.js';
@@ -30,10 +30,12 @@ function reportsFrom(laydown, settings = {}) {
   for (const [k, v] of Object.entries(settings)) expect(sim.commands.configureUnit(camera, k, v)).toBeNull();
   sim.state.warnedWire = true;
   sim.commands.startWave();
-  sim.run(4000);
-  return sim.bus.entries.filter((e) => e.type === 'detection_report' && e.from === camera.nodeId).map((e) => e.msg.detection_report);
+  const id = sim.structures.find((s) => s.def.kind === 'camera').nodeId; // the wave rebuilt every unit, with new node ids
+  for (let n = 0; n < 16000 && sim.state.waveActive; n++) sim.step();
+  return sim.bus.entries.filter((e) => e.type === 'detection_report' && e.msg.node_id === id).map((e) => e.msg.detection_report);
 }
 const named = (r) => !!r.classification?.[0]?.sub_class?.[0]?.sub_class;
+const modelOf = (r) => r.classification?.[0]?.sub_class?.[0]?.sub_class?.[0]?.sub_class?.[0]?.type;
 
 describe('pixels on the drone', () => {
   it('are 4 at the edge of its reach, and name the airframe at 8, surely at 13', () => {
@@ -47,6 +49,14 @@ describe('pixels on the drone', () => {
     const reports = reportsFrom([['radar', 600, 0], ['camera', 378, 589]]).filter((r) => r.classification?.[0]?.type === 'Air Vehicle');
     expect(reports.some(named)).toBe(true);
     expect(reports.some((r) => !named(r))).toBe(true);
+  }, 60000);
+  it('name the model once the drone is identified, and the track carries it', () => {
+    // a second radar keeps the track after the strikes reach the first, so the camera can still look close up
+    const reports = reportsFrom([['radar', 600, 0], ['radar', -600, 0], ['camera', 378, 589]]), labels = Object.values(DRONES).map((d) => d.label ?? d.name);
+    const models = reports.map(modelOf).filter(Boolean);
+    expect(models.length).toBeGreaterThan(0);
+    expect(models.every((t) => labels.includes(t))).toBe(true);
+    expect([...sim.net.tracks.values()].some((tr) => labels.includes(tr.model))).toBe(true);
   }, 60000);
 });
 
@@ -68,6 +78,30 @@ describe('the zoom', () => {
   });
 });
 
+describe('looking again', () => {
+  it('cuts short a look to name a model for an unclassified track, but not a look to classify one', () => {
+    setUp(sim, { seed: '1', laydown: [['radar', 600, 0], ['camera', 378, 589]] });
+    expect(sim.commands.configureUnit(sim.structures[0], 'microDoppler', 'no')).toBeNull(); // only the camera classifies
+    sim.state.warnedWire = true;
+    sim.commands.startWave();
+    const camera = sim.structures.find((s) => s.def.kind === 'camera'), reach = camera.def.range * zoomMax(camera.def);
+    const near = () => [...sim.net.tracks.values()].filter((tr) => tr.status === 'confirmed' && sim.net.distToTrack(camera, tr) < reach);
+    for (let n = 0; n < 8000 && near().length < 2; n++) sim.step();
+    const [a, b] = near();
+    const looksSent = (identify) => { // while it dwells on one track, with another unclassified again
+      camera.cue = { trackId: a.id, until: sim.state.time + 60, from: sim.state.time, onAt: null, identify };
+      camera.lookedAt.set(a.id, sim.state.time); // as choosing it does
+      camera.lookedAt.delete(b.id);
+      b.cls = null;
+      const from = sim.bus.entries.length;
+      sim.run(30); // a tasking tick
+      return sim.bus.entries.slice(from).filter((e) => e.type === 'task' && e.msg.destination_id === camera.nodeId && e.msg.task.command?.look_at).length;
+    };
+    expect(looksSent(false)).toBe(0);
+    expect(looksSent(true)).toBe(1); // the task can still be lost on the way, as any can
+  }, 60000);
+});
+
 describe('the hardware', () => {
   it('prices channels, resolution, lens and slew, and more pixels reach further', () => {
     expect(unitCost('camera', { channels: 'visible' })).toBe(50000);
@@ -79,6 +113,13 @@ describe('the hardware', () => {
     expect(unitCost('camera', { fnumber: 1.4 })).toBe(Math.round(100000 + ((2 / 1.4) ** 2 - 1) * 0.1 * 100000));
     expect(unitCost('camera', { slew: 180 })).toBe(110000);
     expect(unitCost('camera', { rangefinder: 'yes' })).toBe(120000);
+  });
+  it('blurs thermal light: a slower lens or finer pixels gain less than they would', () => {
+    expect(thermalSharpness(unitDef('camera_s'))).toBe(1);
+    expect(thermalSharpness(unitDef('camera_s', { fnumber: 2 }))).toBeCloseTo(12 / 20); // a 20 µm spot on 12 µm pixels
+    expect(unitDef('camera_l', { pixels: 'fhd' }).range).toBe(450); // at f/5.5 mid-wave light already spreads over 22 µm
+    expect(unitDef('camera_l', { fnumber: 4 }).range).toBe(Math.round((450 * 22) / 16));
+    expect(thermalSharpness(STRUCTURES.radar)).toBe(1);
   });
   it('a rangefinder measures range, so the camera reports it', () => {
     expect(unitDef('camera', { rangefinder: 'yes' }).sapient.noise.range).toBe(5);

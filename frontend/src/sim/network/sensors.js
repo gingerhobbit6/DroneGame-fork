@@ -6,14 +6,22 @@ import { rand, gauss } from '../rng.js';
 import { terrainState } from '../terrain.js';
 import { errorScale, inClutter, reachFor, reachOnPath } from '../site-range.js';
 import { blindSpeed, classifiesAt, coverArc, elevationBand, inCover, outwardFrom } from '../sensor-model.js';
-import { airframeConfidence, hasZoom, pixelsOn } from '../camera-model.js';
+import { IDENTIFY_PX, airframeConfidence, hasZoom, pixelsOn } from '../camera-model.js';
 import { LIBRARIES, bandGhz, covers, heardBand, libraryKnows } from '../rf-model.js';
 import { deafAt } from '../jamming.js';
-import { RB_UNITS, rbDatum, round, clamp } from './core.js';
+import { logSeen } from '../flight-log.js';
+import { RB_UNITS, rbDatum, round } from './core.js';
+import { clamp } from '../world.js';
 
 export { reachFor };
 
 const STARE_LOOKS = 3; // looks a camera takes at each height while it searches for a track with none
+const SOUND_SPEED = 343; // m/s, in air at 20 °C
+
+// Sound takes time to arrive: what an acoustic sensor hears now left the drone `metres` / 343 s ago, so it points to where the drone was
+// then, 3 s and about 150 m behind a Shahed a kilometre off. Its velocity (per second, in the units of pos), taken back that long,
+// stands in for its path.
+export const heardAt = (pos, vel, metres) => { const late = metres / SOUND_SPEED; return { x: pos.x - vel.x * late, y: pos.y - vel.y * late, z: pos.z - vel.z * late }; };
 
 export function createSensors(core, feed) {
   const { ctx, mpu, T, nodes, tracker, fusion, send, deliver, antennaM, rel, bearingOf } = core;
@@ -60,7 +68,8 @@ export function createSensors(core, feed) {
     if (!inCover(def, b.az, b.el)) return 0; // outside a radar's arc, or above or below its beam
     const T3 = terrainState.data, m = mpu();
     const dxm = d.pos.x * m, dzm = d.pos.z * m, dym = d.pos.y * m;
-    const p = inClutter(def, T3, dxm, dzm, dym - T3.groundAt(dxm, dzm), r.hr) ? SENSING.clutterPenalty : 1; // lost in clutter
+    const speed = d.vel ? Math.hypot(d.vel.x, d.vel.y, d.vel.z) * m : d.def.speed; // a coverage probe has no velocity: its type's speed
+    const p = inClutter(def, T3, dxm, dzm, dym - T3.groundAt(dxm, dzm), r.hr, speed) ? SENSING.clutterPenalty : 1; // lost in clutter
     const blind = blindSpeed(def);
     if (blind && d.vel && Math.abs((d.vel.x * r.east - d.vel.z * r.north + d.vel.y * r.up) * m) < blind * r.rng) return 0; // too slow, or crossing, for its clutter filter
     const reach = reachTo(s, d) * zoom;
@@ -82,14 +91,15 @@ export function createSensors(core, feed) {
     const id = s.def.kind || s.def.id;
     const sub = (type, c, level, inner) => ({ type, confidence: round(c, 2), level, ...(inner ? { sub_class: [inner] } : {}) });
     if (!d) return [{ type: 'Unknown', confidence: 0.4 }]; // a false alarm doesn't look like anything in particular
-    if (id === 'camera') { // it names the airframe once the drone covers enough pixels (camera-model.js)
-      const named = airframeConfidence(pixelsOn(reach, rng));
-      return [{ type: 'Air Vehicle', confidence: 0.95, sub_class: [sub('UAV', 0.9, 1, named ? sub(d.def.airframe, named, 2) : null)] }];
+    if (id === 'camera') { // it names the airframe once the drone covers enough pixels, and identified, its model (camera-model.js)
+      const px = pixelsOn(reach, rng), named = airframeConfidence(px), model = px >= IDENTIFY_PX ? sub(d.def.label ?? d.def.name, 0.9, 3) : null;
+      return [{ type: 'Air Vehicle', confidence: 0.95, sub_class: [sub('UAV', 0.9, 1, named ? sub(d.def.airframe, named, 2, model) : null)] }];
     }
     if (id === 'acoustic') return [{ type: 'Air Vehicle', confidence: 0.7, sub_class: [sub('UAV', 0.6, 1)] }]; // it sounds like a drone, not which one
     if (id === 'rf') { // its library names the airframe of a link it knows, and takes any other moving emitter for a drone; with none, it is energy
       if (!LIBRARIES[s.def.library].knows) return [{ type: 'Unknown', confidence: 0.5 }];
-      return [{ type: 'Air Vehicle', confidence: 0.85, sub_class: [sub('UAV', 0.8, 1, libraryKnows(s.def, d.def) ? sub(d.def.airframe, 0.9, 2) : null)] }];
+      const model = d.def.protocol === 'commercial' ? sub(d.def.label ?? d.def.name, 0.9, 3) : null; // a DJI or Autel link says what the drone is
+      return [{ type: 'Air Vehicle', confidence: 0.85, sub_class: [sub('UAV', 0.8, 1, libraryKnows(s.def, d.def) ? sub(d.def.airframe, 0.9, 2, model) : null)] }];
     }
     if (classifiesAt(s.def, rng, reach)) return [{ type: 'Air Vehicle', confidence: 0.8, sub_class: [sub('UAV', 0.7, 1, sub(d.def.airframe, 0.6, 2))] }]; // rotors or wings, by micro-Doppler
     return [{ type: 'Air Vehicle', confidence: 0.7, sub_class: [sub('UAV', 0.55, 1)] }];
@@ -111,11 +121,14 @@ export function createSensors(core, feed) {
     return { east: hr * Math.sin(az), north: hr * Math.cos(az), up: rng * Math.sin(el), hr, rng };
   }
 
+  // Where an acoustic sensor hears a drone: where it was when the sound left it (heardAt).
+  const heardFrom = (s, d) => { const now = rel(s, d); return d.vel ? rel(s, { pos: heardAt(d.pos, d.vel, now.rng) }) : now; };
+
   // Build one detection (a real drone `d`, or a false alarm when d is null), send the SAPIENT DetectionReport, and return
   // what the fusion node's tracker needs.
   function measure(s, d) {
     const def = s.def, n = def.sapient.noise || {};
-    const r = d ? rel(s, d) : falseGeometry(s);
+    const r = d ? (def.kind === 'acoustic' ? heardFrom(s, d) : rel(s, d)) : falseGeometry(s);
     if (!r) return null;
     const b = bearingOf(r);
     const reach = (d ? reachTo(s, d) : def.range) * zoomOf(s), k = errorScale(def, r.rng, reach); // a weak signal gives a worse measurement, and the sensor knows it
@@ -169,7 +182,7 @@ export function createSensors(core, feed) {
       sent,
       meas: {
         node: s.nodeId, color: def.color, from, az: rad(azM), el: n.el != null ? rad(elM) : null, range: n.range != null ? rngM : null,
-        sigAz: rad(errAz), sigEl: n.el != null ? rad(errEl) : null, sigRange: errRange || 0, t: T(), scan: s.scanId, every: def.sapient.interval,
+        sigAz: rad(errAz), sigEl: n.el != null ? rad(errEl) : null, sigRange: errRange || 0, t: T(), scan: s.scanId, every: def.sapient.interval, reach,
       },
       source: { name: s.name, objectId, ts: S.timestamp(), conf, rb, from: { east: from[0], north: from[1], up: from[2] }, color: def.color, vel, cls: report.classification, rangeErr: errRange, hasRange: n.range != null },
     };
@@ -179,11 +192,12 @@ export function createSensors(core, feed) {
   function scan(s) {
     s.scanId = (s.scanId || 0) + 1;
     const found = [];
+    const c = ctx.siteCentre(), m = mpu();
     for (const d of ctx.drones) {
       const p = pd(s, d);
-      if (p > 0 && rand() < p) found.push(measure(s, d));
+      if (p > 0 && rand() < p) { found.push(measure(s, d)); logSeen(d, s.def.id, T(), rel(s, d).rng, Math.hypot(d.pos.x - c.x, d.pos.z - c.z) * m); }
     }
-    if (s.def.falseAlarm && rand() < s.def.falseAlarm) { const f = measure(s, null); if (f) found.push(f); }
+    if (s.def.falseAlarm && rand() < s.def.falseAlarm) { const f = measure(s, null); if (f) { found.push(f); ctx.onFalseAlarm?.(s.def.id); } }
     s.detections = (s.detections || 0) + found.length; // false alarms included: the sensor cannot tell them apart
     for (const f of found) deliver(f.sent, () => feed(s, f)); // the tracker only hears it when it arrives
   }

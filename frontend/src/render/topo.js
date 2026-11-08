@@ -1,7 +1,8 @@
 // Topography from a real world's own height grid: height colours, hill shading and contour lines. No DOM, and no download, so it works offline.
 
+import { clamp } from '../sim/world.js';
+
 const WATER = 4, WOOD = 1, BUILDING = 2;
-const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
 // The same colours as .topo-legend in map-panel.css.
 const RAMP = [[0, 120, 170, 110], [0.3, 190, 210, 130], [0.55, 235, 220, 150], [0.8, 205, 160, 105], [1, 165, 120, 90]];
 

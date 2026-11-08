@@ -16,7 +16,10 @@ AGENT = {"User-Agent": "site-guard-mapbuild"}
 DOWNLOAD = "https://geoportaal.maaruum.ee/index.php?lang_id=2&plugin_act=otsing&andmetyyp={kind}&dl=1&f={name}&page_id={page}"
 HEIGHTS, SURFACE = "DTM_10m_eesti.tif", "ndsm_5m_2020-2023_kogu_Eesti.zip"
 BUILDINGS, LAND, TRANSPORT, WATER, UTILITIES = (f"ETAK_Eesti_SHP_{theme}.zip" for theme in ("ehitised", "kolvikud", "transport", "veekogud", "tehnovorgud"))
-FILES = {HEIGHTS: ("mp_korgusmudelid", 664), SURFACE: ("mk_korgusmudelid", 664), BUILDINGS: ("ETAK", 618), LAND: ("ETAK", 618), TRANSPORT: ("ETAK", 618), WATER: ("ETAK", 618), UTILITIES: ("ETAK", 618)}
+PLACES = "asustusyksus_shp.zip"  # settlements, from the agency's page of administrative and settlement units
+FILES = {name: DOWNLOAD.format(kind=kind, name=name, page=page) for name, (kind, page) in {
+    HEIGHTS: ("mp_korgusmudelid", 664), SURFACE: ("mk_korgusmudelid", 664), BUILDINGS: ("ETAK", 618), LAND: ("ETAK", 618), TRANSPORT: ("ETAK", 618), WATER: ("ETAK", 618), UTILITIES: ("ETAK", 618)}.items()}
+FILES[PLACES] = f"https://s3.pilw.io/rp-kemit-kataster/EHAK/{PLACES}"  # kept on the agency's file store, not the portal
 RETRIES = 8
 MAX_WAIT_S = 300
 ROOM_NEEDED = 8_000_000_000  # the national files, in bytes, with a little to spare
@@ -51,8 +54,7 @@ def _fetch(name: str, folder: str, say) -> None:
         return
     os.makedirs(folder, exist_ok=True)
     part = target + ".part"
-    kind, page = FILES[name]
-    url = DOWNLOAD.format(kind=kind, name=name, page=page)
+    url = FILES[name]
 
     def attempt() -> None:
         done = os.path.getsize(part) if os.path.exists(part) else 0

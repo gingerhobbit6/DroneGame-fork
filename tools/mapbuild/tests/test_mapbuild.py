@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import shapely
 
-from mapbuild import estonia, estonia_files, features, fit, packfile, pictures, terrain
+from mapbuild import download, estonia, estonia_files, features, fit, packfile, pictures, terrain
 from mapbuild.grid import Window, parse_grid_ref, square_letters
 
 
@@ -170,6 +170,16 @@ def test_feature_lists_use_scene_axes():
     assert lists["names"][0] == ["Town", "Populated Place", "Large", 10.0, 10.0]
 
 
+def test_a_city_keeps_the_buildings_nearest_the_middle(monkeypatch):
+    monkeypatch.setattr(features, "MAX_BUILDINGS", 2)
+    window = Window(1000, 2000, 100)
+    houses = np.array([shapely.box(1000 + x, 2000, 1005 + x, 2005) for x in (60, -30, 10)])
+    bldg = np.zeros((window.side, window.side), "uint8")
+    empty = {"CLASSIFICA": np.array([])}
+    lists = features.feature_lists(window, houses, np.array([]), np.array([]), empty, np.array([]), {"DISTNAME": [], "CLASSIFICA": [], "FONTHEIGHT": []}, bldg)
+    assert [row[0] for row in lists["buildings"]] == [12.5, -27.5]
+
+
 def test_the_fit_is_accurate_on_a_smooth_surface():
     window = Window(400000, 200000, 15000)
     grid = np.linspace(-15000, 15000, 21)
@@ -235,7 +245,7 @@ def test_the_estonian_base_map_is_cut_into_pieces_placed_on_the_grid():
 
 def test_estonian_credits_name_the_owner_and_carry_the_licence():
     found = estonia.credits(30, 2026)
-    assert "Land and Spatial Development Board" in found["osmap"] and estonia.LICENCE in found["osmap"]
+    assert "Land and Spatial Development Board" in found["osmap"] and estonia.LICENCE in found["osmap"] and "settlement units" in found["osmap"]
     assert "2020-2023" in found["lidar"] and "2020-2023" not in estonia.credits(0, 2026)["lidar"]
 
 
@@ -284,7 +294,7 @@ def test_lidar_is_only_fetched_for_estonia_when_asked(tmp_path, monkeypatch):
     got = []
     monkeypatch.setattr(estonia_files, "_fetch", lambda name, folder, say: got.append(name))
     estonia_files.ensure(str(tmp_path), False, lambda _: None)
-    assert estonia.SURFACE not in got and estonia.HEIGHTS in got
+    assert estonia.SURFACE not in got and estonia.HEIGHTS in got and estonia.PLACES in got
     estonia_files.ensure(str(tmp_path), True, lambda _: None)
     assert estonia.SURFACE in got
 
@@ -464,7 +474,52 @@ def test_a_filtered_etak_layer_really_is_filtered(tmp_path):
     assert len(etak.read(estonia.UTILITIES, "E_601_elektriliin_j")[0]) == 4  # no filter, and no columns asked for
 
 
+def test_settlements_are_named_once_at_their_middle_without_their_type_word(tmp_path):
+    import zipfile
+    from pyogrio.raw import write
+    square = lambda e, n, side: shapely.box(e, n, e + side, n + side)
+    town = square(610600, 6569600, 800)
+    bent = shapely.Polygon([(611100, 6570100), (611400, 6570100), (611400, 6570400), (611300, 6570400), (611300, 6570200), (611100, 6570200)])  # an L, with its centroid outside it
+    rows = [(town, "Tapa linn", "1", "5"), (square(611450, 6570450, 20), "Tapa linn", "1", "5"), (bent, "Tahu küla / Skåtanäs", "2", "8"),
+            (square(611300, 6569500, 50), "Lehtse alevik", "3", "7"), (square(611600, 6570000, 50), "Odd place", "4", "9"), (square(612600, 6570000, 900), "Far küla", "5", "8")]
+    folder = tmp_path / "shapes"
+    folder.mkdir()
+    write(str(folder / "asustusyksus.shp"), np.array([shapely.to_wkb(r[0]) for r in rows], dtype=object), [np.array([r[i] for r in rows], dtype=object) for i in (1, 2, 3)],
+          fields=["ANIMI", "AKOOD", "TYYP"], driver="ESRI Shapefile", geometry_type="Polygon", crs="EPSG:3301")
+    with zipfile.ZipFile(tmp_path / estonia.PLACES, "w") as z:
+        for part in folder.glob("asustusyksus.*"):
+            z.write(part, part.name)
+    points, fields = estonia.place_names(str(tmp_path), Window(611000, 6570000, 1000))
+    found = dict(zip(fields["DISTNAME"], zip(fields["FONTHEIGHT"], points)))
+    assert sorted(found) == ["Lehtse", "Odd place", "Tahu / Skåtanäs", "Tapa"]  # the far village's middle is outside the window
+    assert found["Tapa"][0] == "Large" and found["Lehtse"][0] == "Medium" and found["Tahu / Skåtanäs"][0] == "Medium" and found["Odd place"][0] == "Small"
+    assert (found["Tapa"][1].x, found["Tapa"][1].y) == (611000, 6570000)  # on the town, not its small detached piece
+    assert bent.contains(found["Tahu / Skåtanäs"][1])
+    assert set(fields["CLASSIFICA"]) == {"Populated Place"}
+
+
 def test_an_etak_layer_only_gives_what_is_in_the_window(tmp_path):
     _etak_theme(tmp_path, estonia.UTILITIES, "E_601_elektriliin_j", "nimipinge", [110])
     far_away = estonia.Etak(str(tmp_path), Window(500000, 6500000, 1000))
     assert len(far_away.read(estonia.UTILITIES, "E_601_elektriliin_j")[0]) == 0
+
+
+def test_an_os_download_comes_only_from_os_and_never_runs_past_its_size(tmp_path, monkeypatch):
+    class Endless:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self, _):
+            return b"x" * 1000  # a reply that never ends
+
+    monkeypatch.setattr(download.urllib.request, "urlopen", lambda *a, **k: Endless())
+    good = {"fileName": "t50.zip", "size": 2500, "md5": "0" * 32, "url": "https://api.os.uk/downloads/v1/products/Terrain50/downloads?area=GB"}
+    for bad in ({"url": "http://api.os.uk/x"}, {"url": "https://example.com/x"}, {"size": "2500"}, {"md5": None}, {"md5": "not a checksum"}):
+        with pytest.raises(SystemExit, match="did not describe"):
+            download._fetch({**good, **bad}, str(tmp_path), lambda _: None)
+    with pytest.raises(SystemExit, match="did not download"):
+        download._fetch(good, str(tmp_path), lambda _: None)
+    assert list(tmp_path.iterdir()) == []  # nothing half-written is left

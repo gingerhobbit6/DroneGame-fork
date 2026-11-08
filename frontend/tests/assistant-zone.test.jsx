@@ -166,10 +166,11 @@ describe('moving it out of the way', () => {
     expect($('#wizard').style.left).toBe('462px');
   });
   it('anchors to the nearer edge, so it can never run off the screen', () => {
-    expect(placed(100, 50, BOX, 1600, 900)).toEqual({ left: 100, top: 50, bottom: 'auto', maxHeight: 838, transform: 'none' });
-    expect(placed(100, 500, BOX, 1600, 900)).toEqual({ left: 100, top: 'auto', bottom: 100, maxHeight: 788, transform: 'none' });
-    expect(placed(-50, 5000, BOX, 1600, 900)).toEqual({ left: 0, top: 'auto', bottom: 0, maxHeight: 888, transform: 'none' });
-    expect(placed(5000, -50, BOX, 1600, 900)).toEqual({ left: 1300, top: 0, bottom: 'auto', maxHeight: 888, transform: 'none' });
+    const fixed = { position: 'fixed', right: 'auto', width: BOX.width };
+    expect(placed(100, 50, BOX, 1600, 900)).toEqual({ ...fixed, left: 100, top: 50, bottom: 'auto', maxHeight: 838, transform: 'none' });
+    expect(placed(100, 500, BOX, 1600, 900)).toEqual({ ...fixed, left: 100, top: 'auto', bottom: 100, maxHeight: 788, transform: 'none' });
+    expect(placed(-50, 5000, BOX, 1600, 900)).toEqual({ ...fixed, left: 0, top: 'auto', bottom: 0, maxHeight: 888, transform: 'none' });
+    expect(placed(5000, -50, BOX, 1600, 900)).toEqual({ ...fixed, left: 1300, top: 0, bottom: 'auto', maxHeight: 888, transform: 'none' });
   });
   it('still lets the header buttons work, and ignores a right-click', () => {
     opened();
@@ -203,7 +204,7 @@ describe('moving it out of the way', () => {
     const pending = game.sim.net.pendingRequests;
     pending.push({ id: 'r1', text: 'Engage T1?' });
     refresh();
-    dragTo($('.req-h'), 500, 110);
+    dragTo($('#approval .mv-bar'), 500, 110);
     expect($('#approval').style.left).toBe('462px');
     expect($('#approval').style.transform).toBe('none');
     dragTo(button('Approve'), 700, 300);

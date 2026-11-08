@@ -22,7 +22,7 @@ function traceRange(g, s, x, y, px) {
 }
 
 export function createMinimap(sim, canvas, camera, controls) {
-  const mm = { span: 6500, drag: false };
+  const mm = { span: WORLD.radius - 500, drag: false };
   const g = canvas.getContext('2d');
   const mmXY = (xm, zm) => [(xm / mm.span + 1) * canvas.width / 2, (zm / mm.span + 1) * canvas.width / 2];
   let tick = 0;
@@ -32,9 +32,9 @@ export function createMinimap(sim, canvas, camera, controls) {
     const w = canvas.width, mpu = WORLD.metresPerUnit, data = terrainState.data;
     const px = (metres) => (metres / mm.span) * (w / 2);
     g.fillStyle = '#0a1120'; g.fillRect(0, 0, w, w);
-    if (terrainState.hillshade) {
+    if (view.hillshade) {
       const half = px(data.R);
-      g.globalAlpha = 0.85; g.drawImage(terrainState.hillshade, w / 2 - half, w / 2 - half, 2 * half, 2 * half); g.globalAlpha = 1;
+      g.globalAlpha = 0.85; g.drawImage(view.hillshade, w / 2 - half, w / 2 - half, 2 * half, 2 * half); g.globalAlpha = 1;
     }
     const [ox, oy] = mmXY(0, 0);
     const ring = (r, col, dash) => {
@@ -96,7 +96,7 @@ export function createMinimap(sim, canvas, camera, controls) {
   canvas.addEventListener('pointerdown', (e) => { mm.drag = true; canvas.setPointerCapture(e.pointerId); goTo(e); });
   canvas.addEventListener('pointermove', (e) => { if (mm.drag) goTo(e); });
   canvas.addEventListener('pointerup', () => { mm.drag = false; });
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); mm.span = clamp(mm.span * (e.deltaY > 0 ? 1.15 : 0.87), 1500, 9000); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); mm.span = clamp(mm.span * (e.deltaY > 0 ? 1.15 : 0.87), 1500, WORLD.radius + 2000); }, { passive: false });
 
   return { draw };
 }

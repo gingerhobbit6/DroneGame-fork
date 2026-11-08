@@ -33,8 +33,7 @@ describe('timeline', () => {
   const withReplay = () => {
     const speed = { last: 1 };
     const replay = createReplay({
-      scene: new THREE.Scene(), rec: game.sim.rec, droneTemplate: () => new THREE.Group(),
-      makeLabel: () => document.createElement('div'), placeLabel: () => {}, trackColour: () => 0xffffff,
+      scene: new THREE.Scene(), rec: game.sim.rec, labels: { make: () => document.createElement('div'), place: () => {} },
       getStructures: () => game.sim.structures, labelOf: () => document.createElement('div'), hideLive: () => {},
       getLastSpeed: () => speed.last, ...game.reviewClock,
     });
@@ -46,7 +45,7 @@ describe('timeline', () => {
     const replay = withReplay();
     game.sim.state.warnedWire = true;
     game.sim.commands.startWave();
-    game.sim.run(6000);
+    game.sim.run(13000);
     show(<Timeline />);
     expect($('#review-banner').className).toBe('hidden');
     expect(Number($('#tl-range').max)).toBe(game.sim.rec.frames.length - 1);
@@ -134,7 +133,8 @@ describe('the whole page', () => {
     fireEvent.click($('#btn-deploy'));
     fireEvent.click($('#btn-sandbox'));
     expect($('#tuning').className).toContain('hidden');
-    expect($('#hud-bottom-left summary').textContent).toBe('Legend');
+    expect($('#hud-bottom-left .mv-title').textContent).toBe('Legend');
+    expect($('#hud-bottom-left').className).toContain('minimised'); // it starts shrunk to its title
   });
 });
 

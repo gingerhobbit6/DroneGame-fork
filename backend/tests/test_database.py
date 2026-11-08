@@ -24,16 +24,16 @@ def write(folder, name, sql):
 
 
 def test_from_empty_builds_every_table(conn):
-    assert migrate(conn) == 1
-    assert version(conn) == 1
-    assert {"laydowns", "runs", "figure_sets"} <= tables(conn)
+    assert migrate(conn) == 2
+    assert version(conn) == 2
+    assert {"laydowns", "runs", "figure_sets", "users", "sessions", "units"} <= tables(conn)
 
 
 def test_running_again_changes_nothing(conn):
     migrate(conn)
     conn.execute("INSERT INTO figure_sets (name, figures, game_version, created_at) VALUES ('a', '{}', '1', 'now')")
     conn.commit()
-    assert migrate(conn) == 1
+    assert migrate(conn) == 2
     assert conn.execute("SELECT COUNT(*) FROM figure_sets").fetchone()[0] == 1
 
 
@@ -84,7 +84,7 @@ def test_open_database_creates_the_folder(tmp_path):
     open_database(path)
     open_database(path)
     conn = connect(path)
-    assert version(conn) == 1
+    assert version(conn) == 2
     conn.close()
 
 

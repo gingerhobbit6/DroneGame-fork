@@ -4,7 +4,7 @@
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createGame } from '../src/game.js';
-import { BUILD, DRONES, FIGURE_FIELDS, PEOPLE, PEOPLE_LIMITS, RESEARCHED, exportFigures, importFigures, resetAllFigures } from '../src/sim/config/index.js';
+import { BUILD, CASUALTY, DRONES, FIGURE_FIELDS, PEOPLE, PEOPLE_LIMITS, RESEARCHED, casualtyRadii, exportFigures, importFigures, resetAllFigures } from '../src/sim/config/index.js';
 import { blastOnGround, blastOnSite, bunkerSide } from '../src/sim/people.js';
 import { parsePack, worldId } from '../src/sim/world-pack.js';
 import { terrainState } from '../src/sim/terrain.js';
@@ -224,6 +224,16 @@ describe('saving', () => {
     expect(sim.people.map((g) => g.count)).toEqual([7, 5]);
   });
 
+  it('keeps soldiers as soldiers, saving the role only for them', () => {
+    expect(sim.commands.placePeople(30, 20, 5, 'open', 'military')).toBeNull();
+    expect(sim.commands.placePeople(...CLEAR_SPOT, 7, 'open', 'tank')).toBe('Choose civilians or soldiers');
+    sim.commands.placePeople(...CLEAR_SPOT, 7, 'open');
+    const spec = JSON.parse(JSON.stringify(sim.currentLaydown()));
+    expect(spec.people).toEqual([{ x: 20, z: 20, count: 7, protection: 'open' }, { x: 30, z: 20, count: 5, protection: 'open', role: 'military' }]);
+    expect(sim.commands.loadLaydown(spec, '1')).toBeNull();
+    expect(sim.people.map((g) => g.role)).toEqual(['civilian', 'military']);
+  });
+
   it('ignores a group it does not understand', () => {
     const spec = { structures: [], fusionUplinks: [], fusionCell: 'B8', people: [{ x: 20, z: 20, count: 5, protection: 'toString' }, { x: 20, z: 20, count: 5, protection: 'open' }] };
     expect(sim.commands.loadLaydown(spec, '1')).toBeNull();
@@ -232,8 +242,30 @@ describe('saving', () => {
 });
 
 describe('figures', () => {
-  it('labels every casualty figure as an assumption', () => {
-    for (const key of ['casualtyRadius', 'pCasualty', 'reachScale']) expect(FIGURE_FIELDS[key].basis).toBe('assumption');
+  it('labels every casualty figure as an assumption, and the warhead as researched', () => {
+    for (const key of ['pCasualty', 'reachScale']) expect(FIGURE_FIELDS[key].basis).toBe('assumption');
+    expect(FIGURE_FIELDS.warhead.basis).toBe('research');
+  });
+
+  it('grows the radii with the cube root of the warhead, from the M67 grenade', () => {
+    const m67 = casualtyRadii({ warhead: 0.18 });
+    expect(m67.lethal).toBeCloseTo(5, 0); expect(m67.injury).toBeCloseTo(14, 0); // the US Army's 5 m and 15 m
+    const shahed = casualtyRadii(DRONES.shahed136);
+    expect(shahed.injury / shahed.lethal).toBeCloseTo(CASUALTY.injuryK / CASUALTY.lethalK);
+    expect(shahed.injury).toBeCloseTo(m67.injury * Math.cbrt(DRONES.shahed136.warhead / 0.18));
+    expect(casualtyRadii(DRONES.orlan10)).toEqual({ lethal: 0, injury: 0 }); // a reconnaissance drone carries none
+  });
+
+  it('kills only within the lethal radius and injures only within the injury radius', () => {
+    sim.commands.placePeople(...CLEAR_SPOT, 400, 'open');
+    blastOnGround(fakeWorld(), shahed(), ...CLEAR_SPOT);
+    const g = sim.people[0], { lethal, injury } = casualtyRadii(DRONES.fw), at = (i) => Math.hypot(g.spots[i * 2] - CLEAR_SPOT[0], g.spots[i * 2 + 1] - CLEAR_SPOT[1]) * 20;
+    const killed = g.hits.filter((i) => g.down[i] === 2), injured = g.hits.filter((i) => g.down[i] === 1);
+    expect(killed.length).toBeGreaterThan(0); expect(injured.length).toBeGreaterThan(0);
+    for (const i of killed) expect(at(i)).toBeLessThan(lethal + 1);
+    for (const i of injured) expect(at(i)).toBeLessThan(injury + 1);
+    expect(sim.state.killed).toBe(killed.length); expect(sim.state.injured).toBe(injured.length);
+    expect(sim.state.casualties).toBe(killed.length + injured.length);
   });
 
   it('a bunker shelters more than a building, which shelters more than the open', () => {
@@ -271,6 +303,9 @@ describe('the screens', () => {
     expect($('[data-protection="bunker"]').getAttribute('aria-pressed')).toBe('true');
     expect(view.people).toEqual({ count: 12, protection: 'bunker' });
     expect(document.body.textContent).toMatch(/assumed figures/);
+    fireEvent.click($('[data-role="military"]'));
+    expect($('[data-role="military"]').getAttribute('aria-pressed')).toBe('true');
+    expect(view.people.role).toBe('military');
   });
 
   it('lists the groups, and removes one', () => {
@@ -278,22 +313,23 @@ describe('the screens', () => {
     show(<ToolPicker key="p" />);
     act(() => game.setTool('people'));
     const [g] = sim.people;
-    expect($('.people-list').textContent).toContain('12 · Unarmoured');
+    expect($('.people-list').textContent).toContain('12 civilians · Unarmoured');
     fireEvent.click($(`[data-remove="${g.id}"]`));
     expect(sim.people).toHaveLength(0);
   });
 
-  it('shows casualties in the HUD only when there are people', () => {
+  it('shows casualties in the HUD', () => {
     show(<Hud key="h" />);
-    expect($('#casualties')).toBeNull();
+    expect($('#killed').textContent).toBe('0');
     act(() => { sim.commands.placePeople(...CLEAR_SPOT, 50, 'open'); blastOnGround(fakeWorld(), shahed(), ...CLEAR_SPOT); game.bump(); });
-    expect(Number($('#casualties').textContent)).toBe(sim.state.casualties);
+    expect(Number($('#killed').textContent)).toBe(sim.state.killed);
+    expect(Number($('#injured').textContent)).toBe(sim.state.injured);
   });
 
   it('marks every figure in the Sources tab as an assumption', () => {
     show(<SourcesTab key="s" active={false} />);
-    const fields = [...document.querySelectorAll('input[data-key="pCasualty"], input[data-key="reachScale"], input[data-key="casualtyRadius"]')];
-    expect(fields.length).toBeGreaterThanOrEqual(9); // every drone, real ones included, has a casualty radius
+    const fields = [...document.querySelectorAll('input[data-key="pCasualty"], input[data-key="reachScale"]')];
+    expect(fields.length).toBeGreaterThanOrEqual(6); // both, for each level of protection
     for (const input of fields) expect(input.closest('label').querySelector('.fb').textContent).toBe('ASSUMPTION');
     expect(document.body.textContent).toMatch(/not base real decisions/);
   });
@@ -305,8 +341,9 @@ describe('the screens', () => {
     sim.state.over = true;
     show(<Overlay key="o" />);
     const text = $('#casualty-summary').textContent;
-    expect(text).toContain(`unarmoured ${sim.people[0].hits.length} of 50`);
-    expect(text).toMatch(/in a bunker \d+ of 20/);
+    const [open] = sim.people, count = (sev) => open.hits.filter((i) => open.down[i] === sev).length;
+    expect(text).toContain(`unarmoured ${count(2)} killed and ${count(1)} injured of 50`);
+    expect(text).toMatch(/in a bunker \d+ killed and \d+ injured of 20/);
     expect(text).toMatch(/assumed figures/);
     sim.state.over = false;
   });

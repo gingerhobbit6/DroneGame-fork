@@ -10,6 +10,7 @@ import numpy as np
 
 MAGIC = b"SGMAP"
 VERSION = 1
+MAX_FEATURES = 32 * 1024 * 1024  # MAX_FEATURES in frontend/src/api/pack-store.js: the game refuses a pack with more
 
 
 @dataclass
@@ -61,6 +62,8 @@ def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: 
     for name, data in grids.raw():
         add(name, gzip.compress(data, 6, mtime=0), len(data))
     text = json.dumps(features, separators=(",", ":")).encode()
+    if len(text) > MAX_FEATURES:
+        raise ValueError(f"the buildings, roads and names come to {len(text) / 1e6:.0f} MB, more than the game reads: build a smaller pack")
     add("features", gzip.compress(text, 6, mtime=0), len(text))
     for index, picture in enumerate(pictures):
         meta = {k: v for k, v in picture.items() if k != "data"}

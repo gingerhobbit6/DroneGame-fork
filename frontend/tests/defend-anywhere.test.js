@@ -2,10 +2,10 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { BUILD, DRONES, STRUCTURES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
-import { inZone, launchPoint } from '../src/sim/attack-area.js';
+import { inZone, launchDistance, launchPoint } from '../src/sim/attack-area.js';
 import { routeProblem } from '../src/sim/patrol.js';
 import { createSimulation } from '../src/sim/simulation.js';
-import { SITE_POS, hdist, onMap, u } from '../src/sim/units.js';
+import { SITE_POS, onMap, u } from '../src/sim/units.js';
 import { suggestSpot } from '../src/ui/assistant/spots.js';
 import { zoneShare } from '../src/ui/coverage.js';
 import { addZonePoint } from '../src/zone.js';
@@ -24,24 +24,34 @@ function placeNear(id, x, z) {
 }
 
 describe('where an attack starts', () => {
-  it('is the same as ever with nothing drawn', () => {
+  it('is the distance asked for, along the bearing, with nothing drawn', () => {
     for (const a of [0, 1, 2.5, 4, 5.5]) {
-      const p = launchPoint(SITE_POS, a);
+      const p = launchPoint(SITE_POS, a, WORLD.spawnDist);
       expect(p.x).toBe(Math.cos(a) * u(WORLD.spawnDist));
       expect(p.z).toBe(Math.sin(a) * u(WORLD.spawnDist));
     }
   });
+  it('is 12 to 15 km out for a quadcopter, out to 26 km for a fixed-wing, and off the map for the Shahed class', () => {
+    expect([launchDistance(DRONES.fpv, 0), launchDistance(DRONES.fpv, 1)]).toEqual([12000, 15000]);
+    expect([launchDistance(DRONES.spotter, 0), launchDistance(DRONES.spotter, 1)]).toEqual([12000, 26000]);
+    expect(launchDistance(DRONES.lancet3, 0.5)).toBe(19000); // a fixed-wing with about 40 km of range
+    expect(launchDistance(DRONES.ch901, 1)).toBe(15000); // a fixed-wing with 10 to 15 km
+    for (const id of ['fw', 'shahed136', 'geran2', 'geran3']) expect(launchDistance(DRONES[id], 0)).toBe(Infinity);
+    const p = launchPoint(SITE_POS, 0, Infinity); // comes in at the edge
+    expect(p.x).toBeCloseTo(u(WORLD.radius - 200));
+    expect(onMap(p.x, p.z)).toBe(true);
+  });
   it('is always on the map, and leaves room to fly in, wherever the area is', () => {
-    for (const [cx, cz] of [[FAR, 0], [-FAR, 0], [0, FAR], [0, -FAR], [FAR, FAR], [-FAR, FAR], [340, 340], [-340, -340], [120, -80]]) {
+    for (const [cx, cz] of [[FAR, 0], [-FAR, 0], [0, FAR], [0, -FAR], [FAR, FAR], [-FAR, FAR], [1340, 1340], [-1340, -1340], [120, -80]]) {
       for (let a = 0; a < 2 * Math.PI; a += 0.13) {
-        const p = launchPoint({ x: cx, z: cz }, a);
+        const p = launchPoint({ x: cx, z: cz }, a, WORLD.spawnDist);
         expect(onMap(p.x, p.z)).toBe(true);
         expect(Math.hypot(p.x - cx, p.z - cz)).toBeGreaterThanOrEqual(u(2000) - 1e-6);
       }
     }
   });
   it('still comes from the bearing asked for when there is room', () => {
-    const p = launchPoint({ x: FAR, z: 0 }, Math.PI); // towards the middle of the map, with plenty of room
+    const p = launchPoint({ x: FAR, z: 0 }, Math.PI, WORLD.spawnDist); // towards the middle of the map, with plenty of room
     expect(p.x).toBeCloseTo(FAR - u(WORLD.spawnDist));
   });
 });
@@ -51,22 +61,22 @@ describe('with an area drawn', () => {
 
   it('can be drawn anywhere on the map, and not off it', () => {
     expect(addZonePoint(null, FAR, 100).points).toEqual([[FAR, 100]]);
-    expect(addZonePoint(null, 340, -340).points).toEqual([[340, -340]]);
-    expect(addZonePoint(null, 400, 0)).toBeNull();
+    expect(addZonePoint(null, 1340, -1340).points).toEqual([[1340, -1340]]);
+    expect(addZonePoint(null, 1500, 0)).toBeNull();
   });
   it('lets you build far from the station, and close to it', () => {
     expect(placeNear('radar', FAR, 0)).toBe(true);
     expect(placeNear('rf', 0, u(BUILD.minDist / 2))).toBe(true);
-    expect(sim.commands.place('radar', 400, 0)).toMatch(/off the map/);
+    expect(sim.commands.place('radar', 1500, 0)).toMatch(/off the map/);
   });
   it('sends the attack at the area, from around the area', () => {
     sim.commands.enterSandbox();
     for (let i = 0; i < 12; i++) {
-      const d = sim.spawnDrone('fw', (i / 12) * 2 * Math.PI);
+      const d = sim.spawnDrone('fw', (i / 12) * 2 * Math.PI); // the Shahed class comes in at the edge of the map
       expect(onMap(d.pos.x, d.pos.z)).toBe(true);
-      expect(hdist(d.pos, sim.state.zoneCentre)).toBeLessThanOrEqual(u(WORLD.spawnDist) + 1e-6);
+      expect(Math.max(Math.abs(d.pos.x), Math.abs(d.pos.z))).toBeCloseTo(u(WORLD.radius - 200));
     }
-    sim.run(6000);
+    for (let n = 0; n < 40000 && sim.drones.length; n += 500) sim.run(500);
     expect(sim.ledger.leaked.fw).toBeGreaterThan(0);
     expect(sim.drones.length).toBe(0);
   }, 60000);
@@ -74,7 +84,7 @@ describe('with an area drawn', () => {
     sim.commands.setZone(square(340, 340));
     sim.commands.enterSandbox();
     sim.spawnDrone('spotter', 0);
-    sim.run(16000);
+    for (let n = 0; n < 80000 && sim.drones.length; n += 500) sim.run(500);
     expect(sim.ledger.launched.spotter).toBe(1);
     expect(sim.drones.length).toBe(0);
     expect(sim.ledger.escaped.spotter).toBe(1);
@@ -121,7 +131,7 @@ describe('one reach rule for systems, people and patrols', () => {
     expect(sim.commands.placePeople(FAR, 0, 5, 'open')).toMatch(/build zone/);
     sim.commands.setZone(square(FAR, 0));
     expect(near((x, z) => sim.commands.placePeople(x, z, 5, 'open'), FAR, 0)).toBe(true);
-    expect(sim.commands.placePeople(400, 0, 5, 'open')).toMatch(/off the map/);
+    expect(sim.commands.placePeople(1500, 0, 5, 'open')).toMatch(/off the map/);
   });
   it('lets a patrol walk far from the station, with systems placed beside it', () => {
     const route = farRoute();
@@ -129,8 +139,9 @@ describe('one reach rule for systems, people and patrols', () => {
     expect(sim.commands.setPatrol(route)).toBeNull();
     expect(sim.siteIsFree()).toBe(true);
     const [[x, z]] = route;
-    expect(near((px, pz) => sim.commands.place('rf', px, pz), x, z + 30)).toBe(true);
-    expect(routeProblem(square(345, 0, 10))).toMatch(/off the map/);
+    expect(near((px, pz) => sim.commands.place('rf', px, pz), x, z + 3)).toBe(true); // inside its 200 m corridor
+    expect(sim.commands.place('rf', x, z + 30)).toMatch(/inside its corridor/);
+    expect(routeProblem(square(1370, 0, 10))).toMatch(/off the map/);
   });
   it('will not have an area and a patrol at once, whichever comes first', () => {
     const route = farRoute();

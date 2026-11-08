@@ -39,7 +39,7 @@ describe('the people step', () => {
     fireEvent.click($('#wz-people [data-protection="bunker"]'));
     act(() => { game.sim.commands.placePeople(20, 20, view.people.count, view.people.protection); game.bump(); }); // what a map click does with the People tool
     expect(game.sim.people.map((g) => [g.count, g.protection])).toEqual([[25, 'bunker']]);
-    expect($('#wz-people .people-list').textContent).toContain('25 · In a bunker');
+    expect($('#wz-people .people-list').textContent).toContain('25 civilians · In a bunker');
     fireEvent.click(button('Next'));
     expect($('#wizard h2').textContent).toBe('Rehearse before it counts');
     expect(game.getTool()).toBeNull();

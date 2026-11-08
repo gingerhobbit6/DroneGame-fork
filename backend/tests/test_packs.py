@@ -1,6 +1,7 @@
 """Listing and serving map packs, and starting a build: only plain names, only one at a time, and never a shell."""
 
 import json
+import shutil
 import struct
 import threading
 
@@ -8,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from conftest import sign_up
 from app.services.packs import BuildBusy, PackBuilder, PackLibrary, read_summary
 
 API = "/api/v1/packs"
@@ -29,6 +31,7 @@ def root(tmp_path, monkeypatch):
 @pytest.fixture
 def client(root, tmp_path):
     with TestClient(create_app(tmp_path / "test.db", game=tmp_path / "no-game"), base_url="http://localhost") as c:
+        sign_up(c)
         yield c
 
 
@@ -99,7 +102,7 @@ def test_a_build_runs_with_fixed_arguments_and_no_shell(root):
     command, options = calls[0]
     assert isinstance(command, list) and "shell" not in options
     assert "422000,166000" in command and "--fetch" in command
-    assert command[command.index("--lidar-km") + 1] == "14"
+    assert command[command.index("--lidar-km") + 1] == "54" and command[command.index("--size") + 1] == "70"
     assert command[command.index("--out") + 1].endswith("area_422_166.sgmap")
     assert wait_finished(builder) == {"running": False, "ok": True, "message": "Finished"}
 
@@ -124,6 +127,14 @@ def test_only_one_build_at_a_time(root):
 def test_a_missing_builder_is_reported(root):
     builder, _ = builder_with(root, FileNotFoundError())
     assert builder.start(1, 2, True) == {"running": False, "ok": False, "message": "The map builder could not start. It needs uv installed."}
+
+
+def test_a_map_folder_that_cannot_be_made_ends_the_build_so_another_can_start(root):
+    builder, calls = builder_with(root, FakeProcess([], 0))
+    shutil.rmtree(builder.library.folder, ignore_errors=True)
+    builder.library.folder.write_text("in the way", encoding="utf-8")  # a file where the folder should be
+    assert builder.start(1, 2, True) == {"running": False, "ok": False, "message": "The map folder could not be made."}
+    assert builder.start(1, 2, True)["ok"] is False and not calls  # not busy, and nothing ran
 
 
 def test_the_build_route_checks_its_input_and_refuses_a_second_build(client):
@@ -166,6 +177,8 @@ def test_lists_only_finished_os_downloads(client, root):
         (root / "estonia" / f"ETAK_Eesti_SHP_{theme}.zip").write_bytes(b"x")
     assert client.get(f"{API}/downloads").json()["estonia"] == {"heights": True, "surface": False, "features": False}  # one theme is missing
     (root / "estonia" / "ETAK_Eesti_SHP_tehnovorgud.zip").write_bytes(b"x")
+    assert client.get(f"{API}/downloads").json()["estonia"]["features"] is False  # the settlement names are missing
+    (root / "estonia" / "asustusyksus_shp.zip").write_bytes(b"x")
     assert client.get(f"{API}/downloads").json()["estonia"]["features"] is True
 
 
@@ -182,7 +195,7 @@ def test_an_estonian_build_uses_its_own_folder_and_lidar_across_the_whole_pack(r
     jobs.start(611700, 6570700, True)
     command = calls[0]
     assert command[command.index("--data") + 1] == str(root / "estonia")
-    assert command[command.index("--lidar-km") + 1] == "30"
+    assert command[command.index("--lidar-km") + 1] == "70"
     assert command[command.index("--centre") + 1] == "611700,6570700"
 
 

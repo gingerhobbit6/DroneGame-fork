@@ -1,12 +1,22 @@
 // What the wizard knows: which steps are done, and which weapon answers which drone. It only reads the game, and only what
 // the player could see for themselves: the config and the laydown, never the wave queue or where drones really are.
 
-import { DRONE_CLASSES, STRUCTURES, TOOLBAR } from '../../sim/config/index.js';
+import { DRONE_CLASSES, SENSING, STRUCTURES, TOOLBAR } from '../../sim/config/index.js';
 import { reachFor } from '../../sim/network/sensors.js';
+import { typicalAltitude } from '../../sim/site-range.js';
 
 export const STEP_IDS = ['zone', 'sensors', 'effectors', 'network', 'coverage', 'people', 'rehearse', 'refine', 'preflight'];
 
 const placed = (sim, role) => sim.structures.filter((s) => s.def.role === role);
+// With a deployment pack, what of it is still to place ({ id: how many }); null without a pack, when the whole catalogue is open.
+export function kitLeft(sim) {
+  const kit = sim.state.kit;
+  if (!kit) return null;
+  const left = { ...kit };
+  for (const s of sim.structures) if (left[s.def.id]) left[s.def.id]--;
+  return Object.fromEntries(Object.entries(left).filter(([, n]) => n > 0));
+}
+const budgetOf = (sim) => (sim.state.packed ? Infinity : sim.state.budget); // a pack's budget only counts the cost
 // One size of each kind, for the table of which kinds answer which drone. Which size to buy is systemFor's job.
 const catalogue = (role) => Object.values(STRUCTURES).filter((d) => d.role === role && (d.size ?? 'M') === 'M' && !d.variantOf);
 
@@ -39,8 +49,8 @@ export const kindName = (kind) => familyOf(kind).name;
 // How far out along the ground this system reaches this drone at its usual height: 0 if the drone flies above its reach.
 // Ground clutter also hides a low flyer from radar beyond its low-flyer range.
 export function reachAgainst(def, drone) {
-  const flies = (drone.alt[0] + drone.alt[1]) / 2;
-  const reach = def.role !== 'sensor' ? def.range : Math.min(reachFor(def, drone), def.lowAlt && flies < def.lowAlt ? def.lowRange : Infinity);
+  const flies = typicalAltitude(drone);
+  const reach = def.role !== 'sensor' ? def.range : Math.min(reachFor(def, drone), def.lowAlt && flies < def.lowAlt && drone.speed < SENSING.clutterSpeed ? def.lowRange : Infinity);
   return Math.sqrt(Math.max(reach ** 2 - flies ** 2, 0));
 }
 
@@ -48,8 +58,10 @@ export const warningAgainst = (def, drone) => reachAgainst(def, drone) / drone.s
 
 // Which system of this kind to place against these drones: the one that gives enough warning of the most of them, then the
 // cheapest of those. If it warns of none, the one that reaches furthest. It stays within the budget while anything fits.
-export function systemFor(kind, threats, budget) {
-  const fits = familyOf(kind).classes.map((id) => STRUCTURES[id]).filter((def) => def.role === 'sensor' || threats.some((d) => answer(d, def) === 'Yes'));
+// With a pack, only what of it is left to place (kit); undefined if none of it fits.
+export function systemFor(kind, threats, budget, kit = null) {
+  const fits = familyOf(kind).classes.filter((id) => !kit || kit[id]).map((id) => STRUCTURES[id]).filter((def) => def.role === 'sensor' || threats.some((d) => answer(d, def) === 'Yes'));
+  if (!fits.length) return undefined;
   const affordable = fits.filter((def) => def.cost <= budget);
   const warned = (def) => threats.filter((d) => warningAgainst(def, d) >= WARNING[def.role]).length;
   const furthest = (def) => Math.max(...threats.map((d) => reachAgainst(def, d)));
@@ -57,18 +69,22 @@ export function systemFor(kind, threats, budget) {
 }
 
 // The system to answer this drone: the cheapest kind that clearly does, in the size this drone calls for.
-export function effectorFor(drone, budget = Infinity) {
-  const cheapest = catalogue('effector').filter((def) => answer(drone, def) === 'Yes').sort((a, b) => a.cost - b.cost)[0];
-  return cheapest && systemFor(cheapest.kind, [drone], budget);
+// With a pack, the cheapest of its own systems left to place that answers it, or undefined.
+export function effectorFor(drone, budget = Infinity, kit = null) {
+  const kinds = kit ? Object.keys(kit).map((id) => STRUCTURES[id]).filter((def) => def.role === 'effector') : catalogue('effector');
+  const cheapest = kinds.filter((def) => answer(drone, def) === 'Yes').sort((a, b) => a.cost - b.cost)[0];
+  return cheapest && systemFor(cheapest.kind, [drone], budget, kit);
 }
 
 // Each kind of sensor, marked with whether it is in the laydown yet and which system to place against these drones.
+// With a pack, only the kinds it holds, each with its own system: done once all of that kind in the pack is placed.
 export function sensorChecklist(sim, threats = DRONE_CLASSES) {
-  const have = new Set(placed(sim, 'sensor').map((s) => s.def.kind));
-  const kinds = catalogue('sensor').map((def) => def.kind).filter((kind, i, all) => all.indexOf(kind) === i);
+  const have = new Set(placed(sim, 'sensor').map((s) => s.def.kind)), left = kitLeft(sim), kit = sim.state.kit;
+  const kinds = catalogue('sensor').map((def) => def.kind).filter((kind, i, all) => all.indexOf(kind) === i)
+    .filter((kind) => !kit || familyOf(kind).classes.some((id) => kit[id]));
   return kinds.map((kind) => {
-    const def = systemFor(kind, threats, sim.state.budget);
-    return { kind, name: kindName(kind), def, threats, done: have.has(kind) };
+    const def = systemFor(kind, threats, budgetOf(sim), left) ?? systemFor(kind, threats, Infinity, kit); // all placed: name what was
+    return { kind, name: kindName(kind), def, threats, done: left ? !familyOf(kind).classes.some((id) => left[id]) : have.has(kind) };
   });
 }
 
@@ -76,8 +92,8 @@ export function stepStatus(sim, zone) {
   const kinds = new Set(placed(sim, 'sensor').map((s) => s.def.kind));
   return {
     zone: !!(zone && zone.closed),
-    sensors: kinds.has('radar') && kinds.size >= 2,
-    effectors: unanswered(sim).length === 0,
+    sensors: sim.state.kit ? sensorChecklist(sim).every((r) => r.done) : kinds.has('radar') && kinds.size >= 2,
+    effectors: sim.state.kit ? unanswered(sim).every((d) => !effectorFor(d, Infinity, kitLeft(sim))) : unanswered(sim).length === 0, // nothing left in the pack would help
     network: sim.structures.length > 0 && sim.unwired().length === 0 && sim.net.fusion.uplinks.size > 0,
   };
 }

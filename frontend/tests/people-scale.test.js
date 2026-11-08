@@ -23,11 +23,12 @@ beforeEach(() => {
 });
 afterEach(() => { sim.commands.reset('clear'); sim.commands.deploy('1', '1'); });
 
-// Height and width in metres of every person drawn.
-function measure() {
+// Height and width in metres of every civilian drawn (top and skin), or every soldier (helmet to boots, arms to arms).
+function measure(role = 'civilian') {
   const scene = new THREE.Scene();
   createPeopleViews(scene, sim, labels).sync();
-  const [bodies, heads] = scene.children;
+  const [, top, skin, soldier] = scene.children;
+  const [bodies, heads] = role === 'military' ? [soldier, soldier] : [top, skin];
   heads.geometry.computeBoundingBox(); bodies.geometry.computeBoundingBox();
   const tall = heads.geometry.boundingBox.max.y, wide = bodies.geometry.boundingBox.max.x - bodies.geometry.boundingBox.min.x;
   const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
@@ -51,6 +52,12 @@ describe('people at true scale', () => {
     expect(TERRAIN.visualScale).toBeGreaterThan(1);
     expect(sim.commands.placePeople(20, 20, 30, 'open')).toBeNull();
     human(measure());
+  });
+
+  it('soldiers too, in their helmets and armour', () => {
+    expect(sim.commands.placePeople(20, 20, 30, 'open', 'military')).toBeNull();
+    human(measure('military'));
+    expect(measure()).toEqual([]);
   });
 
   it('on a real map', () => {

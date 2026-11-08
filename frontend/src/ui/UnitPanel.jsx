@@ -4,19 +4,21 @@
 import { useState } from 'react';
 import { COMMS, DRONES, DRONE_CLASSES, SENSING, SPECTRUM, WORLD } from '../sim/config/index.js';
 import { money } from '../sim/economy.js';
-import { magazineWord } from '../sim/magazine.js';
-import { burnTime, hitChance } from '../sim/hit-chance.js';
+import { magazineWord, reloadsInFight } from '../sim/magazine.js';
+import { burnTime, hitChance, layTime } from '../sim/hit-chance.js';
 import { ERROR_AT_LIMIT, predictRange, reachFor, usesPath } from '../sim/site-range.js';
 import { arcsText, coverArc, elevationBand } from '../sim/sensor-model.js';
 import { CHANNELS, IDENTIFY_PX, RECOGNISE_PX, hasZoom } from '../sim/camera-model.js';
 import { LIBRARIES, covers, libraryKnows } from '../sim/rf-model.js';
+import { canFollow } from '../sim/jamming.js';
 import { terrainState } from '../sim/terrain.js';
-import { fmtTime, hex, useGame, useTick } from './hooks.js';
+import { fmtTime, hex, km, useGame, useTick } from './hooks.js';
+import { view } from '../render/view.js';
 import { stateWord } from './dock/NetworkSide.jsx';
 import { SiteRange } from './SiteRange.jsx';
 import { UnitEditor } from './UnitEditor.jsx';
+import { Movable } from './Movable.jsx';
 
-const km = (metres) => `${(metres / 1000).toFixed(1)} km`;
 const plural = (n, word) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
 const names = (ids) => ids.map((id) => DRONES[id].name).join(', ');
 const PD_AT_REACH = Math.round(100 / (1 + Math.pow(1 / SENSING.pdEdge, SENSING.pdSlope)));
@@ -92,7 +94,7 @@ function Stores({ s, now, state, frame }) {
       <Row label="Magazine">{now.rounds} / {def.magazine} rounds{shown}</Row>
       <Row label="Fired">{plural(now.fired, 'round')}</Row>
       <Row label="In storage">{plural(now.storage, 'round')}{state.sandbox ? ', not used up in the sandbox' : ''}</Row>
-      <Row label="Reload">{def.reloadTime} s to fill the magazine, {def.cooldown} s between shots</Row>
+      <Row label="Reload">{def.reloadTime} s to fill the magazine{reloadsInFight(def) ? '' : ', only once the wave is over'}, {def.cooldown} s between shots</Row>
       <Row label="Per round"><PerShot def={def} state={state} frame={frame} /></Row>
     </>
   );
@@ -101,6 +103,8 @@ function Stores({ s, now, state, frame }) {
 // What this jammer's active bands do to one type of drone.
 function jamEffect(s, drone) {
   const links = drone.links || {}, reactive = s.def.technique === 'reactive';
+  if (s.def.technique === 'spoof') return links.gnss && s.jamBands.has('gnss') ? `turned off course${drone.jamResist > 0 ? `, resists ${Math.round(drone.jamResist * 100)}%` : ''}` : 'not affected';
+  if (s.def.technique === 'takeover') return canFollow(s.def, drone) && s.jamBands.has(links.control) ? 'taken over and landed' : 'not affected';
   if (reactive && !libraryKnows(s.def, drone)) return 'not known to its library';
   const hit = [];
   if (links.control && s.jamBands.has(links.control)) hit.push('control');
@@ -164,7 +168,7 @@ function Odds({ def }) {
           return [<span key={d.id}>{d.name}{hits > 1 ? `, ${hits} hits` : ''}</span>, <span key={`${d.id}-near`}>{cell(d, 0)}</span>, <span key={`${d.id}-far`}>{cell(d, def.range)}</span>];
         })}
       </span>
-      <span className="muted">{beam ? 'Drones that evade take longer, and they get better at it each wave. Rain and haze shorten its reach.' : 'On a good track. A poor track lowers it, and drones get harder to hit each wave.'}</span>
+      <span className="muted">{beam ? `${layTime(def) ? `Plus ${layTime(def)} s to swing onto each new drone first. ` : ''}Drones that evade take longer, and they get better at it each wave.${def.rfBeam ? '' : ' Rain and haze shorten its reach.'}` : 'On a good track. A poor track lowers it, and drones get harder to hit each wave.'}</span>
     </Row>
   );
 }
@@ -173,6 +177,8 @@ function jammerLimits(def, arc) {
   const lib = def.library && LIBRARIES[def.library];
   const out = [arc < 360 ? `Jams only through ${arc}° facing ${def.facing ?? 0}°` : 'Jams all round', 'A control link is easier to jam the further the drone is from its operator'];
   if (def.technique === 'reactive') out.push(lib?.knows ? `Reactive: only drones its ${lib.name} library knows, while its receiver hears them` : 'Reactive with no library to follow links by, so it jams nothing');
+  if (def.technique === 'spoof') out.push('Spoofing: false GNSS positions turn navigating drones off course; it jams no link');
+  if (def.technique === 'takeover') out.push(lib?.knows?.includes('commercial') ? 'Takes over commercial drones its receiver hears, and lands them' : 'It needs a receiver with a commercial library to take drones over');
   if (def.trigger === 'receiver') out.push(lib ? 'Switches itself on when its receiver hears a drone, even with the network down' : 'It has no receiver, so it never switches itself on');
   if (def.trigger === 'manual') out.push('Jams only while you switch it on');
   return out.join('. ');
@@ -182,7 +188,7 @@ function limitsOf(def) {
   const band = elevationBand(def), arc = coverArc(def);
   const edge = (e) => (e < 0 ? `${-e}° below the horizon` : e > 0 ? `${e}° up` : 'the horizon');
   const looks = def.kind === 'radar' && `${arc < 360 ? `Looks through ${arc}° facing ${def.facing ?? 0}°` : 'Looks all round'}${band ? `, from ${edge(band[0])} to ${edge(band[1])}` : ''}${def.blank ? `, blind over ${arcsText(def.blank)}` : ''}`;
-  if (def.lowAlt) return `${looks ? `${looks}. ` : ''}Below ${def.lowAlt} m, unreliable beyond about ${def.lowRange} m (ground clutter)`;
+  if (def.lowAlt) return `${looks ? `${looks}. ` : ''}Below ${def.lowAlt} m, a drone moving slower than ${SENSING.clutterSpeed} m/s is lost in ground clutter beyond about ${def.lowRange} m`;
   if (def.fov) return `${def.fov}° search view${hasZoom(def) ? `, ${def.trackFov}° on a cue` : ''}, so it must be pointed. Another sensor cues it. ${CHANNELS[def.channels].label}${def.channels === 'both' ? ' channels' : ' only'}`;
   if (def.fire === 'beam') return 'Needs a clear line of sight, and engages one target at a time';
   if (def.kind === 'jammer') return jammerLimits(def, arc);
@@ -197,14 +203,15 @@ function measuresOf(def) {
   if (n.el != null) out.push(`elevation ±${+n.el.toFixed(2)}°`);
   else if (def.kind === 'radar') out.push('no height');
   if (def.sapient.velocity) out.push('velocity');
-  if (def.kind === 'camera') out.push(`airframe type once the drone covers ${RECOGNISE_PX} pixels, surely at ${IDENTIFY_PX}`);
+  if (def.kind === 'camera') out.push(`airframe type once the drone covers ${RECOGNISE_PX} pixels, and its model at ${IDENTIFY_PX}`);
   if (def.microDoppler === 'yes') out.push('multirotor or fixed wing, close in');
-  if (def.kind === 'rf') out.push(LIBRARIES[def.library].knows ? `the airframe, where its ${LIBRARIES[def.library].name} library knows the link` : 'energy in the band, not what it is');
+  if (def.kind === 'rf') out.push(LIBRARIES[def.library].knows ? `the airframe, where its ${LIBRARIES[def.library].name} library knows the link, and the model of a commercial drone` : 'energy in the band, not what it is');
   const text = out.join(', ');
   return text[0].toUpperCase() + text.slice(1);
 }
 
 function NetworkRow({ s, comms }) {
+  if (s.def.networked === false) return <Row label="Network"><span className="muted">Worked by its crew, off the network: it cannot be wired, and fires or jams at what its crew can see.</span></Row>;
   if (!s.uplink) return <Row label="Network"><span className="warn">No terminal: this system is offline</span></Row>;
   const info = comms.nodeLink(s), path = comms.pathFor(s);
   const via = s.uplink === 'cellular' ? `Cellular ${COMMS.cellular.bands[s.cellBand].label}` : COMMS[s.uplink].name;
@@ -249,9 +256,10 @@ function UnitCard({ s, game }) {
   const editing = side === 'configure' && !frame;
   const ranging = side === 'range' && !frame;
   return (
-    <div id="unit-panel" className="panel" role="region" aria-label={`Selected system: ${s.short}`}>
+    <Movable id="unit-panel" title="Selected system" role="region" aria-label={`Selected system: ${s.short}`}>
       <div className="up-head" style={{ borderLeftColor: hex(def.color) }}>
         <b>{s.short} · {s.custom?.name || def.name}</b>
+        {!frame && <button id="unit-eye" className="up-eye" aria-pressed={view.eye === s} title="Watch from the top of its mast: what it engages or tracks, and the drones and rounds coming in" onClick={() => game.lookFrom(view.eye === s ? null : s)}>{view.eye === s ? 'Map view' : 'View from here'}</button>}
         <button id="unit-close" aria-label="Close the Unit panel" title="Close (Esc)" onClick={() => game.select(null)}>×</button>
       </div>
       {frame && <div className="up-review">Reviewing {fmtTime(frame.t)}. Network and totals are hidden, because they are not recorded.</div>}
@@ -280,7 +288,7 @@ function UnitCard({ s, game }) {
       {isEffector && !frame && <Totals def={def} ledger={ledger} />}
       <Row label="Modelled on">{def.ref.analogues.join(', ')}<span className="muted">{def.ref.confidence}</span></Row>
       </>}
-    </div>
+    </Movable>
   );
 }
 

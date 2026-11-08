@@ -24,7 +24,7 @@ describe('zone', () => {
   it('ignores a double-click before there are three points, and clicks off the ground', () => {
     const zone = addZonePoint(null, 0, 0);
     expect(addZonePoint(zone, 0.5, 0.5)).toBe(zone);
-    expect(addZonePoint(zone, 999, 0)).toBe(zone);
+    expect(addZonePoint(zone, 1500, 0)).toBe(zone);
   });
   it('starts again after a closed zone, and closes itself at the point limit', () => {
     expect(addZonePoint(square, 10, 10)).toEqual({ points: [[10, 10]], closed: false });
@@ -59,7 +59,7 @@ describe('which system to recommend', () => {
   const warned = (def, threats) => threats.filter((d) => warningAgainst(def, d) >= WARNING[def.role]).length;
   it('follows the threat, not a default size', () => {
     expect(systemFor('radar', [DRONES.spotter], 15e6).size).toBe('S'); // high and easy to see
-    expect(systemFor('radar', [DRONES.fo], 15e6).size).toBe('L'); // low, in the clutter: it needs all the reach it can get
+    expect(systemFor('radar', [DRONES.fo], 15e6).size).toBe('M'); // the small radar's 1 km gives under a minute's warning of it
     expect(new Set(DRONE_CLASSES.map((d) => systemFor('radar', [d], 15e6).id)).size).toBeGreaterThan(1);
   });
   it('warns of the most threats, then costs the least', () => {
@@ -73,8 +73,10 @@ describe('which system to recommend', () => {
     expect(systemFor('radar', [DRONES.fo], 100000).cost).toBeLessThanOrEqual(100000);
     expect(systemFor('radar', [DRONES.fo], 1).kind).toBe('radar');
   });
-  it('takes a low flyer out of radar reach beyond its low-flyer range', () => {
-    expect(reachAgainst(STRUCTURES.radar, DRONES.fo)).toBeCloseTo(STRUCTURES.radar.lowRange, -1);
+  it('takes a slow low flyer out of radar reach beyond its low-flyer range, but not a moving one', () => {
+    const hovering = { ...DRONES.fo, speed: 3 }; // slower than a Doppler filter can tell from the ground
+    expect(reachAgainst(STRUCTURES.radar, hovering)).toBeCloseTo(STRUCTURES.radar.lowRange, -1);
+    expect(reachAgainst(STRUCTURES.radar, DRONES.fo)).toBeGreaterThan(STRUCTURES.radar.lowRange); // low, but moving at 18 m/s
     expect(reachAgainst(STRUCTURES.radar, DRONES.fpv)).toBeGreaterThan(STRUCTURES.radar.lowRange);
   });
   it('recommends by kind on the checklist, and never a system that answers nothing', () => {
@@ -175,6 +177,14 @@ describe('zone coverage', () => {
     expect(scores.length).toBe(DRONE_CLASSES.length);
     expect(scores[0].share).toBeLessThanOrEqual(scores[scores.length - 1].share);
     expect(coverageGrid(sim, 'fo')).toBe(coverageGrid(sim, 'fo'));
+  });
+  it('keeps a share for each outline, and works it out again when the outline moves', () => {
+    setUp(sim, { seed: '1', laydown: MIXED });
+    const near = { closed: true, points: [[-20, -20], [20, -20], [20, 20], [-20, 20]] };
+    const far = { closed: true, points: [[600, 600], [640, 600], [640, 640], [600, 640]] }; // about 12 km out, where nothing reaches
+    expect(zoneShare(sim, 'fpv', near)).toBeGreaterThan(0);
+    expect(zoneShare(sim, 'fpv', far)).toBe(0);
+    expect(zoneShare(sim, 'fpv', { ...near })).toBe(zoneShare(sim, 'fpv', near)); // the same outline in a new object is not scanned again
   });
   it('scores nothing for a zone too small to hold a cell', () => {
     expect(zoneShare(sim, 'fpv', { points: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]], closed: true })).toBe(0);

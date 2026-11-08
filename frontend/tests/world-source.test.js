@@ -2,11 +2,11 @@
 
 import { describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
-import { terrainState } from '../src/sim/terrain.js';
+import { generateTerrain, terrainState } from '../src/sim/terrain.js';
 import { makeWorld, pickMasts, rasterBox } from '../src/sim/world.js';
 import { hereU } from '../src/sim/units.js';
 import { mulberry32 } from '../src/sim/rng.js';
-import { COMMS, STRUCTURES } from '../src/sim/config/index.js';
+import { COMMS, STRUCTURES, TERRAIN, WORLD } from '../src/sim/config/index.js';
 import { MIXED, setUp } from './support/scenarios.js';
 
 const u = (m) => m / 20;
@@ -29,6 +29,24 @@ describe('a world from any source', () => {
     expect(makeWorld({ ...grids, ...features, geo: {} }).onBuilding(5, 0)).toBe(true); // a map with no outlines
     grids.bldg.fill(0);
     expect(w.onBuilding(-8, 0)).toBe(false); // an unmarked cell stays free, so no laydown that worked before can stop working
+  });
+
+  it('finds the same building a scan of every one would, filed by square', () => {
+    const rng = mulberry32(5);
+    const houses = Array.from({ length: 400 }, () => ({ x: (rng() - 0.5) * 2000, z: (rng() - 0.5) * 2000, w: 5 + rng() * 60, d: 5 + rng() * 30, h: 8, angle: rng() * Math.PI }));
+    houses.push({ x: 0, z: 0, w: 900, d: 4, h: 8, angle: 0.3 }); // a long wall across many squares
+    const w = makeWorld({ ...emptyGrids(11, 20, 100), ...features, buildings: houses, geo: {} });
+    const scan = (x, z) => houses.find((b) => {
+      const dx = x - b.x, dz = z - b.z, c = Math.cos(b.angle), s = Math.sin(b.angle);
+      return Math.abs(dx * c - dz * s) <= b.w / 2 + 1 && Math.abs(dx * s + dz * c) <= b.d / 2 + 1;
+    }) || null;
+    let found = 0;
+    for (let i = 0; i < 20000; i++) {
+      const x = (rng() - 0.5) * 2200, z = (rng() - 0.5) * 2200, b = w.buildingAt(x, z);
+      expect(b).toBe(scan(x, z));
+      if (b) found++;
+    }
+    expect(found).toBeGreaterThan(100);
   });
 
   it('answers the rules from its grids', () => {
@@ -76,9 +94,10 @@ describe('a world from any source', () => {
 
   // no station, heights relative to the site, a ridge to the north, and a cliff down to sea to the east
   function handMadeWorld() {
-    const grids = emptyGrids(701, 20, 7000);
-    for (let j = 0; j < 701; j++) for (let i = 0; i < 701; i++) {
-      const x = -7000 + i * 20, z = -7000 + j * 20, k = j * 701 + i;
+    const N = 2 * WORLD.radius / 20 + 1; // as big as a real world, so drones start on it
+    const grids = emptyGrids(N, 20, WORLD.radius);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const x = -WORLD.radius + i * 20, z = -WORLD.radius + j * 20, k = j * N + i;
       let h = -0.004 * z + 25 * Math.sin(x / 700) * Math.sin(z / 900);
       if (z < -3000) h += Math.min(330, (-z - 3000) * 0.3);
       if (x > 1700 && x < 2000) h += (2000 - x) * 0.9;
@@ -117,4 +136,23 @@ describe('a world from any source', () => {
     expect(first.lowest).toBeGreaterThan(0);
     expect(play()).toEqual(first);
   }, 120000);
+});
+
+describe('generated ground', () => {
+  it('is made once for a seed and kept, and made afresh for another seed or other figures', () => {
+    // a small world, as building a full one takes seconds and this checks only what is kept; the size is part of the key
+    const radius = WORLD.radius, relief = TERRAIN.relief;
+    WORLD.radius = 3000;
+    try {
+      const a = generateTerrain('cache-a');
+      expect(generateTerrain('cache-a')).toBe(a);
+      const b = generateTerrain('cache-b');
+      expect(b).not.toBe(a);
+      TERRAIN.relief = relief + 1;
+      expect(generateTerrain('cache-b')).not.toBe(b);
+      TERRAIN.relief = relief;
+      WORLD.radius = radius;
+      expect(generateTerrain('cache-b')).not.toBe(b);
+    } finally { WORLD.radius = radius; TERRAIN.relief = relief; }
+  });
 });

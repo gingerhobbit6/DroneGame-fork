@@ -4,6 +4,8 @@
 import { rand, waveStream } from './rng.js';
 import { makeWave } from './waves.js';
 import { removeDrone } from './drones.js';
+import { tally } from './economy.js';
+import { logEnd } from './flight-log.js';
 
 const byTime = (a, b) => a.t - b.t;
 
@@ -26,14 +28,15 @@ export function launchSandboxWave(w) {
 // bearingDeg is a compass bearing, or 'rand'
 export function launchSandboxAttack(w, { type, count, bearingDeg, gap }) {
   const { state } = w;
+  const dist = rand(); // one launch area for a set bearing; random bearings each roll their own
   for (let i = 0; i < count; i++) {
     const bearing = (bearingDeg === 'rand' ? rand() * 360 : Number(bearingDeg)) * Math.PI / 180 - Math.PI / 2; // compass bearing to a scene angle
-    state.sbQueue.push({ t: state.sbTime + i * gap, type, bearing, jitter: 0, altFrac: rand() });
+    state.sbQueue.push({ t: state.sbTime + i * gap, type, bearing, jitter: 0, altFrac: rand(), dist: bearingDeg === 'rand' ? rand() : dist });
   }
   state.sbQueue.sort(byTime);
 }
 
 export function clearSandboxDrones(w) {
   w.state.sbQueue.length = 0;
-  for (const d of w.drones.slice()) removeDrone(w, d);
+  for (const d of w.drones.slice()) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); removeDrone(w, d); } // cleared away, so none stays airborne in the figures
 }

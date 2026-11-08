@@ -537,7 +537,33 @@ The earlier draft made three small asks of the refactor.
 |---|---|
 | Name the column `world`, not `terrain_seed` | **Done,** in the `laydowns` and `runs` tables. |
 | Pass `deploy` one world value | **Done:** `deploy(seed, world)` takes one string. World choice still needs its own component, which M4 adds. |
-| Validate coordinates against the world's `R` | **Withdrawn.** The backend holds no packs, so it cannot read `R`. Every world cut from a pack has the same 7 km `R`, so the fixed `WORLD_LIMIT` in `schemas.py` is correct. Revisit only if worlds change size. |
+| Validate coordinates against the world's `R` | **Withdrawn.** The backend holds no packs, so it cannot read `R`. Every world cut from a pack has the same `R`, so the fixed `WORLD_LIMIT` in `schemas.py` is correct. Worlds grew to 14 km `R` and then 27 km `R` on 2026-11-07, and `WORLD_LIMIT` moved with them, to 1,350 units. |
+
+## 54 km worlds
+
+On 2026-11-07 Alex asked to double the map, meaning twice the width, which made a world 28 km across. The same day Alex asked for drones to launch from as far as 26 km out, and chose to grow the world again to fit: a world is now 54 km across (`WORLD.radius` 27,000 m), and the furthest a drone starts is 26 km (`WORLD.spawnDist`), 1 km inside the edge.
+
+| Measure | 14 km world | 28 km world | 54 km world |
+|---|---|---|---|
+| Height grid | 701 x 701, 3.4 MB | 1401 x 1401, 14 MB | 2701 x 2701, 51 MB |
+| Generating ground, in Node | 0.28 s | 1.1 s | 3.9 to 4.6 s, so the last ground made is kept (`generateTerrain`) |
+| Coverage map, 250 m cells | 2,916 cells | 12,100 cells, about 150 ms per drone type | 45,796 cells, 130 to 580 ms per drone type |
+| Real map mesh | a vertex every 40 m, 245,000 triangles | every 60 m, 435,000 triangles | every 100 m, about 583,000 triangles |
+| Map texture, 4096 px | 3.4 m per pixel | 6.8 m per pixel | 13.2 m per pixel |
+| Minimap and Plan relief, generated ground | 320 px | 640 px, the same 44 m per pixel | 1,227 px, the same 44 m per pixel |
+| Drawn each frame, Narva pack | not measured | 1.19 million triangles in 16 draw calls, 283 MB of script memory | not measured |
+
+The frame rate is not measured yet: both browsers were hidden while this was checked, and a hidden page gets 30 frames a second at most, so the 33 ms frames seen on the Intel Iris Xe say nothing either way. It needs a check with the game on screen. The coverage map is the slowest part to redraw, and is the first thing to speed up if the bigger world feels slow.
+
+**Where drones start.** Each type has a launch band (`WORLD.launchBand`, read by `launchDistance` in `sim/attack-area.js`): a quadcopter starts 12 to 15 km out, the reach of its radio or fibre, and a fixed-wing drone 12 to 26 km. Each of a wave's launch areas rolls its own share of the band, so attacks come from different distances as well as bearings. A drone's `launch` field can name another band: the Lancet-3, with about 40 km of range, flies the long band, and the CH-901, with 10 to 15 km, the short one. The Shahed class (the generic fixed-wing strike drone and its Shahed, Geran, Gerbera, Feilong-300D, Sunflower-200 and ASN-301 variants) has `launch: 'edge'`: it flies hundreds of km, so it comes in from off the map, at the edge less 200 m along its bearing, which at a corner is up to 38 km from the middle. A strike drone now counts as gone only when it leaves the map, or when GNSS jamming has turned it and it is more than 27 km from the area.
+
+**Packs.** The builder's default is now 70 km, so the site can still move 8 km each way, and English lidar covers the whole 54 km world (about 7.1 GB and 2.5 hours). A pack must be at least as wide as a world, and a smaller one is refused with a message to rebuild it: the 30 km packs (Savernake, Hunstanton and Tapa) and any 44 km one need rebuilding. Hereford and Narva are rebuilt at 70 km; Hereford's fit error is 1.6 m. The 30 km pack for the area around SO 50 40 covered the same ground as Hereford, so it was deleted. The position fit allows 5 m of error, as its error grows with the fourth power of the pack's size: about 3 m at 70 km.
+
+**Generated ground** spreads 48 hamlets out to 2 km inside the edge, and its power lines run to the edge. Masts stay 3.5 to 7 km from the middle. Trees are still drawn only within 4.5 km of the middle, as before; beyond that, woods show in the ground's colour. Real maps draw a coarser mesh as they grow, at least every `(N - 1) / 540` posts.
+
+## Grids on the map
+
+Every real map can show its national grid (OS in Great Britain, L-EST97 in Estonia) or MGRS, chosen in the map panel; G steps through them and then off. MGRS is UTM on WGS 84 with letters for each 100 km square (`sim/mgrs.js`), and it covers the world, so a map in any country can carry it. Its projection is the same transverse Mercator series the OS grid uses (`transverseMercator` in `sim/bng.js`), checked against PROJ to under 5 cm. The map draws the UTM zone of its middle across the whole map, through points every 5 km, as its lines sit at an angle to the national grid; no pack yet straddles a zone edge. The cursor's readout follows the grid that is showing. Typing an MGRS reference is not built yet.
 
 ## Estonia
 
@@ -552,8 +578,11 @@ Estonia was added as a second grid, starting with Tapa. Alex asked for it after 
 | Ground heights | `DTM_10m_eesti.tif`, 10 m, from lidar | 2.2 GB | No, whole country |
 | Tree and building heights | `ndsm_5m_2020-2023_kogu_Eesti.zip`, 5 m, one file per square km | 3.8 GB | No, whole country |
 | Buildings, woods, water, roads, power lines | Five `ETAK_Eesti_SHP_*.zip` themes | 1.3 GB | No, whole country |
+| Place names | `asustusyksus_shp.zip`, the settlement units, from the agency's file store at `s3.pilw.io` | 16 MB | No, whole country |
 | Map picture | `epk_v` tiles at 3.9 m per pixel, 930 for a 30 km pack | About 16 MB, in about 10 minutes | Yes, to the agency |
 | Satellite | Sentinel-2, as in Great Britain | Fetched | Yes, to AWS |
+| Heights past the border | Copernicus DEM GLO-30, 30 m, with its water body mask | About 40 MB for Narva's two tiles | Only the 1 degree square, to AWS |
+| Place names past the border | GeoNames `RU.zip`, CC BY 4.0 | 15 MB | No, all of Russia |
 
 **Choices worth knowing.** Whole-country files were preferred over per-sheet requests, because getting them says nothing about the site, and later builds need no heights or features from the internet. The agency's terms prefer its tiles to its live map service for base maps, and ask for reasonable load, so the builder fetches one tile at a time with a pause. It got HTTP 429 from the download site during research when asking for many small ranges, so it fetches each file once and waits when refused. Lidar covers the whole pack rather than the middle 14 km, because it is already on the machine by then.
 
@@ -561,7 +590,11 @@ Estonia was added as a second grid, starting with Tapa. Alex asked for it after 
 
 **Things the data taught.** The lidar zip uses Deflate64, which Python's `zipfile` cannot read, so it is read through GDAL, and only a spread of its sheets can be checked after download. A `where` filter on a shapefile needs its field among the columns read, or it silently matches nothing.
 
-**Known limits.** Estonian data stops at the national border. At Narva, about half of a 14 km world around the city has no heights or detail, and the builder treats ground with no data as water, as it does for sea. The start card says so, and a site well west of the city avoids most of it. Copernicus 30 m heights could fill the Russian side, but that is untested. Place names are not in ETAK, so names come only from the map picture, and `EGM2008` stands in for the local height system when reporting altitude, as PROJ has no grid for EH2000.
+**Past the border.** Estonian data stops at the national border, and the builder used to treat ground with no data as water, as it does for sea. At Narva that was most of the map, so where Estonian heights stop the builder now fills them from [Copernicus DEM GLO-30](https://registry.opendata.aws/copernicus-dem/): 30 m posts from the AWS open data bucket `copernicus-dem-30m`, no account needed. It fetches whole 1 degree tiles, about 14 to 25 MB each, so a download says little about the site, and checks each against the MD5 that S3 gives as its ETag. Each tile's water body mask marks lakes, rivers and sea. The licence allows copying, sharing and changing the data, commercial use included, and asks for a notice and a no-liability sentence, which the pack header carries as `credits.heights` and the game always shows. GLO-30 is a surface model from radar, so woods and buildings are part of its heights: on the Russian side they block sight as ground does rather than thinning it as trees do, and none are drawn. Its heights are on EGM2008, within a few tenths of a metre of Estonia's EH2000. ESA WorldCover could mark trees and built-up land there, but would count trees twice, so it is not used.
+
+**Names and topography past the border.** The basic map is blank, white or black, past the border. The builder samples its pictures at every post, keeps the blank patches that reach ground Copernicus filled, and outlines them (`tools/mapbuild/mapbuild/beyond.py`, leaving out patches under 0.25 km²). The patches matter: Estonia's heights run a few hundred metres past the border, where the map is already blank, so the filled posts alone left a white strip along the Narva. The pack stores the outline as `features.beyond`, rings in metres from the pack's middle. The game shades that ground from its own heights, with contours and their heights (`paintBeyond` in `render/map-texture.js`), on the basic, light and dark maps. Names there come from GeoNames' file for Russia, which holds only places in Russia, so it needs no border of its own: settlements that are not historical, abandoned or part of another place, written in Latin letters (the plain-letter form when GeoNames has only Cyrillic), large for a town of 2,000 people or an administrative centre and medium otherwise. GeoNames asks for a credit, which the pack carries as `credits.names` and the game always shows.
+
+**Known limits.** Place names are not in ETAK, so they come from the settlement units instead: each is named once, at the middle of its area, with its type word ("linn", "küla") left off. Cities and towns are drawn large, and small towns, city districts, boroughs and villages medium, as OS sizes towns and villages. A village's area is its whole parish of farmland, so its name can sit some way from its houses. `EGM2008` stands in for the local height system when reporting altitude, as PROJ has no grid for EH2000.
 
 ## Assumptions to confirm
 
@@ -569,7 +602,7 @@ Set as defaults. Each is cheap to change now.
 
 | Assumption | Default | If wrong |
 |---|---|---|
-| "GRIDS" means a grid overlay and grid references | BNG 6, 8 and 10 figure | MGRS needs one more small module, and display only |
+| "GRIDS" means a grid overlay and grid references | The national grid's 6, 8 and 10 figure references, and an MGRS or national grid on the map | Typing MGRS needs a parser; the lettering and UTM are in `sim/mgrs.js` |
 | Coverage | Great Britain and Estonia | Each new country needs its own open data and grid. See "Estonia" below for what that took |
 | "Offline" | A laptop with no internet, using packs built beforehand | A truly air-gapped build needs the national files and builder carried across, and that is already possible |
 | Licensing | Open data only | Paid OS products (Terrain 5, Premium zooms) would need their own terms checked, especially on storage |
@@ -577,4 +610,4 @@ Set as defaults. Each is cheap to change now.
 
 ## Left out on purpose
 
-MGRS, maps beyond Great Britain and Estonia, national aerial imagery (it needs a public sector or paid licence), Google imagery, named critical-site presets, full 3D building shapes, weather, Premium OS zooms, worlds spanning several packs, a tile streaming engine, and laydown file export (no such feature exists today, and it would cut against keeping laydowns local).
+Typing MGRS references, maps beyond Great Britain and Estonia, national aerial imagery (it needs a public sector or paid licence), Google imagery, named critical-site presets, full 3D building shapes, weather, Premium OS zooms, worlds spanning several packs, a tile streaming engine, and laydown file export (no such feature exists today, and it would cut against keeping laydowns local).

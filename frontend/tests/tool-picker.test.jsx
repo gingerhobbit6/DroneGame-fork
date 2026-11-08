@@ -56,14 +56,39 @@ describe('the list', () => {
     expect($('#tool-picker')).toBeNull();
   });
 
-  it('lists the real systems of the kind picked, by name', () => {
+  it('opens on a toolbar row with nothing picked, and says what to do', () => {
     show();
     fireEvent.click($('.tool-row .tool'));
+    expect(game.getTool()).toBeNull();
+    expect(game.catalogue()).toBe('radar');
     const text = $('#tool-picker').textContent;
     for (const name of ['Echodyne EchoGuard', 'Robin Radar IRIS', 'Blighter A800', 'Hensoldt Spexer']) expect(text).toContain(name);
     expect(document.querySelectorAll('[data-pick]').length).toBe(6);
-    expect($('[data-pick="radar"]').getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelectorAll('[aria-pressed="true"]').length).toBe(0);
     expect(text).toContain('3.1 km small drone');
+    expect($('#pick-hint').textContent).toMatch(/Drag a system onto the map/);
+    expect(text).not.toMatch(/\b[SML] · /); // no small, medium and large labels
+    fireEvent.click($('[data-pick="radar_a800"]'));
+    expect(game.getTool()).toBe('radar_a800');
+    expect($('#pick-hint').textContent).toMatch(/Blighter A800 is picked: click the map/);
+    fireEvent.click($('.tool-row .tool'));
+    expect(game.getTool()).toBeNull();
+    expect($('#tool-picker')).toBeNull();
+  });
+
+  it('opens another kind\'s list in place of the first', () => {
+    show();
+    act(() => game.setTool('radar'));
+    fireEvent.click(document.querySelectorAll('.tool-row .tool')[1]);
+    expect(game.getTool()).toBeNull();
+    expect($('#tool-picker').getAttribute('aria-label')).toBe('Choose a RF detector');
+  });
+
+  it('picks with the keyboard too', () => {
+    show();
+    act(() => game.openCatalogue('rf'));
+    fireEvent.keyDown($('[data-pick="rf_s"]'), { key: 'Enter' });
+    expect(game.getTool()).toBe('rf_s');
   });
 
   it('switches system without switching placing off', () => {
@@ -76,11 +101,12 @@ describe('the list', () => {
     expect($('.tool-row .k').textContent).toContain('Blighter A800');
   });
 
-  it('marks the size of a further system on the row', () => {
+  it('has no small, medium and large buttons on the rows', () => {
     show();
+    expect(document.querySelector('.tool-sizes')).toBeNull();
+    expect($('.tool-row .k').textContent).toBe('[1] 6 real systems');
     act(() => game.setTool('radar_a800'));
-    const chosen = document.querySelector('.tool-row .tool-sizes button.chosen');
-    expect(chosen.textContent).toBe('M');
+    expect($('.tool-row .k').textContent).toBe('[1] Blighter A800');
   });
 
   it('marks what you cannot afford', () => {
@@ -90,21 +116,27 @@ describe('the list', () => {
     expect($('[data-pick="radar"]').className).toContain('poor');
   });
 
-  it('can be hidden while placing, and comes back next time', () => {
+  it('closes with its button, and stops placing', () => {
     show();
     act(() => game.setTool('radar'));
     fireEvent.click($('#picker-close'));
     expect($('#tool-picker')).toBeNull();
-    expect(game.getTool()).toBe('radar');
-    act(() => game.setTool('radar'));
+    expect(game.getTool()).toBeNull();
     act(() => game.setTool('rf'));
     expect($('#tool-picker')).not.toBeNull();
   });
 
-  it('stays out of the wizard\'s way', () => {
+  it('shows beside the wizard, sharing the column', () => {
     view.wizard = 'open';
     show();
     act(() => game.setTool('radar'));
+    expect($('#tool-picker').className).toContain('with-wizard');
+  });
+
+  it('waits for the game to start', () => {
+    sim.state.started = false;
+    show();
+    act(() => game.openCatalogue('radar'));
     expect($('#tool-picker')).toBeNull();
   });
 
@@ -112,11 +144,11 @@ describe('the list', () => {
     show();
     act(() => game.setTool('radar'));
     expect($('#place-mount')).not.toBeNull();
-    commit($('#place-power'), '50');
+    commit($('#place-watts'), '6'); // half the IRIS's rated 12 W
     expect($('#tool-picker').textContent).toContain('2.6 km');
     commit($('#place-mount'), '500');
     expect($('#place-mount').value).toBe('35');
-    expect($('#tool-picker').textContent).toContain('$1.03M');
+    expect($('#tool-picker').textContent).toContain('£776k');
     fireEvent.click($('[aria-label="Reset Mast height"]'));
     expect(game.loadoutFor('radar').mount).toBeUndefined();
   });
@@ -124,11 +156,11 @@ describe('the list', () => {
   it('keeps settings separately for each system', () => {
     show();
     act(() => game.setTool('radar'));
-    commit($('#place-power'), '50');
+    commit($('#place-watts'), '6');
     fireEvent.click($('[data-pick="radar_a800"]'));
-    expect($('#place-power').value).toBe('100');
+    expect($('#place-watts').value).toBe('4'); // the A800's own rated output
     fireEvent.click($('[data-pick="radar"]'));
-    expect($('#place-power').value).toBe('50');
+    expect($('#place-watts').value).toBe('6');
   });
 
   it('only accepts settings that belong to the system', () => {
@@ -140,10 +172,10 @@ describe('the list', () => {
 describe('placing with chosen settings', () => {
   it('places the unit with them, and charges its real price', () => {
     const before = sim.state.budget;
-    expect(game.commands.place('radar', 30, 0, { mount: 35, power: 50 })).toBeNull();
+    expect(game.commands.place('radar', 30, 0, { mount: 35, watts: 6 })).toBeNull();
     const [s] = sim.structures;
     expect(s.def.mount).toBe(35);
-    expect(s.def.settings.power).toBe(50);
+    expect(s.def.settings.watts).toBe(6);
     expect(sim.state.budget).toBe(before - 1035000);
     expect(sim.ledger.capex).toBe(1035000);
   });
@@ -161,12 +193,12 @@ describe('placing with chosen settings', () => {
   });
 
   it('the real systems survive the rebuild at wave 1 with their settings', () => {
-    game.commands.place('radar_a800', 30, 0, { power: 50 });
+    game.commands.place('radar_a800', 30, 0, { watts: 2 });
     game.commands.place('interceptor_p1', -30, 0);
     sim.state.warnedWire = true;
     game.commands.startWave();
     const a800 = sim.structures.find((s) => s.def.id === 'radar_a800');
-    expect(a800.def.settings.power).toBe(50);
+    expect(a800.def.settings.watts).toBe(2);
     expect(a800.short).toBe('A80-01');
     expect(sim.structures.find((s) => s.def.id === 'interceptor_p1').def.shotCost).toBe(1000);
   });

@@ -13,7 +13,6 @@ import { basisOf } from '../src/ui/dock/SourcesTab.jsx';
 import { followMessages } from '../src/ui/dock/LearnTab.jsx';
 import { drawSpectrum, jamConflicts } from '../src/ui/dock/spectrum-canvas.js';
 import { createMinimap } from '../src/ui/minimap.js';
-import { terrainState } from '../src/sim/terrain.js';
 import { MIXED, setUp, play } from './support/scenarios.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 
@@ -76,10 +75,12 @@ describe('learn tab', () => {
   }, 30000);
 
   it('follows a track through its messages', () => {
-    running(MIXED, 3600);
+    running(MIXED, 0);
+    const named = () => [...game.sim.net.tracks.values()].find((t) => t.short);
+    for (let n = 0; n < 40000 && !named(); n += 100) game.sim.run(100); // drones start 12 to 26 km out: play until one is tracked, before the defence clears the sky
     openDock('learn');
     refresh();
-    const tr = [...game.sim.net.tracks.values()].find((t) => t.short);
+    const tr = named();
     expect(tr).toBeTruthy();
     expect(followMessages(tr).length).toBeGreaterThan(0);
     fireEvent.change($('#follow'), { target: { value: tr.id } });
@@ -107,7 +108,7 @@ describe('cost tab', () => {
     const text = $('#cost').textContent;
     expect(text).toContain('Medium radar');
     expect(text).toContain('terminal');
-    expect(text).toMatch(/\$[\d.]+ of shots/);
+    expect(text).toMatch(/£[\d.]+ of shots/);
     expect(text).toContain('Lost to enemy strikes');
     expect($('#cost a')).not.toBeNull();
   }, 60000);
@@ -198,7 +199,7 @@ describe('minimap', () => {
     cv.setPointerCapture = () => {};
     const camera = { position: { x: 0, y: 300, z: 380 }, fov: 55, aspect: 1.5 };
     const controls = { target: { x: 0, y: 0, z: 0 } };
-    terrainState.hillshade = document.createElement('canvas');
+    view.hillshade = document.createElement('canvas');
     const map = createMinimap(game.sim, cv, camera, controls);
     map.draw(); map.draw();
     view.rings = false; view.truth = false;
@@ -212,6 +213,6 @@ describe('minimap', () => {
     at('pointerup');
     cv.dispatchEvent(new WheelEvent('wheel', { deltaY: 1 }));
     cv.dispatchEvent(new WheelEvent('wheel', { deltaY: -1 }));
-    terrainState.hillshade = null;
+    view.hillshade = null;
   });
 });

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createGame } from '../src/game.js';
 import { COMMS, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { costProblem } from '../src/sim/laydown.js';
-import { UNIT_FIELDS, cleanSettings, fieldsFor, unitCost } from '../src/sim/unit-config.js';
+import { UNIT_FIELDS, cleanSettings, fieldsFor, stepOf, unitCost } from '../src/sim/unit-config.js';
 import { GameContext } from '../src/ui/hooks.js';
 import { UnitPanel } from '../src/ui/UnitPanel.jsx';
 import { CostTab } from '../src/ui/dock/CostTab.jsx';
@@ -48,15 +48,24 @@ describe('the field table', () => {
 describe('what a setting does', () => {
   const set = (id, key, value) => { lay(id); expect(game.commands.configureUnit(unit(id), key, value)).toBeNull(); return unit(id).def; };
 
-  it('radar power trades range and signature', () => {
-    const def = set('radar', 'power', 50);
+  it('radar power, in watts, trades range and signature', () => {
+    const def = set('radar', 'watts', 6); // half the IRIS's rated 12 W
     expect(def.range).toBe(Math.round(3100 * Math.pow(0.5, 0.25)));
     expect(def.signature).toBeCloseTo(0.5);
     expect(def.cost).toBe(900000);
   });
 
+  it('reads a power saved as a percentage as that share of the rated watts, and says where the rating came from', () => {
+    expect(cleanSettings('radar', { power: 50 })).toEqual({ watts: 6 });
+    expect(cleanSettings('radar_a800', { power: 50, watts: 3 })).toEqual({ watts: 3 });
+    const f = fieldsFor('radar_s').find((x) => x.key === 'watts');
+    expect(f.note('radar_s')).toMatch(/Rated 2 W: an assumption/);
+    expect(f.note('radar_a800')).toMatch(/Rated 4 W: published/);
+    expect(stepOf(f, 'jammer_sf')).toBe(50);
+  });
+
   it('jammer power follows the square root', () => {
-    const def = set('jammer', 'power', 25);
+    const def = set('jammer', 'watts', 10); // a quarter of its 40 W
     expect(def.range).toBe(500);
   });
 
@@ -75,7 +84,8 @@ describe('what a setting does', () => {
     expect(unit('radar').def.sapient.interval).toBe(5);
     firstWave();
     let confirmed = false;
-    for (let n = 0; n < 3000 && !confirmed; n++) { sim.step(); confirmed = [...sim.net.tracks.values()].some((tr) => tr.status === 'confirmed'); }
+    // drones start 13 km out
+    for (let n = 0; n < 10000 && !confirmed; n++) { sim.step(); confirmed = [...sim.net.tracks.values()].some((tr) => tr.status === 'confirmed'); }
     expect(confirmed).toBe(true);
   });
 
@@ -99,7 +109,7 @@ describe('what a setting does', () => {
   });
 
   it('settings follow figure edits made in the Sources tab', () => {
-    const def = set('radar', 'power', 50);
+    const def = set('radar', 'watts', 6);
     game.commands.setFigure('structures', 'radar', 'published', 4000);
     expect(def.range).toBe(Math.round(4000 * Math.pow(0.5, 0.25)));
   });
@@ -126,7 +136,7 @@ describe('limits', () => {
   });
 
   it('refuses what is not a value, or not a field of this system', () => {
-    expect(game.commands.configureUnit(unit('radar'), 'power', Number.NaN)).toContain('Not a valid');
+    expect(game.commands.configureUnit(unit('radar'), 'watts', Number.NaN)).toContain('Not a valid');
     expect(game.commands.configureUnit(unit('radar'), 'threshold', 'constructor')).toContain('Not a valid');
     expect(game.commands.configureUnit(unit('radar'), 'view', 3)).toContain('cannot be changed');
     expect(game.commands.configureUnit(unit('radar'), '__proto__', 3)).toContain('cannot be changed');
@@ -167,7 +177,7 @@ describe('price', () => {
     game.commands.configureUnit(sim.structures[0], 'mount', 35);
     render(<GameContext.Provider value={game}><CostTab active /></GameContext.Provider>);
     expect(document.body.textContent).toContain('varies');
-    expect(document.body.textContent).toContain('$1,935,000');
+    expect(document.body.textContent).toContain('£1,451,250');
   });
 });
 
@@ -175,7 +185,7 @@ describe('locks', () => {
   it('nothing but jamming bands changes after the first wave starts', () => {
     lay('jammer');
     firstWave();
-    expect(game.commands.configureUnit(unit('jammer'), 'power', 50)).toContain('locked');
+    expect(game.commands.configureUnit(unit('jammer'), 'watts', 20)).toContain('locked');
     expect(game.commands.renameUnit(unit('jammer'), 'Alpha', '')).toContain('locked');
     expect(unit('jammer').def.range).toBe(1000);
     game.commands.toggleJamBand(unit('jammer'), 'gnss', true);
@@ -223,12 +233,12 @@ describe('saving', () => {
   it('settings, names and prices survive the rebuild when wave 1 starts', () => {
     lay('radar', 'missile');
     game.commands.configureUnit(unit('radar'), 'mount', 35);
-    game.commands.configureUnit(unit('radar'), 'power', 50);
+    game.commands.configureUnit(unit('radar'), 'watts', 6);
     game.commands.renameUnit(unit('radar'), 'North mast', 'NORTH-1');
     firstWave();
     const s = unit('radar');
     expect(s.def.mount).toBe(35);
-    expect(s.def.settings.power).toBe(50);
+    expect(s.def.settings.watts).toBe(6);
     expect([s.name, s.short]).toEqual(['North mast', 'NORTH-1']);
     const terminals = Object.entries(sim.ledger.terminals).reduce((sum, [k, n]) => sum + n * COMMS[k].cost, 0);
     expect(sim.ledger.capex).toBe(1035000 + 1000000 + terminals);
@@ -263,9 +273,9 @@ describe('saving', () => {
 
   it('a run with custom settings replays to its own digest', () => {
     lay('radar', 'jammer', 'interceptor');
-    game.commands.configureUnit(unit('radar'), 'power', 50);
+    game.commands.configureUnit(unit('radar'), 'watts', 6);
     game.commands.configureUnit(unit('radar'), 'scan', 0.5);
-    game.commands.configureUnit(unit('jammer'), 'power', 40);
+    game.commands.configureUnit(unit('jammer'), 'watts', 16);
     game.commands.configureUnit(unit('interceptor'), 'reload', 1.5);
     game.commands.renameUnit(unit('radar'), 'North mast', 'NORTH-1');
     let run = null;
@@ -276,7 +286,7 @@ describe('saving', () => {
     sim.endRun();
     sim.off('runEnded', take);
     const record = JSON.parse(JSON.stringify(run));
-    expect(record.spec.structures.find((l) => l.id === 'radar').settings).toEqual({ power: 50, scan: 0.5 });
+    expect(record.spec.structures.find((l) => l.id === 'radar').settings).toEqual({ watts: 6, scan: 0.5 });
     replayRun(sim, record);
     expect(sim.digest()).toBe(record.digest);
   }, 60000);
@@ -296,9 +306,9 @@ describe('the Configure side of the panel', () => {
     for (const f of fieldsFor('radar')) expect($(`#unit-${f.key}`)).not.toBeNull();
     expect($('#unit-view')).toBeNull();
     commit($('#unit-mount'), '35');
-    expect($('#unit-editor').textContent).toContain('$1.03M');
-    expect($('#unit-editor').textContent).toContain('+$135k');
-    commit($('#unit-power'), '50');
+    expect($('#unit-editor').textContent).toContain('£776k');
+    expect($('#unit-editor').textContent).toContain('+£101k');
+    commit($('#unit-watts'), '6');
     expect($('#unit-editor').textContent).toContain('2.6 km');
   });
 
@@ -374,7 +384,7 @@ describe('the Configure side of the panel', () => {
     act(() => firstWave());
     act(() => game.select(unit('jammer')));
     fireEvent.click($('#unit-configure'));
-    expect($('#unit-power').disabled).toBe(true);
+    expect($('#unit-watts').disabled).toBe(true);
     expect($('#unit-name').disabled).toBe(true);
     expect($('#unit-sell')).toBeNull();
     const gnss = [...document.querySelectorAll('#unit-jamming label')].find((l) => l.textContent.includes('GNSS')).querySelector('input');

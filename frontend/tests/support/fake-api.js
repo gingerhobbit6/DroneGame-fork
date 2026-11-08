@@ -29,7 +29,7 @@ export function createFakeApi() {
       page: async (limit, offset) => { guard(); const all = [...rows.values()].map(summary).reverse(); return { items: all.slice(offset, offset + limit), total: all.length }; },
     };
   };
-  return { state, laydowns: table('laydowns'), figureSets: table('figureSets'), runs: table('runs') };
+  return { state, laydowns: table('laydowns'), figureSets: table('figureSets'), runs: table('runs'), units: table('units') };
 }
 
 export function createFakeStorage() {

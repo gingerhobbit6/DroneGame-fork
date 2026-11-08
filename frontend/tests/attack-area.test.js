@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createGame } from '../src/game.js';
 import { DRONES, resetAllFigures } from '../src/sim/config/index.js';
-import { aimInZone, cleanZone, inZone, zoneCentre } from '../src/sim/attack-area.js';
+import { aimInZone, cleanZone, distToZone, inZone, zoneCentre } from '../src/sim/attack-area.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { hdist, u } from '../src/sim/units.js';
 import { MIXED, play, setUp } from './support/scenarios.js';
@@ -128,5 +128,14 @@ describe('from the map', () => {
     g.commands.startWave();
     g.setViewOption('zone', null);
     expect(g.sim.state.zone).toEqual(AREA);
+  });
+});
+
+describe('distance to the area', () => {
+  it('is to its outline, and nothing inside it', () => {
+    const square = [[0, 0], [10, 0], [10, 10], [0, 10]];
+    expect(distToZone(square, 5, 5)).toBe(0);
+    expect(distToZone(square, 15, 5)).toBe(5);
+    expect(distToZone(square, 13, 14)).toBe(5); // past a corner
   });
 });

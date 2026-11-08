@@ -97,6 +97,22 @@ describe('run saver', () => {
     expect([...api.runs.rows.values()].map((r) => r.kills)).toEqual([1, 2]);
     expect(notes.at(-1)).toMatch(/2 kept runs saved/);
   });
+  it('saves the kept runs as soon as a later run reaches the server', async () => {
+    const { saver } = make();
+    api.state.down = true;
+    await saver.save({ kills: 1 });
+    api.state.down = false;
+    await saver.save({ kills: 2 });
+    expect(saver.pending()).toBe(0);
+    expect([...api.runs.rows.values()].map((r) => r.kills).sort()).toEqual([1, 2]);
+  });
+  it('keeps a run while signed out, and says to sign in', async () => {
+    const { saver, notes } = make();
+    api.runs.create = async () => { throw new ApiError('Sign in first', true, 401); };
+    await saver.save({ kills: 1 });
+    expect(saver.pending()).toBe(1);
+    expect(notes[0]).toMatch(/signed out.*saved when you sign in again/);
+  });
   it('reports a run the server refuses, instead of retrying it for ever', async () => {
     const { saver, notes } = make();
     api.state.refuse = true;
