@@ -4,7 +4,7 @@ import { Vector3 } from 'three';
 import { WORLD, TERRAIN, SYSTEM_UNIT_M } from './config/index.js';
 import { beamFactor, evasionFactor, hitChance, layTime } from './hit-chance.js';
 import { rand } from './rng.js';
-import { antennaHeight } from './site-range.js';
+import { antennaHeight, flies } from './site-range.js';
 import { terrainState } from './terrain.js';
 import { u, hereU, hdist } from './units.js';
 import { affordable, spend, tally } from './economy.js';
@@ -22,7 +22,7 @@ export const muzzle = (s, out = _m) => out.set(s.pos.x, s.pos.y + u((s.def.muzzl
 
 // The laser needs a clear optical path; guided weapons (interceptor drones, missiles) are cued over the terrain.
 export function opticalLos(s, d) {
-  if (s.def.fire === 'guided') return true;
+  if (flies(s.def)) return true;
   const m = WORLD.metresPerUnit;
   const r = terrainState.data.los(s.pos.x * m, s.pos.y * m + antennaHeight(s.def), s.pos.z * m, d.pos.x * m, d.pos.y * m, d.pos.z * m);
   return r.clear && r.canopy <= TERRAIN.opticalCanopyTol;
@@ -85,6 +85,7 @@ const FIRE = {
   // a jammer's effect is applied to each drone it covers (see drones.js), and its time on is counted below
   jam() {},
 };
+export const FIRE_MODES = Object.keys(FIRE);
 
 export function updateStructures(w, dt) {
   const { state } = w;

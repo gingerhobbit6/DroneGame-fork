@@ -5,7 +5,7 @@ import { FUSION, DRONES } from '../config/index.js';
 import { canFire } from '../magazine.js';
 import { coverArc, inArcOf } from '../sensor-model.js';
 import { bandGhz } from '../rf-model.js';
-import { antennaHeight, reachOnPath, typicalAltitude } from '../site-range.js';
+import { antennaHeight, flies, reachOnPath, typicalAltitude } from '../site-range.js';
 import { terrainState } from '../terrain.js';
 import { canFollow, hears } from '../jamming.js';
 import { burnTime, hitChance, meetTime } from '../hit-chance.js';
@@ -169,7 +169,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   // Can a round from this launcher meet the track within its reach, flying at where the track will be? A slow interceptor drone cannot
   // chase down a faster drone going past or away. A track with no velocity yet is given the benefit of the doubt.
   function canMeet(s, tr) {
-    if (s.def.fire !== 'guided' || !tr.vel) return true;
+    if (!flies(s.def) || !tr.vel) return true;
     const m = mpu(), p = [tr.est.east - s.pos.x * m, tr.est.north + s.pos.z * m, tr.flat ? 0 : tr.est.up - s.pos.y * m];
     return meetTime(p, tr.flat ? [tr.vel[0], tr.vel[1], 0] : tr.vel, s.def.missileSpeed) * s.def.missileSpeed <= s.def.range;
   }
@@ -181,7 +181,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     if (s.denied.has(tr.id) || authority().pending.some((p) => p.s === s)) return false; // one request at a time for each effector
     if (T() < (s.rejected.get(tr.id) ?? 0) || T() < (tr.emptyUntil ?? 0)) return false;
     if (!takesAirframe(def, tr.airframe)) return false; // already known to be beyond this effector
-    if (def.fire === 'guided' && leaveToJammer(tr)) return false; // soft kill first
+    if (flies(def) && leaveToJammer(tr)) return false; // soft kill first
     if (def.engagePolicy === 'fixed-wing' && tr.airframe !== 'Fixed wing') {
       if (tr.airframe === 'Multirotor') return false; // a known quadcopter is never worth the round
       // last ditch only: something unidentified that has got close and that nothing else is on

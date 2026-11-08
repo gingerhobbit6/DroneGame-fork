@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { createGame } from '../src/game.js';
-import { DRONES } from '../src/sim/config/index.js';
+import { DRONES, STRUCTURES } from '../src/sim/config/index.js';
 import { u } from '../src/sim/units.js';
 import { createStructureViews } from '../src/render/structure-view.js';
 import { createDroneViews } from '../src/render/drone-view.js';
@@ -114,5 +114,8 @@ describe('map symbols', () => {
     expect(texts).toEqual(['RAD', 'RF', 'EO', 'ACU', 'EW', 'GUN', 'LSR']);
     expect(calls.filter(([k]) => k === 'stroke')).toHaveLength(13);
     expect(calls.filter(([k]) => k === 'setLineDash')).toHaveLength(1); // only the pending frame is dashed
+    calls.length = 0;
+    for (const def of Object.values(STRUCTURES)) symbolSprite(`friend:${def.kind}`, 0); // every kind in the catalogue, not just these
+    expect(calls.filter(([k, text]) => k === 'fillText' && text === '?')).toEqual([]);
   });
 });
