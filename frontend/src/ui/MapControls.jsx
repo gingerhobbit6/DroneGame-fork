@@ -164,7 +164,7 @@ export function MapControls() {
     const at = toScene(point.e, point.n), tool = game.getTool();
     if (!inWorld(at)) { say('That grid reference is outside this world.', point); return; }
     if (STRUCTURES[tool]) {
-      const problem = game.commands.place(tool, at.x, at.z);
+      const problem = game.placeSystem(at.x, at.z); // with its chosen settings and vehicle, as a click would
       say(problem || `Placed at ${gridRef(point.e, point.n)}.`);
     } else {
       gameView?.centreOn(at.x, at.z);

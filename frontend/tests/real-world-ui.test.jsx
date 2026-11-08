@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
 import { createPackStore, decodePack } from '../src/api/pack-store.js';
 import { resetAllFigures } from '../src/sim/config/index.js';
+import { fieldsFor } from '../src/sim/unit-config.js';
 import { parseWorldId, worldId } from '../src/sim/world-pack.js';
 import { view } from '../src/render/view.js';
 import { tilesOver } from '../src/render/map-texture.js';
@@ -485,8 +486,9 @@ describe('choosing a world', () => {
       fireEvent.submit($('#map-goto'));
       expect(v.centreOn).toHaveBeenCalledWith(25, -25);
       game.setTool('rf');
+      game.setLoadout('rf', fieldsFor('rf').find((f) => f.key === 'mount'), 12); // the settings chosen for it come too
       fireEvent.submit($('#map-goto'));
-      expect(game.sim.structures[0].pos).toMatchObject({ x: 25, z: -25 });
+      expect(game.sim.structures[0]).toMatchObject({ pos: { x: 25, z: -25 }, def: { mount: 12 } });
       await settle();
       expect($('#map-message').textContent).toContain('Placed at SU 225 665');
     }, 30000);

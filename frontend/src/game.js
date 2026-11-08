@@ -140,6 +140,13 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   let patrolClick = null; // made on first use, once everything it calls exists
 
+  // The picked system, with the settings and vehicle chosen for it, however the spot was given. Returns why it was refused, or null.
+  function placeSystem(x, z) {
+    const tool = tools.get(), loadout = Object.keys(loadoutFor(tool)).length ? { ...loadoutFor(tool) } : undefined, vehicle = tools.vehicle();
+    refusal = vehicle ? commands.place(tool, x, z, loadout, vehicle) : loadout ? commands.place(tool, x, z, loadout) : commands.place(tool, x, z);
+    return refusal;
+  }
+
   function groundClick(x, z) {
     const tool = tools.get();
     if (!tool || state.over || !state.started) return;
@@ -160,9 +167,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       }
       return;
     }
-    const loadout = Object.keys(loadoutFor(tool)).length ? { ...loadoutFor(tool) } : undefined, vehicle = tools.vehicle();
-    refusal = vehicle ? commands.place(tool, x, z, loadout, vehicle) : loadout ? commands.place(tool, x, z, loadout) : commands.place(tool, x, z);
-    if (refusal) { toast(refusal); return; }
+    if (placeSystem(x, z)) { toast(refusal); return; }
     const esc = tools.dragging() ? '' : ', or press Esc to stop placing'; // a drag puts the last tool back itself
     toast(`${placedSummary()}${selectHinted ? '' : `. Click a system for details${esc}`}`);
     selectHinted = true;
@@ -279,7 +284,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   return {
     packs, loadPack, ensureWorld, mapSource, cursor: () => placement?.cursor() ?? null,
     sim, commands, clock, setSpeed, reviewClock, subscribe, getTick, bump, attach, debug, api, saver, storage, pageClosing,
-    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
+    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, placeSystem, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
     catalogue: tools.catalogue, openCatalogue: tools.openCatalogue, pickFromTray: tools.pickFromTray, startDrag: tools.startDrag, endDrag: tools.endDrag, dropAt,
     toast, onToast(fn) { toastListeners.add(fn); return () => toastListeners.delete(fn); },
     onFrame(fn) { frameListeners.add(fn); return () => frameListeners.delete(fn); },
