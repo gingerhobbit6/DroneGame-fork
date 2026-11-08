@@ -224,6 +224,7 @@ frontend/src/
     assistant/  The wizard: its steps, and what it reads from the game.
     account/    The login page, the profile hub and the deployment pack editor.
   zone.js     The area to defend. Stays out of the simulation.
+  patrol-draw.js  Drawing a patrol route, which goes to the simulation once finished.
   api/        The backend client, and keeping runs safe when it is down.
   game.js     Wires the simulation to the view and runs the frame loop.
 backend/app/
@@ -322,6 +323,12 @@ Raise `GAME_VERSION` in `frontend/src/sim/config/world.js` at the same time, so 
 - [Decision records](docs/adr/)
 
 ## Accuracy
+
+## Patrol mode
+
+Instead of a site, protect soldiers on patrol. In the Area to defend panel, press **Draw a patrol route**, click waypoints from the start, and double-click at the end. Set how wide the corridor is, the soldiers' formation (single file, staggered column or wedge), and the vehicles that escort them, each ahead, behind or to one side. Systems from the toolbar stand anywhere inside the corridor and stay put.
+
+From the first wave the patrol walks to the end, waits a minute, and walks back, then holds at the start until the next wave. Weapons in the column halt it to fire. Strikes do not know where it is: spotters must search the corridor and keep it in sight, and strikes head for the last fix they passed, shown as a red ring. Jam or shoot down the spotter, or walk into woods, and they strike where the patrol was. Every speed, spacing and search figure is a labelled assumption in the Sources tab. The design and what is left out are in [docs/PATROL_MODE.md](docs/PATROL_MODE.md).
 
 ## Simulated people
 

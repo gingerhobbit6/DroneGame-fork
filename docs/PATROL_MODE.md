@@ -1,92 +1,90 @@
 # Patrol mode: design note
 
-Status: prototype. A first playable slice is in the code (see "What the slice does"). Everything else here is design, not yet built.
+Status: prototype, second round. What is built is under "What it does now", and what is not is under "Left out". Everything else here explains the rules and why they were chosen.
 
-In the fixed-site game the player defends the station, or an area drawn around it. In patrol mode the player protects a group of simulated people walking a set route, with air defence vehicles moving alongside them. It is a simulation for teaching, not a planning tool. Every speed and mobile performance figure below is an assumption, and each one the slice uses is labelled `ASSUMPTION` in the Sources tab.
+In the fixed-site game the player defends the station, or an area drawn around it. In patrol mode the player protects soldiers walking a route through a corridor, with air defence vehicles in their formation and static systems along the way. It is a simulation for teaching, not a planning tool. Every speed, spacing, delay and enemy search figure is an assumption, labelled `ASSUMPTION` in the Sources tab under Patrol, where each can be edited (a logged change, like any other figure).
 
-## How the route is set
+## The route and the corridor
 
-The player clicks waypoints on the ground, as when drawing the area to defend, and closes the loop by clicking near the first point or double-clicking. The route always loops back from the last waypoint to the first.
+The player opens the Area to defend panel, presses **Draw a patrol route**, clicks waypoints from the start, and double-clicks to finish at the end. The route is open: it runs from its first waypoint to its last, and does not loop.
 
-The route is checked on the ground every 20 m along each leg. It is refused if it:
+Each leg is checked on the ground every 20 m. The route is refused if it leaves the map, crosses water, crosses ground steeper than a slope of 0.4 (the build rule), or goes through a building outline. The refusal says which, and the player redraws.
 
-- leaves the map. Attacks start out from the patrol, as they do from a drawn area, so it needs no ring around the station to leave them room;
-- crosses water;
-- crosses ground steeper than the build rule allows (a slope of 0.4), the same test as for placing a system or a group of people;
-- goes through a building outline.
+The corridor is a band along the route, 20 to 1000 m wide (200 m to start with). It is drawn on the map as a faint blue band, with a peg at each end. It is where static systems can stand: with a patrol set, the placement tools refuse a spot outside it. Redrawing the route keeps the corridor width, the formation and the vehicles.
 
-The refusal says which, and the player redraws. A later version should snap legs to mapped paths and roads from the map pack instead of straight lines, and allow open (out and back) routes.
+## The formation
 
-## Which drones hunt the patrol, and how they find it
+The soldiers (12 to start with, 5 m apart) walk in single file, a staggered column or a wedge behind the lead soldier. Each vehicle in the column has a place in the formation: metres ahead of the lead (behind if negative, up to 200 m) and metres to the right (left if negative, up to 100 m).
 
-Strike drones (FPV, FO, fixed-wing) attack the patrol in place of the station. The ones that already look for loud radio emitters still do, so an FPV can dive on the radar vehicle instead of the people. Spotters orbit the patrol, not the station, and the fusion node measures threats from the patrol.
+Every member follows the route at its own place along it, offset to the side of the way the route runs there. So the shape bends round a turn as a real patrol's would, rather than swinging round as a rigid block. Walking back, ahead and right stay ahead and right of the way the patrol faces, so the column reverses its order on the way home. At the ends of the route, members that would be beyond it bunch at the end point.
 
-Finding it, in the slice: every strike drone knows where the patrol is at every moment and homes on it. That is the simplest rule and the most dangerous case, as if a spotter or ISR feed passed a live fix. It is labelled here as an assumption, not a claim about real capability.
+## Mobile and static systems
 
-Finding it, as designed: a drone homes on the last position passed to it. That fix is refreshed only while a spotter is on station with working video, and otherwise goes stale, so jamming a spotter's video makes strikes land where the patrol was. Emitter seekers would also be drawn by the escort's terminals and radar, which gives the player a real trade between seeing and being seen.
+Mobile systems ride in the column on a Patria 6x6, a Toyota Hilux or a Mule UGV, as before. Static systems are placed from the toolbar, inside the corridor, and stay where they are: an overwatch radar on high ground, or a jammer at a choke point. Both come from the same systems and budget.
 
-## Sensors and weapons on the move
+Sensors work on the move. Weapons fire from the halt: while any weapon in the column has an engagement task, the whole patrol stops, and it walks on once the task ends. A jammer works on the move. Making this a per-system choice was considered and left out: the only systems that need it today are jammers, and the rule already exempts them.
 
-Sensors work on the move in the slice. The sensor vehicle's radar scans from wherever it is, with no penalty. The network reads each node's live position, so detections, bearings and status reports carry where the node really is. Starlink sky checks re-run as a node moves (they are cached on position), and cellular picks the best tower from wherever the node is.
+## Out and back
 
-Weapons fire from the halt. While the weapon vehicle has an engagement task, the whole patrol stops, and it walks on once the task ends. That stands for a crew that must stop, lay the launcher and fire, and it keeps the escort together.
+Once the first wave starts, the patrol walks to the end of the route, waits there (60 s to start with), and walks back. At the start it stops and holds until the next wave begins, then sets out again. Each wave is one more trip if it lasts long enough, and a trip can run across waves. Stopping at the start was chosen over looping straight away so that a trip has a clear end, the run can be read as "how many trips did it get through", and the next wave is the natural moment to go again.
 
-As designed, each mobile system would get two figures: whether it can sense on the move, and a penalty if it does (a radar's error grows and its range shrinks while bouncing over rough ground). A camera would need to stop to sweep. A jammer would work on the move, but with a mast that must be lowered to drive.
+The timeline marks each step: set out, reached the end, heading back, back at the start. The Area panel shows where it is, how many trips are done, and how old the enemy's fix is.
 
-## Which assets can be mobile, and how fast
+## How the enemy finds the patrol
 
-The people on patrol are soldiers, drawn in MultiCam with helmets, body armour and rifles at true size; it changes only the drawing.
+Strikes no longer know where the patrol is. They home on the last fix passed to them, and the fix comes from spotters.
 
-The escort is a column of 1 to 6 vehicles, chosen in the Area panel once the route is drawn: a Patria 6x6, a Toyota Hilux or a Mule UGV in the Milrem THeMIS class, each carrying one system it can take (a Mule light ones, a Hilux medium ones too, a Patria anything that rides) at a gap ahead of or behind the soldiers. A new patrol gets a Blighter A800 on a Hilux 40 m ahead and a Thales Rapid Ranger on a Patria 40 m behind. Every vehicle moves at the group's walking pace, keeping its gap along the route, and a sensor on one stands on the vehicle's short mast (2 to 3.5 m, an assumption).
+- **Search.** A spotter flies to the nearest point of the route and sweeps along it, end to end and back, until its camera picks the patrol out. It must be within 3.5 km, with working video and a line of sight clear of the ground and of tree canopy. It looks once a second.
+- **Fix.** Once it has found the patrol, the spotter circles it at its standoff range and passes a fix each time it sees it. The red ring on the map is that fix, which is where strikes are heading.
+- **Stale.** If the spotter is jammed (its video link), shot down, or loses sight behind a hill or into woods, the fix stops updating, and strikes keep heading for where the patrol was. A strike that arrives where no soldier is within 30 m comes down there and is wasted, though anyone close to the blast can still be hurt. The timeline shows it as a miss.
+- **Waiting.** With no fix at all, strikes fly to the corridor's middle and circle within 400 m of it. After 10 minutes waiting they turn for home and leave the attack.
+- **Seeing it themselves.** A strike flown by video (an FPV, or a fibre-optic drone) sees the patrol for itself within 500 m with a clear line of sight, and then homes on the patrol itself. Its video must not be jammed.
+- **Emitters.** Drones that seek loud emitters still go for them, so a radar or a jamming jammer in the column or the corridor can still draw FPVs.
+
+Drones still spawn around the patrol, as they do around a drawn area. That means the enemy knows the area of operations but not the patrol's place in it.
 
 | Figure | Value | Basis |
 | --- | --- | --- |
-| Walking speed of the patrol | 1.4 m/s | assumption |
-| Gap from the people to each escort vehicle, along the route | 40 m | assumption |
-| People in the patrol | 12 | assumption |
-
-These are in the Sources tab under "Patrol" and can be edited, which is logged like any other figure change.
-
-As designed, a mobile flag and a road speed would be added to each system that is vehicle-mounted in real life, all labelled assumptions: small radars, RF detectors and jammers, cameras on masts, and short-range missiles and guns on vehicles. Large radars, large lasers and the Sky Sabre class would stay fixed, or redeploy only between waves.
-
-## Choosing and saving a mobile laydown
-
-The player draws the route, and the default column is added; they can then change each vehicle, what it carries and its gap, or add and remove vehicles. Each system is paid from the budget like any other (the vehicles themselves are not priced), and each gets a Starlink terminal (the fusion node gets one too if it has none). Escorts cannot be sold on their own: clearing or redrawing the patrol removes them and refunds them in full, as nothing has happened yet. The patrol locks when the first wave starts, like the rest of the laydown, and a patrol and a drawn area cannot both be set.
-
-A saved laydown carries the patrol as its route, `patrol: [[x, z], ...]`, and its column, `patrolColumn: [{ vehicle, system, gap }, ...]`, beside the systems. The escort and its people are rebuilt from these and the figures when the laydown is restored, so they are not in the saved structures or people lists; a laydown saved before the column existed gets the default one. With a deployment pack deployed that lists vehicles, the column takes only the pack's vehicles, each as many times as the pack has, less any parked on the map; a system parked on a vehicle outside a patrol is saved with the structures, with a `vehicle` field. The backend accepts the route with the same limits as the area to defend (2 to 32 points).
-
-As designed, the player would pick which systems ride with the patrol and where each sits in the column (ahead, behind, on a flank), from the mobile systems above. A mix of fixed systems near the route and mobile ones in the column should be allowed, since that is how a real route would be covered.
+| Walking speed | 1.4 m/s | assumption |
+| Soldiers | 12 | assumption |
+| Spacing in the formation | 5 m | assumption |
+| Wait at the end | 60 s | assumption |
+| Gap for a new vehicle | 40 m | assumption |
+| Spotter sees the patrol | 3,500 m | assumption |
+| Strike drone sees it itself | 500 m | assumption |
+| Strike waits within | 400 m | assumption |
+| Strike can wait for | 600 s | assumption |
 
 ## Winning and losing
 
-In the slice the patrol has the same integrity as the site, and each strike that reaches it costs the same. A run is lost when integrity reaches zero, and a strike on the patrol can also cause casualties among its people, counted as for any other group. Waves run as in the fixed-site game.
+These are unchanged: the patrol has the same integrity as the site, a strike that reaches it costs the same, and the run is lost at zero. Strikes can cause casualties among the soldiers. A strike wasted on a stale fix costs nothing.
 
-As designed, a run would be won by walking a set number of laps, and lost when casualties pass a chosen share of the group or the patrol cannot move (both escorts destroyed). The debrief would report casualties, laps and time halted.
+## Saving
+
+A saved laydown carries the route as `patrol: [[x, z], ...]`, the column as `patrolColumn: [{ vehicle, system, gap, side }, ...]`, and the plan as `patrolPlan: { width, formation }`. The backend checks each one. The game checks the route again on the ground when it is restored. A laydown saved before this round gets a 200 m corridor and single file, and its route, once a loop, is now walked as an open route from its first waypoint to its last.
 
 ## Determinism, replay and digests
 
-- Nothing in the patrol draws a random number. It moves a set distance each simulation step, so the same seed and laydown give the same run.
-- Setting the patrol is a logged command, `setPatrol`, so a run's command log reproduces it.
-- A run with no patrol runs no patrol code and draws nothing extra, so the fixed-site reference digests do not change. The tests check this.
-- A run with a patrol adds the distance walked to its digest, and its people's casualties are already in it.
-- Replay: snapshots already record each system's health and task. The slice does not record where the escort was, so replaying a patrol run draws the escort where it is now. Recording escort positions in each snapshot is the next step for replay.
+- Nothing in the patrol or the enemy search draws a random number. Spotters look once a second of game time, so the same seed and laydown give the same run.
+- A run with no patrol runs none of this code, so the fixed-site reference digests do not change. The tests check it.
+- A patrol run adds its distance walked, phase, trips and the enemy's fix to its digest.
+- Replay does not yet record where the patrol or its escort was, so a replay draws them where they are now.
 
-## What the slice does
+## What it does now
 
-- Draw a looped route from the Area to defend panel ("Draw a patrol route"). It is checked on the ground as above.
-- A group of 12 simulated people walks the route at 1.4 m/s once the first wave starts, with the radar 40 m ahead and the Rapid Ranger 40 m behind, both moving with them.
-- Strike drones home on the patrol and spotters orbit it. Emitter seekers can still pick the radar.
-- The patrol halts while the Rapid Ranger is engaging.
-- A strike on the patrol damages its integrity and can cause casualties. It lands on the patrol's spot, as a strike on a system lands on the system, because a strike counts from 30 m and a small drone's casualty radius is 25 m.
-- The route saves in the laydown and is restored with its escort.
+- An open route with a corridor of a chosen width. Static systems go inside the corridor.
+- Soldiers in single file, a staggered column or a wedge, with each vehicle ahead, behind or to one side, keeping their places round turns.
+- Out to the end, wait, back to the start, then hold until the next wave.
+- Spotters search the corridor and pass fixes, which go stale when the spotter is jammed, shot down or loses sight. Strikes waste themselves on stale fixes, wait mid-corridor with none, and see the patrol for themselves when close with a camera.
 
-## Left out of the slice
+## Left out
 
-- Spotter-cued targeting with a stale fix: drones know where the patrol is at all times.
-- Choosing the escort systems, their places in the column and their road speeds.
+- Free placement of each soldier by hand: the three formations only.
+- Routes along mapped roads and paths, rather than straight legs.
 - Penalties for sensing on the move, and stopping to sweep.
-- Open routes, and routes along mapped roads.
-- Win by laps, and loss by casualties or by losing both escorts.
-- Escort positions in replay snapshots.
-- A hotkey and a toolbar button for the patrol: it is in the Area to defend panel only.
-- Moving range rings are re-predicted only every 100 m of travel.
+- A per-system halt-to-fire choice.
+- Spotters picking the patrol out by its emissions, or seeing the static systems and passing them as targets.
+- Win by trips, and loss by casualties or by losing the whole column.
+- Escort and soldier positions in replay snapshots.
+- A hotkey or toolbar button for the patrol: it is in the Area panel only.
+- Static systems placed before the corridor existed, or left outside it when the route is redrawn, are not moved or refused.

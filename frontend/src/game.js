@@ -17,6 +17,7 @@ import { view } from './render/view.js';
 import { createApi } from './api/client.js';
 import { createRunSaver } from './api/run-saver.js';
 import { addZonePoint } from './zone.js';
+import { patrolClicker } from './patrol-draw.js';
 import { createTools } from './tools.js';
 import { createPackStore } from './api/pack-store.js';
 import { parseWorldId } from './sim/world-pack.js';
@@ -133,17 +134,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     if (JSON.stringify(points) !== JSON.stringify(sim.state.zone)) commands.setZone(points);
   }
 
-  // A click while drawing a patrol route. A closed route goes to the simulation, which adds the escort. A refused one is wiped.
-  function patrolClick(x, z) {
-    if (sim.designLocked()) { toast('The patrol is locked once the first wave starts'); return; }
-    if (!view.route && sim.getPatrol()) commands.setPatrol(null); // a new route replaces the old one
-    view.route = addZonePoint(view.route, x, z);
-    if (!view.route?.closed) { bump(); return; }
-    const refused = commands.setPatrol(view.route.points);
-    view.route = null;
-    toast(refused || 'Patrol set. It starts walking with the first wave. Choose its vehicles in the Area panel');
-    setTool('patrol');
-  }
+  let patrolClick = null; // made on first use, once everything it calls exists
 
   function groundClick(x, z) {
     const tool = tools.get();
@@ -154,7 +145,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (refusal) toast(refusal);
       return;
     }
-    if (tool === 'patrol') { patrolClick(x, z); return; }
+    if (tool === 'patrol') { (patrolClick ??= patrolClicker({ sim, commands, view, toast, setTool, bump }))(x, z); return; }
     if (tool === 'zone') {
       if (sim.designLocked()) toast(ZONE_LOCKED);
       else if (sim.getPatrol()) toast(PATROL_FIRST);

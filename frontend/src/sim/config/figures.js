@@ -11,7 +11,7 @@ import { PATROL } from './patrol.js';
 const STRUCT_KEYS = ['published', 'cost', 'shotCost', 'missileSpeed', 'pk', 'damage', 'splash', 'fuze', 'cooldown', 'magazine', 'storage', 'reloadTime', 'dps', 'falseAlarm', 'lowRange', 'fov', 'dwell', 'slow', 'killTime'];
 const DRONE_KEYS = ['cost', 'speed', 'hp', 'rcs', 'size', 'rfPower', 'sound', 'evade', 'jamResist', 'warhead'];
 const PEOPLE_KEYS = ['pCasualty', 'reachScale'];
-const PATROL_KEYS = ['walkSpeed', 'escortGap', 'groupSize'];
+const PATROL_KEYS = ['walkSpeed', 'escortGap', 'groupSize', 'spacing', 'endDelay', 'sightRange', 'strikeSight', 'holdRadius', 'holdTime'];
 
 export const FIGURE_FIELDS = {
   published: { label: 'Range', unit: 'm', step: 100, basis: 'research' },
@@ -51,6 +51,12 @@ export const FIGURE_FIELDS = {
   walkSpeed: { label: 'Walking speed', unit: 'm/s', step: 0.1, basis: 'assumption' },
   escortGap: { label: 'Gap to each escort', unit: 'm', step: 5, basis: 'assumption' },
   groupSize: { label: 'People', unit: 'people', step: 1, basis: 'assumption' },
+  spacing: { label: 'Spacing in the formation', unit: 'm', step: 1, basis: 'assumption' },
+  endDelay: { label: 'Wait at the end', unit: 's', step: 10, basis: 'assumption' },
+  sightRange: { label: 'Spotter sees the patrol', unit: 'm', step: 100, basis: 'assumption' },
+  strikeSight: { label: 'Strike drone sees it itself', unit: 'm', step: 50, basis: 'assumption' },
+  holdRadius: { label: 'Strike waits within', unit: 'm', step: 50, basis: 'assumption' },
+  holdTime: { label: 'Strike can wait for', unit: 's', step: 30, basis: 'assumption' },
 };
 
 const grab = (obj, keys) => Object.fromEntries(keys.filter((k) => typeof obj[k] === 'number').map((k) => [k, obj[k]]));

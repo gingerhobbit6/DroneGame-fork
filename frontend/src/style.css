@@ -427,6 +427,8 @@ button.wz-go:hover:not(:disabled) { background: #d4ff4d; }
 /* the patrol column: vehicle and system side by side, the gap and remove button beside them */
 .patrol-column select { flex: 1 1 0; min-width: 0; }
 .patrol-column input { width: 4em; flex: none; }
+.patrol-plan label { display: block; margin: 4px 0; }
+.patrol-plan input { width: 5em; }
 .people-list button { padding: 0 6px; font-size: 12px; line-height: 18px; }
 .cov-key { font-size: 12px; color: #9fb2cf; }
 .cov-key span { margin-left: 10px; white-space: nowrap; }

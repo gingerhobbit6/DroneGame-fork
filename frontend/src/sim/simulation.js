@@ -185,7 +185,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     deploy,
     leave,
     setZone: (points) => laydown.setZone(w, points),
-    setPatrol: (points, column) => setPatrol(w, points, column),
+    setPatrol: (points, column, plan) => setPatrol(w, points, column, plan),
     setAttack: (ids) => laydown.setAttack(w, ids),
     setConditions: (name) => laydown.setConditions(w, name),
     place: (id, x, z, settings, vehicle) => laydown.place(w, id, x, z, settings, vehicle),
@@ -237,7 +237,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     for (const e of bus.entries) feed(JSON.stringify(e.msg));
     feed(JSON.stringify([state.kills, state.health, state.budget, state.leaks, state.time, bus.seq, { ...w.ledger, jamTime: undefined }])); // jamTime came later: left out so recorded digests still match
     if (w.people.length) feed(JSON.stringify(w.people.map((g) => g.hits))); // with no people, a run's digest stays as it was
-    if (w.patrol) feed(String(w.patrol.dist));
+    if (w.patrol) feed(JSON.stringify([w.patrol.dist, w.patrol.phase, w.patrol.trips, w.patrol.fix]));
     return (h >>> 0).toString(16);
   }
 

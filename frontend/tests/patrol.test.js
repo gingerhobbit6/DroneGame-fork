@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FIGURE_FIELDS, PATROL, PATROL_VEHICLES, RESEARCHED, exportFigures, resetAllFigures } from '../src/sim/config/index.js';
 import { createSimulation } from '../src/sim/simulation.js';
-import { along, columnProblem, routeProblem } from '../src/sim/patrol.js';
+import { columnProblem, routeProblem } from '../src/sim/patrol.js';
+import { inCorridor, nearest, pointAt } from '../src/sim/route.js';
+import { placeIn } from '../src/sim/formation.js';
 import { pickTarget } from '../src/sim/targeting.js';
 import { u } from '../src/sim/units.js';
 import { play, setUp } from './support/scenarios.js';
 
-// Scene units on terrain 1: a 400 m square of open, flat ground near the station, and one that runs into water.
+// Scene units on terrain 1: three sides of a 400 m square of open, flat ground near the station, walked from the first corner to the
+// last, and one that runs into water.
 const square = (cx, cz, r) => [[cx - r, cz - r], [cx + r, cz - r], [cx + r, cz + r], [cx - r, cz + r]];
 const ROUTE = square(20, 20, 10);
 const WET = square(40, 40, 10);
@@ -17,7 +20,7 @@ beforeEach(() => { sim = createSimulation(); setUp(sim, { seed: '1', laydown: []
 afterEach(() => resetAllFigures());
 
 describe('the route', () => {
-  it('accepts a loop on open ground', () => expect(routeProblem(ROUTE)).toBeNull());
+  it('accepts a route on open ground', () => expect(routeProblem(ROUTE)).toBeNull());
   it('refuses water, the edge of the map and malformed waypoints', () => {
     expect(routeProblem(WET)).toMatch(/water/);
     expect(routeProblem(square(130, 0, 10)) ?? '').not.toMatch(/station|build zone/); // fine, or refused for the ground, never the distance
@@ -27,23 +30,30 @@ describe('the route', () => {
     expect(routeProblem([[1, 1], [1, 1]])).toMatch(/no length/);
     expect(routeProblem('nonsense')).toMatch(/2 to 32/);
   });
-  it('walks round the loop and back to the start', () => {
-    const p = { route: ROUTE, ends: [0, 20, 40, 60, 80] };
-    expect(along(p, 0)).toEqual({ x: 10, z: 10 });
-    expect(along(p, 30)).toEqual({ x: 30, z: 20 });
-    expect(along(p, 80)).toEqual({ x: 10, z: 10 });
-    expect(along(p, -10)).toEqual({ x: 10, z: 20 });
+  it('runs from its start to its end, and no further either way', () => {
+    const p = { route: ROUTE, ends: [0, 20, 40, 60], width: 200 };
+    expect(pointAt(p, 0)).toMatchObject({ x: 10, z: 10, dx: 1, dz: 0 });
+    expect(pointAt(p, 30)).toMatchObject({ x: 30, z: 20, dx: 0, dz: 1 });
+    expect(pointAt(p, 999)).toMatchObject({ x: 10, z: 30 });
+    expect(pointAt(p, -5)).toMatchObject({ x: 10, z: 10 });
+    expect(nearest(p, 20, 12)).toEqual({ along: 10, off: 2 });
+  });
+  it('has a corridor of its width along it, and no further', () => {
+    const p = { route: ROUTE, ends: [0, 20, 40, 60], width: 200 }; // 5 scene units each side
+    expect(inCorridor(p, 20, 14.9)).toBe(true);
+    expect(inCorridor(p, 20, 4)).toBe(false);
+    expect(inCorridor(p, 20, 20)).toBe(false); // the open side of the square is not walked
   });
 });
 
 describe('the column', () => {
-  const COLUMN = [{ vehicle: 'mule', system: 'gun_hmg', gap: 25 }, { vehicle: 'hilux', system: 'rf', gap: -30 }, { vehicle: 'patria', system: 'missile_paladin', gap: -60 }];
+  const COLUMN = [{ vehicle: 'mule', system: 'gun_hmg', gap: 25, side: 0 }, { vehicle: 'hilux', system: 'rf', gap: -30, side: -20 }, { vehicle: 'patria', system: 'missile_paladin', gap: -60, side: 15 }];
 
-  it('brings each vehicle with its system, at its gap and on the vehicle mast', () => {
+  it('brings each vehicle with its system, at its place in the formation and on the vehicle mast', () => {
     expect(sim.commands.setPatrol(ROUTE, COLUMN)).toBeNull();
     const p = sim.getPatrol();
     expect(p.escorts.map(({ s }) => [s.def.id, s.def.vehicle])).toEqual([['gun_hmg', 'mule'], ['rf', 'hilux'], ['missile_paladin', 'patria']]);
-    for (const { s, gap } of p.escorts) expect(s.pos.x).toBeCloseTo(along(p, p.dist + u(gap)).x);
+    for (const { s, gap, side } of p.escorts) { const q = placeIn(p, gap, side); expect([s.pos.x, s.pos.z]).toEqual([q.x, q.z]); }
     expect(p.escorts[1].s.def.mount).toBe(PATROL_VEHICLES.hilux.mast);
   });
 
@@ -64,6 +74,7 @@ describe('the column', () => {
     expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 250 }])).toMatch(/within 200 m/);
     expect(columnProblem(Array(7).fill(COLUMN[0]))).toMatch(/1 to 6/);
     expect(columnProblem([])).toMatch(/1 to 6/);
+    expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 0, side: 120 }])).toMatch(/100 m to the side/);
     expect(sim.commands.setPatrol(ROUTE, [{ vehicle: 'mule', system: 'missile_paladin', gap: 0 }])).toMatch(/cannot carry/);
     expect(sim.getPatrol()).toBeNull();
   });
@@ -121,11 +132,11 @@ describe('walking', () => {
     sim.run(200);
     const p = sim.getPatrol(), metres = p.dist * 20;
     expect(metres).toBeCloseTo(FOOT.walkSpeed * 200 * 0.05, 3);
-    const at = along(p, p.dist);
+    const at = placeIn(p, 0, 0);
     expect(p.group.x).toBeCloseTo(at.x); expect(p.group.z).toBeCloseTo(at.z);
-    for (const { s, gap } of p.escorts) expect(s.pos.x).toBeCloseTo(along(p, p.dist + u(gap)).x);
+    for (const { s, gap, side } of p.escorts) expect(s.pos.x).toBeCloseTo(placeIn(p, gap, side).x);
     expect(p.escorts.map((e) => e.gap)).toEqual([FOOT.escortGap, -FOOT.escortGap]); // one ahead, one behind
-    expect(sim.state.zoneCentre).toEqual(at); // spotters orbit it
+    expect(sim.state.zoneCentre).toEqual(at); // the fusion node measures from it
   });
 
   it('halts while its weapon is engaging', () => {
@@ -141,9 +152,11 @@ describe('walking', () => {
     expect(p.dist).toBe(held);
   });
 
-  it('is what strike drones go for', () => {
-    const fw = sim.spawnDrone('fw', 0);
-    expect(pickTarget({ structures: sim.structures, patrol: sim.getPatrol() }, fw)).toMatchObject({ x: sim.getPatrol().group.x, patrol: true });
+  it('is what strike drones go for, once the enemy has a fix on it', () => {
+    const fw = sim.spawnDrone('fw', 0), p = sim.getPatrol(), world = { structures: sim.structures, patrol: p, state: sim.state };
+    expect(pickTarget(world, fw)).toMatchObject({ ...pointAt(p, p.ends.at(-1) / 2), hold: true }); // no fix: it waits mid-corridor
+    p.fix = { x: 15, z: 11, t: 0 };
+    expect(pickTarget(world, fw)).toMatchObject({ x: 15, z: 11, patrol: true });
   });
 });
 
@@ -164,7 +177,8 @@ describe('a whole run', () => {
     sim.commands.setPatrol(ROUTE);
     sim.commands.startWave();
     sim.commands.setFigure('drones', 'fw', 'warhead', 1); // a 25 m injury radius
-    const { group } = sim.getPatrol(), d = sim.spawnDrone('fw', 0);
+    const p = sim.getPatrol(), { group } = p, d = sim.spawnDrone('fw', 0);
+    p.fix = { x: group.x, z: group.z, t: 0 };
     d.pos.set(group.x + u(29), d.pos.y, group.z); // inside the 30 m strike distance, beyond its 25 m injury radius
     sim.step();
     expect(sim.state.leaks).toBe(1);
@@ -175,6 +189,7 @@ describe('a whole run', () => {
     sim.commands.setPatrol(ROUTE);
     const spec = sim.currentLaydown();
     expect(spec.patrol).toEqual(ROUTE);
+    expect(spec.patrolPlan).toEqual({ width: 200, formation: 'file' });
     expect(spec.structures).toEqual([]);
     expect(spec.people).toBeUndefined();
     sim.commands.reset('clear');
