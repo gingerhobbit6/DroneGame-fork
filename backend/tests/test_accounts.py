@@ -126,14 +126,17 @@ class TestSigningIn:
         assert anon.get(f"{API}/me").status_code == 401
 
 
+OPEN = {("GET", "/api/v1/health"), *(("POST", f"{API}/{name}") for name in ("register", "sign-in", "sign-out", "reset"))}
+
+
 class TestEverythingElseNeedsASession:
-    @pytest.mark.parametrize("method, path", [
-        ("get", "/api/v1/laydowns"), ("get", "/api/v1/laydowns/1"), ("get", "/api/v1/runs"), ("get", "/api/v1/figure-sets"),
-        ("get", "/api/v1/packs"), ("get", "/api/v1/packs/build"), ("get", "/api/v1/units"), ("get", "/api/v1/units/1"),
-        ("delete", "/api/v1/laydowns/1"), ("delete", "/api/v1/units/1"), ("get", f"{API}/me"),
-    ])
-    def test_refused_without_one(self, anon, method, path):
-        assert getattr(anon, method)(path).status_code == 401
+    def test_every_route_but_signing_in_is_refused_without_one(self, anon):
+        # Every route in the schema, so a router added without the session check fails here rather than going out open.
+        routes = [(method.upper(), path) for path, ops in anon.app.openapi()["paths"].items() for method in ops]
+        assert OPEN <= set(routes) and len(routes) > 30
+        for method, path in sorted(set(routes) - OPEN):
+            reply = anon.request(method, re.sub(r"\{[^}]+\}", "1", path), json={})
+            assert reply.status_code == 401, f"{method} {path} answered {reply.status_code} without a session"
 
     def test_writes_are_refused_without_one(self, anon):
         assert anon.post("/api/v1/laydowns", json=laydown()).status_code == 401
