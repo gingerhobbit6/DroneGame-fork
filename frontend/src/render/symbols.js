@@ -4,12 +4,14 @@
 // bottom); unseen is the hostile frame in grey, for a drone no sensor has.
 
 import * as THREE from 'three';
-import { VIEW_HEIGHT } from './view.js';
+import { VIEW_HEIGHT, view } from './view.js';
 
 // A model drawn more than this many times life size gives way to its symbol: a system's from about 1.5 km of zoom, while at a few
 // hundred metres it is 2 to 4 times life size and keeps its model.
 export const SYMBOL_OVER = 12;
 export const SYMBOL_PX = 36; // how big a symbol is drawn on the screen, in pixels
+// Whether something drawn this many times life size is shown as its symbol. Never in the ground view, where everything is near.
+export const asSymbol = (timesLife) => !view.eye && timesLife > SYMBOL_OVER;
 
 const S = 64, K = 0.38; // the canvas, and its pixels per unit of the 200 x 200 box the standard draws symbols in
 const FILL = { friend: '#80e0ff', hostile: '#ff8080', unknown: '#ffff80', pending: '#ffff80', unseen: '#8a94a3' };

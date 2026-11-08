@@ -62,9 +62,9 @@ export function createPlanCanvas(cv, sim) {
     g.clearRect(0, 0, w, h);
     g.fillStyle = '#0b1424'; g.fillRect(0, 0, w, h);
     const Rt = terrainState.data ? terrainState.data.R : 0;
-    if (terrainState.hillshade) { // shaded relief, north up
+    if (view.hillshade) { // shaded relief, north up
       g.imageSmoothingEnabled = true;
-      g.drawImage(terrainState.hillshade, X(-Rt), Y(Rt), 2 * Rt * k, 2 * Rt * k);
+      g.drawImage(view.hillshade, X(-Rt), Y(Rt), 2 * Rt * k, 2 * Rt * k);
     }
     if (coverage) {
       const c = coverageGrid(sim, coverage), side = c.n * c.cell * k;

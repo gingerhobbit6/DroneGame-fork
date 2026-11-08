@@ -11,7 +11,6 @@ import { Dock } from '../src/ui/dock/Dock.jsx';
 import { summary } from '../src/ui/dock/MessagesTab.jsx';
 import { createPlanCanvas } from '../src/ui/dock/plan-canvas.js';
 import { createNetworkCanvas, pointAlong, linkColour, nodeList } from '../src/ui/dock/network-canvas.js';
-import { terrainState } from '../src/sim/terrain.js';
 import { bus, emit } from '../src/sim/sapient.js';
 import { MIXED, setUp } from './support/scenarios.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
@@ -182,7 +181,7 @@ describe('plan tab', () => {
   }, 30000);
   it('draws a running game, with and without coverage', () => {
     running();
-    terrainState.hillshade = document.createElement('canvas');
+    view.hillshade = document.createElement('canvas');
     const cv = newCanvas(), plan = createPlanCanvas(cv, game.sim);
     plan.draw(null);
     plan.draw('fpv');
@@ -194,7 +193,7 @@ describe('plan tab', () => {
     cv.dispatchEvent(new WheelEvent('wheel', { deltaY: -1 }));
     expect(() => createPlanCanvas(document.createElement('canvas'), game.sim).draw(null)).not.toThrow();
     plan.dispose();
-    terrainState.hillshade = null;
+    view.hillshade = null;
   }, 30000);
 });
 

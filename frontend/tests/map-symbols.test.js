@@ -88,7 +88,7 @@ describe('map symbols', () => {
     const tr = (id) => ({ id, short: `T${id}`, status: 'confirmed', airframe: 'Unknown', estErr: 20, est: { east: 100 * id, north: 0, up: 50 } });
     const net = { tracks: new Map([[1, tr(1)], [2, tr(2)]]), bearingCandidates: () => [] };
     const scene = new THREE.Scene();
-    const beliefs = createBeliefViews(scene, net, camera, document.createElement('div'));
+    const beliefs = createBeliefViews(scene, net, createLabels(document.createElement('div'), camera));
     beliefs.update();
     const [a, b] = scene.children.filter((o) => sprite(o)).map(sprite);
     expect(a.userData.symbol).toBe('unknown:uav');

@@ -11,7 +11,7 @@ import { buildModel } from './models.js';
 import { TRUE_UNIT, drawnUnit } from './system-parts.js';
 import { drapedRing } from './terrain-view.js';
 import { hexCss, setText } from './labels.js';
-import { SYMBOL_OVER, symbolScale, symbolSprite } from './symbols.js';
+import { asSymbol, symbolScale, symbolSprite } from './symbols.js';
 import { wideLines } from './wide-lines.js';
 import { view } from './view.js';
 
@@ -93,7 +93,7 @@ export function createStructureViews(scene, sim, labels) {
   }
 
   function sync(real) {
-    const unit = drawnUnit(), symbols = !view.eye && unit / TRUE_UNIT > SYMBOL_OVER, px = symbolScale(); // never in the ground view
+    const unit = drawnUnit(), symbols = asSymbol(unit / TRUE_UNIT), px = symbolScale();
     const live = new Set(sim.structures);
     for (const [s, v] of views) if (!live.has(s)) dispose(s, v);
     for (const s of sim.structures) {

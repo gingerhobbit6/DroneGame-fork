@@ -8,7 +8,7 @@ import { hereU } from '../sim/units.js';
 import { droneTemplate } from './models.js';
 import { drawScale } from './drone-models.js';
 import { hexCss } from './labels.js';
-import { SYMBOL_OVER, SYMBOL_PX, droneSymbol, setSymbol, symbolScale, symbolSprite } from './symbols.js';
+import { SYMBOL_PX, asSymbol, droneSymbol, setSymbol, symbolScale, symbolSprite } from './symbols.js';
 import { view } from './view.js';
 import { createTrail } from './trail.js';
 
@@ -72,7 +72,7 @@ export function createDroneViews(scene, sim, labels, camera) {
       const tracked = d.detected;
       const dist = camera.position.distanceTo(d.pos);
       const k = drawScale(d.def, view.eye ? dist : view.zoom); // it shrinks to true size as the camera closes in; from a mast, by its own distance
-      const symbol = !view.eye && k * WORLD.metresPerUnit > SYMBOL_OVER; // never in the ground view
+      const symbol = asSymbol(k * WORLD.metresPerUnit);
       v.group.visible = view.truth;
       v.trail.push(d.pos); // kept while hidden, so switching it on shows the whole flight
       v.trail.line.visible = view.trails && view.truth;

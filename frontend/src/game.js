@@ -11,8 +11,6 @@ import { createGameView } from './render/game-view.js';
 import { hereU } from './sim/units.js';
 import { PLACING_PICK_PX, createPlacement, pickStructure, selectionFrom, slideToShow } from './render/placement.js';
 import { createReplay } from './render/replay-view.js';
-import { droneTemplate } from './render/models.js';
-import { trackColour } from './render/belief-view.js';
 import { view } from './render/view.js';
 import { createApi } from './api/client.js';
 import { createRunSaver } from './api/run-saver.js';
@@ -273,7 +271,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       getTool: tools.get, defFor: (id) => unitDef(id, onVehicle(id, loadoutFor(id), tools.vehicle())), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
     });
     replay = createReplay({
-      scene: gameView.scene, rec: sim.rec, droneTemplate, makeLabel: gameView.labels.make, placeLabel: gameView.labels.place, trackColour,
+      scene: gameView.scene, rec: sim.rec, labels: gameView.labels,
       getStructures: () => sim.structures, labelOf: gameView.structures.labelOf, hideLive: gameView.hideLive,
       getLastSpeed: () => clock.lastSpeed, ...reviewClock,
     });

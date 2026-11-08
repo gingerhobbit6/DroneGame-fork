@@ -3,16 +3,18 @@
 // "Live" returns to where the run had got to.
 
 import * as THREE from 'three';
-import { WORLD, DRONES, STRUCTURES } from '../sim/config/index.js';
+import { WORLD, DRONES } from '../sim/config/index.js';
 import { view } from './view.js';
 import { drawScale } from './drone-models.js';
+import { droneTemplate } from './models.js';
+import { trackColour } from './belief-view.js';
 import { labelLift } from './structure-view.js';
-import { setText } from './labels.js';
-import { SYMBOL_OVER, SYMBOL_PX, droneSymbol, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
+import { hexCss, setText } from './labels.js';
+import { SYMBOL_PX, asSymbol, droneSymbol, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
 
-// deps: { scene, rec, droneTemplate, makeLabel, placeLabel, trackColour, getStructures, labelOf, hideLive, getLastSpeed, setPaused, resume }
+// deps: what lives in the game: { scene, rec, labels, getStructures, labelOf, hideLive, getLastSpeed, setPaused, resume }
 export function createReplay(deps) {
-  const { scene, rec } = deps;
+  const { scene, rec, labels } = deps;
   const review = { active: false, idx: 0, playing: false };
   const u = (m) => m / WORLD.metresPerUnit;
 
@@ -30,12 +32,12 @@ export function createReplay(deps) {
     if (o) return o;
     const def = DRONES[d.type];
     const g = new THREE.Group();
-    const model = deps.droneTemplate(d.type, false).clone();
-    const unseen = deps.droneTemplate(d.type, true).clone();
+    const model = droneTemplate(d.type, false).clone();
+    const unseen = droneTemplate(d.type, true).clone();
     const symbol = symbolSprite('hostile:uav', 16);
     g.add(model, unseen, symbol);
     group.add(g);
-    o = { group: g, model, unseen, symbol, label: deps.makeLabel(def.label, '#' + def.color.toString(16).padStart(6, '0'), 'dlabel') };
+    o = { group: g, model, unseen, symbol, label: labels.make(def.label, hexCss(def.color), 'dlabel') };
     droneObjs.set(d.u, o);
     return o;
   }
@@ -49,11 +51,11 @@ export function createReplay(deps) {
       seen.add(d.u);
       const o = droneObj(d);
       o.group.visible = view.truth;
-      const def = DRONES[d.type], k = drawScale(def), symbol = !view.eye && k * WORLD.metresPerUnit > SYMBOL_OVER; // as drone-view.js draws them live
+      const def = DRONES[d.type], k = drawScale(def), symbol = asSymbol(k * WORLD.metresPerUnit);
       o.group.position.set(d.x, d.y, d.z); o.group.rotation.y = d.ry; o.group.scale.setScalar(k);
       o.model.visible = d.tracked && !symbol; o.unseen.visible = !d.tracked && !symbol; o.symbol.visible = symbol;
       if (symbol) { setSymbol(o.symbol, droneSymbol(def, d.tracked)); o.symbol.material.opacity = d.tracked ? 1 : 0.6; o.symbol.scale.setScalar(symbolScale(SYMBOL_PX, k)); }
-      deps.placeLabel(o.label, d.x, d.y + Math.max(DRONES[d.type].size * o.group.scale.y * 0.7, 0.004 * view.zoom), d.z, view.truth && view.labels);
+      labels.place(o.label, d.x, d.y + Math.max(DRONES[d.type].size * o.group.scale.y * 0.7, 0.004 * view.zoom), d.z, view.truth && view.labels);
       o.label.style.opacity = d.tracked ? '1' : '0.5';
     }
     for (const [uid, o] of droneObjs) if (!seen.has(uid)) { o.group.visible = false; o.label.style.display = 'none'; }
@@ -61,18 +63,17 @@ export function createReplay(deps) {
     f.tracks.forEach((tr, i) => {
       const o = pool(trackObjs, () => {
         const mesh = symbolSprite('unknown:uav', 20); group.add(mesh);
-        return { mesh, label: deps.makeLabel('', '#ffffff', 'dlabel') };
+        return { mesh, label: labels.make('', '#ffffff', 'dlabel') };
       }, i);
       o.mesh.visible = true;
       o.mesh.position.set(tr.x, tr.y, tr.z);
       setSymbol(o.mesh, trackSymbol(tr)); // the same symbol the live track had
       o.mesh.scale.setScalar(symbolScale(tr.status === 'tentative' ? SYMBOL_PX * 0.75 : SYMBOL_PX));
       o.mesh.material.color.setScalar(tr.status === 'coasting' ? 0.55 : 1);
-      const col = deps.trackColour(tr);
-      o.label.style.borderColor = '#' + col.toString(16).padStart(6, '0');
+      o.label.style.borderColor = hexCss(trackColour(tr));
       const cls = tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV';
       setText(o.label, tr.status === 'tentative' ? 'tentative' : `${tr.short} · ${cls}${tr.kill ? ' · kill reported' : ''}`);
-      deps.placeLabel(o.label, tr.x, tr.y, tr.z, view.labels);
+      labels.place(o.label, tr.x, tr.y, tr.z, view.labels);
     });
     for (let i = f.tracks.length; i < trackObjs.length; i++) { trackObjs[i].mesh.visible = false; trackObjs[i].label.style.display = 'none'; }
 
@@ -90,7 +91,7 @@ export function createReplay(deps) {
       const label = deps.labelOf(s);
       if (!st) { label.style.display = 'none'; continue; }
       setText(label, `${s.short} · ${st.mode}${st.trackShort ? ' ▸ ' + st.trackShort : ''}`);
-      deps.placeLabel(label, s.pos.x, s.pos.y + labelLift(s.def), s.pos.z, view.labels);
+      labels.place(label, s.pos.x, s.pos.y + labelLift(s.def), s.pos.z, view.labels);
       const tgt = st.target != null ? byUid.get(st.target) : null;
       if (tgt) {
         const line = pool(lineObjs, () => {
@@ -98,7 +99,7 @@ export function createReplay(deps) {
           l.frustumCulled = false; group.add(l); return l;
         }, li++);
         line.visible = true;
-        line.material.color.setHex(STRUCTURES[s.def.id].color);
+        line.material.color.setHex(s.def.color);
         const p = line.geometry.attributes.position;
         p.setXYZ(0, s.pos.x, s.pos.y + 6, s.pos.z); p.setXYZ(1, tgt.x, tgt.y, tgt.z); p.needsUpdate = true;
       }

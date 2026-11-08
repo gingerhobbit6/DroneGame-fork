@@ -33,8 +33,7 @@ describe('timeline', () => {
   const withReplay = () => {
     const speed = { last: 1 };
     const replay = createReplay({
-      scene: new THREE.Scene(), rec: game.sim.rec, droneTemplate: () => new THREE.Group(),
-      makeLabel: () => document.createElement('div'), placeLabel: () => {}, trackColour: () => 0xffffff,
+      scene: new THREE.Scene(), rec: game.sim.rec, labels: { make: () => document.createElement('div'), place: () => {} },
       getStructures: () => game.sim.structures, labelOf: () => document.createElement('div'), hideLive: () => {},
       getLastSpeed: () => speed.last, ...game.reviewClock,
     });

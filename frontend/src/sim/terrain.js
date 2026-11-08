@@ -7,7 +7,7 @@ import { mulberry32, hashSeed } from './rng.js';
 import { clamp, makeWorld, pickMasts, rasterBox } from './world.js';
 
 // The terrain currently in use. Other modules read it through the helpers below.
-export const terrainState = { data: null, hillshade: null };
+export const terrainState = { data: null };
 export const terrain = () => terrainState.data;
 
 const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };

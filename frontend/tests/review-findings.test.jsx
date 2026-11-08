@@ -12,7 +12,6 @@ import { createStructureViews } from '../src/render/structure-view.js';
 import { buildWorldView } from '../src/render/terrain-view.js';
 import { createLabels, setText } from '../src/render/labels.js';
 import { createReplay } from '../src/render/replay-view.js';
-import { droneTemplate } from '../src/render/models.js';
 import { GameContext, useLoad } from '../src/ui/hooks.js';
 import { RunsTab } from '../src/ui/dock/RunsTab.jsx';
 import { Timeline } from '../src/ui/Timeline.jsx';
@@ -278,7 +277,7 @@ describe('3D resources are freed', () => {
     const scene = new THREE.Scene(), labels = createLabels(document.createElement('div'), new THREE.PerspectiveCamera());
     const frame = { t: 0, drones: [{ u: 1, type: 'fpv', x: 0, y: 1, z: 0, ry: 0, tracked: true }], tracks: [], missiles: [], structs: [] };
     const replay = createReplay({
-      scene, rec: { frames: [frame] }, droneTemplate, makeLabel: labels.make, placeLabel: labels.place, trackColour: () => 0xffffff,
+      scene, rec: { frames: [frame] }, labels,
       getStructures: () => [], labelOf: () => null, hideLive: () => {}, getLastSpeed: () => 1, setPaused: () => {}, resume: () => {},
     });
     expect(scene.children.length).toBe(0);
