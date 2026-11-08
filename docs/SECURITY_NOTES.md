@@ -51,7 +51,7 @@ An independent security review on the same date found one low-severity bug, now 
 
 Accounts and packs were checked on 2026-11-07. `backend/tests/test_accounts.py` and `test_units.py` cover hashing, lockout, expiry, cookie flags, revocation, every route refusing a missing session, and another account's packs answering `404`. The whole flow was also walked through in a real browser against a local server. An independent security review on the same date found the lockout could be beaten by sending many tries at once, as each was counted after its slow hash and they overwrote each other. Tries are now counted first, in one statement, with a test that fails on the old code. The review's other findings are low and listed under accepted limits.
 
-`npm audit` and `pip-audit` reported nothing on that date. Neither is run automatically, because there is no CI until a remote exists.
+`npm audit` and `pip-audit` reported nothing on that date. Neither is run automatically: the repository has a GitHub remote but no CI workflow yet.
 
 ## Accepted limits
 

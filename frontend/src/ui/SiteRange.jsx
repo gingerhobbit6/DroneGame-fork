@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { DRONES, WORLD } from '../sim/config/index.js';
 import { BEARINGS, ERROR_AT_LIMIT, pathReport, predictRange, reachFor, usesPath } from '../sim/site-range.js';
 import { terrainState } from '../sim/terrain.js';
+import { km } from './hooks.js';
 
-const km = (metres) => `${(metres / 1000).toFixed(1)} km`;
 const db = (x) => `${x.toFixed(1)} dB`;
 const POLAR = 90, PROFILE = { w: 280, h: 120, top: 6, bottom: 16 };
 

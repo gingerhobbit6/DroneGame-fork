@@ -38,17 +38,18 @@ UnitVehicle = PatrolVehicle  # a pack brings the same vehicles as a patrol
 LineCount = Annotated[int, Field(ge=1, le=MAX_UNIT_COUNT)]
 
 
+def _not_the_username(password: str, info: ValidationInfo) -> str:
+    if password.lower() == str(info.data.get("username", "")).lower():
+        raise ValueError("must not be the username")
+    return password
+
+
 class Register(Strict):
     username: Username
     display_name: DisplayName
     password: Password
 
-    @field_validator("password")
-    @classmethod
-    def not_the_username(cls, password: str, info: ValidationInfo) -> str:
-        if password.lower() == str(info.data.get("username", "")).lower():
-            raise ValueError("must not be the username")
-        return password
+    not_the_username = field_validator("password")(_not_the_username)
 
 
 class SignIn(Strict):
@@ -61,6 +62,8 @@ class Reset(Strict):
     username: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
     recovery_code: RecoveryCode
     new_password: Password
+
+    not_the_username = field_validator("new_password")(_not_the_username)
 
 
 class ChangePassword(Strict):

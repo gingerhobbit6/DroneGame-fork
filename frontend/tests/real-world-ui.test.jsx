@@ -51,9 +51,10 @@ describe('reading a pack file', () => {
     await expect(damaged((h) => { h.gridsSha256 = 'f'.repeat(64); })).rejects.toThrow(/fingerprint/);
   });
   it('stops at the declared size, so a small file cannot expand without limit', async () => {
-    await expect(damaged((h) => { h.sections[1].rawLength = 10; })).rejects.toThrow(/longer/);
-    await expect(damaged((h) => { h.sections[1].rawLength = 2801 * 2801 + 5; })).rejects.toThrow(/shorter/);
-    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 40; })).rejects.toThrow(/unreasonable/);
+    await expect(damaged((h) => { h.sections[4].rawLength = 10; })).rejects.toThrow(/longer/); // the features, whose size is their own
+    await expect(damaged((h) => { h.sections[4].rawLength += 5; })).rejects.toThrow(/shorter/);
+    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 40; for (const i of [1, 2, 3]) h.sections[i].rawLength = 2 ** 38; })).rejects.toThrow(/unreasonable/);
+    await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 26; })).rejects.toThrow(/damaged/); // grids that disagree are refused before any is unpacked
   });
   it('refuses sections outside the file, or missing', async () => {
     await expect(damaged((h) => { h.sections[0].offset = 1e12; })).rejects.toThrow(/damaged/);
@@ -83,6 +84,13 @@ describe('the pack store', () => {
     const file = await mine.fileOf({ source: 'server', file: 'a.sgmap' });
     const added = await createPackStore({ api: {}, idb: null }).importFile(file);
     expect(added.hash).toBe((await decodePack(buffer)).pack.hash);
+  });
+  it('keeps the pack it has when another with the same ground but other contents is imported', async () => {
+    const store = createPackStore({ api: {}, idb: null });
+    const first = await store.importFile(new NodeBlob([await encodePack()]));
+    expect((await store.importFile(new NodeBlob([await encodePack()]))).hash).toBe(first.hash); // the same file again is fine
+    await expect(store.importFile(new NodeBlob([await encodePack({ change: (h) => { h.name = 'Other'; } })]))).rejects.toThrow(/different map pack/);
+    expect(store.get(first.hash).pack.header.name).toBe('Fixture');
   });
   it('notices a pack that has changed, or cannot be fetched', async () => {
     const buffer = await encodePack();
@@ -222,6 +230,12 @@ describe('choosing a world', () => {
     await until(() => game.api.packs.build.mock.calls.length);
     expect(game.api.packs.build.mock.calls[0][0]).toMatchObject({ lidar: false });
     expect(game.api.packs.build.mock.calls[0][0].north).toBeGreaterThan(700000);
+    // once built, the list has a map there, and the picker goes to it rather than offering to build it again
+    const { east, north } = game.api.packs.build.mock.calls[0][0];
+    game.api.packs.list.mockImplementation(async () => [entry, { ...entry, file: 'built.sgmap', hash: 'b'.repeat(64), east, north }]);
+    const opened = () => fetch.mock.calls.some(([url]) => String(url).includes('built.sgmap'));
+    for (let i = 0; i < 200 && !opened(); i++) await settle(30); // the builder is asked how it is going every 2 s
+    expect(opened()).toBe(true);
   }, 30000);
   it('says when the laptop is outside Great Britain, or a location is refused', async () => {
     useGeolocation(fixAt(40, -100));

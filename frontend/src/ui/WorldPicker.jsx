@@ -82,12 +82,12 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
     onWorld(worldId(loaded.pack.hash, e0, n0));
   }
   // Go to a point: into the pack already open if it fits, then any other pack, otherwise offer to build one.
-  const goTo = async (point, prefix = '') => {
+  const goTo = async (point, prefix = '', packs = null) => { // packs: a list newer than this render's, such as after a build
     touched.current = true;
     const ticket = ++latest.current;
     setWanted(null); setElsewhere(null);
     if (decoded && covers(decoded.pack.header, point.e, point.n)) { setStart(decoded, point); if (prefix) setNote(prefix); return; }
-    const all = (listing || await refresh()).packs;
+    const all = packs ?? (listing || await refresh()).packs;
     const match = all.find((p) => covers(p, point.e, point.n));
     if (ticket !== latest.current) return;
     if (match) { if (await choosePack(match, point) && prefix) setNote(prefix); return; }
@@ -174,7 +174,7 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
               </li>
             </ol>
             {note && <div id="world-note" className="map-note">{note}</div>}
-            <SiteStatus site={site} decoded={decoded} wanted={wanted} downloads={downloads} onBuilt={async () => { const point = wanted; setWanted(null); await refresh(); await goTo(point); }} />
+            <SiteStatus site={site} decoded={decoded} wanted={wanted} downloads={downloads} onBuilt={async () => { const point = wanted; setWanted(null); await goTo(point, '', (await refresh()).packs); }} />
           </div>
           <div className="site-view">
             <SiteMap packs={ready} downloads={downloads} point={site || wanted} planned={!site && !!wanted} elsewhere={elsewhere} moving={touched} onPick={pickOnMap} />

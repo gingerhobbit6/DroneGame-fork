@@ -4,7 +4,7 @@
 import { SITE, ECONOMY, DRONES, ADAPT } from '../sim/config/index.js';
 import { enemyCost, money } from '../sim/economy.js';
 import { parseWorldId, worldLabel } from '../sim/world-pack.js';
-import { runStats } from '../sim/stats.js';
+import { liveStats } from '../sim/stats.js';
 import { useGame, useTick } from './hooks.js';
 import { StatsHeadline } from './RunStats.jsx';
 import { Movable } from './Movable.jsx';
@@ -45,7 +45,7 @@ export function Hud({ openDock }) {
     const def = DRONES[type], kk = (next - 1) * (def.adapt ?? 1);
     return Math.max(Math.min(ADAPT.evadeFloor, def.evade), def.evade * (1 - ADAPT.evadePerWave * kk)).toFixed(2);
   };
-  const destroyed = enemyCost(ledger.killed), ammo = ammunition(sim.structures), stats = runStats(sim);
+  const destroyed = enemyCost(ledger.killed), ammo = ammunition(sim.structures), stats = liveStats(sim);
   return (
     <Movable id="hud-top-left" title="Run">
       {state.sandbox && <Rehearsal state={state} ledger={ledger} />}

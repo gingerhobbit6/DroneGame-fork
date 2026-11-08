@@ -79,6 +79,7 @@ export function createNetwork(ctx) {
     S.clearBus();
     nodes.clear(); tracker.clear(); names.clear();
     registration.reset();
+    tasks.reset(); // what the last run taught it about jammers must not shape this one
     fused.reset(); fusionT = 0; authority.pending.length = 0;
     scheduled.length = 0; comms.reset(); fusion.uplinks.clear(); fusion.cellBand = 'B8';
     fusion.nodeId = S.uuid(); gui.nodeId = S.uuid(); fusion.statusT = 0;

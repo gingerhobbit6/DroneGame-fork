@@ -19,7 +19,6 @@ export function fillMagazine(s) {
 
 // Nothing without a magazine runs out.
 export const canFire = (s) => !s.def.magazine || (s.reload === 0 && s.rounds > 0);
-export const outOfRounds = (s) => !!s.def.magazine && !isBeam(s.def) && s.rounds === 0 && s.storage === 0;
 
 // In words. def is passed separately because a moment being reviewed does not carry one.
 export function magazineWord(now, def) {

@@ -126,7 +126,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     worldView = buildWorldView(scene, terrainState.data, siteMat);
     for (const m of [worldView.mesh, ...worldView.scenery]) m.receiveShadow = true;
     ownMaterial = worldView.mesh.material;
-    if (terrainState.data.geo) { worldView.mesh.material = map.material; refreshMap(); }
+    if (terrainState.data.geo) { worldView.mesh.material = map.material; refreshMap().catch(() => {}); } // the terrain still shows if its picture fails
     else showOsm();
     siteRing.update(0, 0);
     buildRing.update(0, 0);

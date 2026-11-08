@@ -157,6 +157,36 @@ describe('replaying a saved run', () => {
     expect(sim.digest()).toBe(r.digest);
   }, 60000);
 
+  it('reproduces a run that was lost, as most are', () => {
+    fresh([]);
+    play(sim, 8);
+    expect(sim.state.over).toBe(true);
+    const r = JSON.parse(JSON.stringify(runs.at(-1)));
+    replayRun(sim, r);
+    expect(sim.state.over).toBe(true);
+    expect(sim.digest()).toBe(r.digest);
+  }, 60000);
+
+  it('reproduces a deployment pack run that costs more than the budget', () => {
+    sim.commands.reset('clear');
+    sim.state.started = true;
+    sim.commands.setPacked(true);
+    const dearest = Object.values(STRUCTURES).sort((a, b) => b.cost - a.cost)[0].id;
+    for (let i = 0; i < 4; i++) expect(sim.commands.place(dearest, 30 + i * 8, -40)).toBe(null);
+    expect(sim.state.budget).toBeLessThan(0);
+    sim.commands.autoWire();
+    sim.state.warnedWire = true;
+    sim.commands.startWave();
+    sim.run(100);
+    const r = JSON.parse(JSON.stringify(finish()));
+    sim.commands.setPacked(false);
+    sim.commands.reset('clear');
+    replayRun(sim, r);
+    expect(sim.structures.length).toBe(r.spec.structures.length);
+    expect(sim.digest()).toBe(r.digest);
+    sim.commands.setPacked(false);
+  }, 60000);
+
   it('a different seed gives a different run, so the digest means something', () => {
     fresh();
     play(sim, 2);

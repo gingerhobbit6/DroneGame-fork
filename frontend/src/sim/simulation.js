@@ -4,7 +4,7 @@
 //  - on(event, fn): moments the rendering and UI need to hear about (explosion, toast, siteHit, gameOver, reset, terrain, sandbox...)
 
 import { ADAPT, ECONOMY, FUSION, RESEARCHED, SITE, WAVES, WORLD, applyRangeScale, exportFigures, importFigures, resetAllFigures, resetFigure, setFigure } from './config/index.js';
-import { seedAll } from './rng.js';
+import { hashSeed, seedAll } from './rng.js';
 import { generateTerrain, terrainState } from './terrain.js';
 import { cutWorld, parseWorldId, siteProblem } from './world-pack.js';
 import { bus } from './sapient.js';
@@ -28,6 +28,14 @@ import { enterSandbox, launchSandboxWave, launchSandboxAttack, clearSandboxDrone
 export const SIM_STEP = 0.05; // fixed simulation step in game seconds, so a run does not depend on frame rate
 
 // shortcut: bus, clock, terrainState and the random streams are module-level singletons, so only one simulation can exist at a time. Pass them in if parallel runs are ever needed.
+// What a run starts with, and a reset goes back to. The seeds, the start, the conditions and the pack stay across a reset.
+const freshRun = () => ({
+  health: SITE.maxHealth, budget: ECONOMY.budget, wave: 0, kills: 0, leaks: 0, hits: 0, casualties: 0, killed: 0, injured: 0, time: 0, warnedWire: false, over: false,
+  waveActive: false, queue: [], waveTime: 0, autoTimer: -1, zone: null, zoneCentre: SITE_POS, attack: DEFAULT_MIX,
+  sandbox: false, sbLevel: 1, sbQueue: [], sbTime: 0, sbSpent: 0, // sandbox: attacks without consequences, before the first wave
+  ended: false, // the operator ended the deployment
+});
+
 export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
   const listeners = new Map();
   const packs = new Map(); // real-world map packs the rules can cut from, by hash
@@ -39,11 +47,8 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
   terrainState.data = generateTerrain(terrainSeed);
 
   const state = {
-    seed, terrainSeed, health: SITE.maxHealth, budget: ECONOMY.budget, wave: 0, kills: 0, leaks: 0, hits: 0, casualties: 0, killed: 0, injured: 0, time: 0, warnedWire: false,
-    started: false, over: false, autoStart: false, zone: null, zoneCentre: SITE_POS, attack: DEFAULT_MIX, conditions: 'day',
-    waveActive: false, queue: [], waveTime: 0, autoTimer: -1,
-    sandbox: false, sbLevel: 1, sbQueue: [], sbTime: 0, sbSpent: 0, // sandbox: attacks without consequences, before the first wave
-    packed: false, kit: null, ended: false, // packed: a deployment pack is in use, so the budget only counts; kit: how many of each system it holds; ended: the operator ended the deployment
+    seed, terrainSeed, ...freshRun(), started: false, autoStart: false, conditions: 'day',
+    packed: false, kit: null, // packed: a deployment pack is in use, so the budget only counts; kit: how many of each system it holds
   };
   const w = { state, drones: [], structures: [], missiles: [], people: [], peopleUid: 0, peopleRev: 0, patrol: null, ledger: createLedger(), emit, droneUid: 0, startLaydown: null, startFigures: null, runEnded: false };
   laydown.applyConditions(w, 'day'); // the conditions are module state that physics reads: a new simulation starts on a clear day
@@ -83,6 +88,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     updateMissiles(w, dt);
     updateDrones(w, dt);
     if (++stepCount % SNAPSHOT_EVERY === 0) w.rec.push(takeSnapshot(w));
+    if (state.over) endRun(); // the site falls during a step, so the record waits for it to finish and replays reach the same state
   }
 
   // Start the run again from the beginning, on the same seed. 'keep' rebuilds the laydown the run started with (or the
@@ -96,10 +102,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     w.missiles.length = 0;
     people.clearPeople(w);
     w.patrol = null; // its escort and people went with the rest
-    Object.assign(state, {
-      health: SITE.maxHealth, budget: ECONOMY.budget, wave: 0, kills: 0, leaks: 0, hits: 0, casualties: 0, killed: 0, injured: 0, time: 0, warnedWire: false, over: false,
-      waveActive: false, queue: [], waveTime: 0, autoTimer: -1, sandbox: false, sbLevel: 1, sbQueue: [], sbTime: 0, sbSpent: 0, zone: null, zoneCentre: SITE_POS, attack: DEFAULT_MIX, ended: false,
-    });
+    Object.assign(state, freshRun());
     laydown.applyConditions(w, 'day'); // a kept laydown brings its own back
     resetLedger(w.ledger);
     w.rec.clear(); stepCount = 0; w.droneUid = 0;
@@ -128,12 +131,12 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     w.runEnded = true;
     emit('runEnded', runRecord(w, log, stepCount, digest()));
   }
-  on('gameOver', endRun);
 
   // The operator stands the deployment down: the run ends as if lost, and the report shows.
   function endDeployment() {
     if (state.wave === 0 || state.over || state.sandbox) return;
     state.over = true; state.ended = true;
+    endRun();
     emit('gameOver');
   }
 
@@ -235,13 +238,11 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
 
   // FNV-1a over the messages still kept (the newest bus.max at most), plus the headline numbers: a fingerprint of a run.
   function digest() {
-    let h = 0x811c9dc5;
-    const feed = (s) => { for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } };
-    for (const e of bus.entries) feed(JSON.stringify(e.msg));
+    const parts = bus.entries.map((e) => JSON.stringify(e.msg)), feed = (s) => parts.push(s);
     feed(JSON.stringify([state.kills, state.health, state.budget, state.leaks, state.time, bus.seq, { ...w.ledger, jamTime: undefined, flights: undefined, falseAlarms: undefined }])); // these came later: left out so recorded digests still match
     if (w.people.length) feed(JSON.stringify(w.people.map((g) => g.hits))); // with no people, a run's digest stays as it was
     if (w.patrol) feed(JSON.stringify([w.patrol.dist, w.patrol.phase, w.patrol.trips, w.patrol.fix]));
-    return (h >>> 0).toString(16);
+    return hashSeed(parts.join('')).toString(16); // one FNV-1a over everything, as feeding it piece by piece once did
   }
 
   return {

@@ -1,6 +1,7 @@
 """Listing and serving map packs, and starting a build: only plain names, only one at a time, and never a shell."""
 
 import json
+import shutil
 import struct
 import threading
 
@@ -126,6 +127,14 @@ def test_only_one_build_at_a_time(root):
 def test_a_missing_builder_is_reported(root):
     builder, _ = builder_with(root, FileNotFoundError())
     assert builder.start(1, 2, True) == {"running": False, "ok": False, "message": "The map builder could not start. It needs uv installed."}
+
+
+def test_a_map_folder_that_cannot_be_made_ends_the_build_so_another_can_start(root):
+    builder, calls = builder_with(root, FakeProcess([], 0))
+    shutil.rmtree(builder.library.folder, ignore_errors=True)
+    builder.library.folder.write_text("in the way", encoding="utf-8")  # a file where the folder should be
+    assert builder.start(1, 2, True) == {"running": False, "ok": False, "message": "The map folder could not be made."}
+    assert builder.start(1, 2, True)["ok"] is False and not calls  # not busy, and nothing ran
 
 
 def test_the_build_route_checks_its_input_and_refuses_a_second_build(client):

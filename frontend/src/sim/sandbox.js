@@ -4,6 +4,8 @@
 import { rand, waveStream } from './rng.js';
 import { makeWave } from './waves.js';
 import { removeDrone } from './drones.js';
+import { tally } from './economy.js';
+import { logEnd } from './flight-log.js';
 
 const byTime = (a, b) => a.t - b.t;
 
@@ -36,5 +38,5 @@ export function launchSandboxAttack(w, { type, count, bearingDeg, gap }) {
 
 export function clearSandboxDrones(w) {
   w.state.sbQueue.length = 0;
-  for (const d of w.drones.slice()) removeDrone(w, d);
+  for (const d of w.drones.slice()) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); removeDrone(w, d); } // cleared away, so none stays airborne in the figures
 }

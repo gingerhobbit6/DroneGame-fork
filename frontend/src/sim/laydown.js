@@ -43,6 +43,7 @@ export function placementProblem(w, x, z, def, cost = def.cost) {
   const r = Math.hypot(x, z);
   const xm = x * WORLD.metresPerUnit, zm = z * WORLD.metresPerUnit;
   if (BUILD.lockAfterStart && w.state.wave > 0) return 'The laydown is locked once the first wave starts';
+  if (w.structures.length >= BUILD.maxSystems) return `No more than ${BUILD.maxSystems} systems, so the laydown can still be saved`;
   if (!siteIsFree(w) && r < u(BUILD.minDist)) return `Too close to the station (minimum ${BUILD.minDist} m)`;
   const far = reachProblem(w, x, z);
   if (far) return far;

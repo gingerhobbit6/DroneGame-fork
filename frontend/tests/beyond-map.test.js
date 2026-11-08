@@ -1,7 +1,7 @@
 // Past a border the national map can be blank, and the pack outlines that ground so it is shaded from its heights.
 
-import { describe, expect, it } from 'vitest';
-import { paintBeyond } from '../src/render/map-texture.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { paintBeyond, paintPictures } from '../src/render/map-texture.js';
 
 // A 2D context that records what is asked of it.
 function recorder() {
@@ -32,5 +32,16 @@ describe('ground past the border', () => {
       paintBeyond(frame(g), DATA, rings, TOPO);
       expect(calls).toEqual([]);
     }
+  });
+});
+
+describe('a pack picture the browser cannot read', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('is left out, and the pictures after it are still drawn', async () => {
+    vi.stubGlobal('createImageBitmap', async (blob) => { if (blob === 'junk') throw new Error('The source image could not be decoded.'); return { close() {} }; });
+    const { g, calls } = recorder(), f = { g, west: 0, top: 1000, span: 1000, px: (m) => m };
+    const at = (blob, west) => ({ layer: 'osmap', west, top: 1000, width: 100, height: 100, blob });
+    await paintPictures(f, [at('junk', 0), at('good', 200)], 'osmap', () => true);
+    expect(calls.filter(([name]) => name === 'drawImage').map((c) => c[2])).toEqual([200]);
   });
 });

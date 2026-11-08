@@ -8,7 +8,7 @@ export const RANGE_BINS = [0, 1000, 2000, 3000, 5000, 8000, 12000]; // metres fr
 
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const per = (a, b) => (b ? a / b : null);
-const nameOf = (id) => STRUCTURES[id]?.name ?? (id === PERIMETER.id ? PERIMETER.name : id === 'jammer' ? 'Jamming' : id);
+const nameOf = (id) => STRUCTURES[id]?.name ?? (id === PERIMETER.id ? PERIMETER.name : id);
 const ended = (fs, end) => fs.filter((f) => f.end === end).length;
 export const firstSeen = (f) => Object.values(f.seen).reduce((a, s) => (!a || s.t < a.t ? s : a), null);
 
@@ -98,4 +98,17 @@ export function runStats({ ledger, structures }, wave = null) {
     sensors: sensorRows(fs, structures, alarms),
     types: typeRows(fs),
   };
+}
+
+// The whole run's figures for panels that refresh ten times a second: worked out again only when a sim-second passes, a
+// drone launches or ends, or something is bought or sold, so they lag the run by at most a sim-second.
+const live = new WeakMap();
+export function liveStats(sim) {
+  const { ledger, structures, state } = sim;
+  const key = [Math.floor(state.time), ledger.flights.length, state.kills, state.leaks, structures.length, ledger.capex, ledger.consumables, ledger.lostValue].join();
+  const hit = live.get(ledger);
+  if (hit?.key === key) return hit.stats;
+  const stats = runStats(sim);
+  live.set(ledger, { key, stats });
+  return stats;
 }

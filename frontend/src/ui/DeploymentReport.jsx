@@ -10,7 +10,7 @@ export function DeploymentReport({ report: r }) {
     <div id="deployment-report">
       <h1>{TITLE[r.outcome]}</h1>
       <p>{r.outcome === 'ended' ? 'You ended the deployment' : 'You held out'} after <b>{r.waves}</b> full wave(s).</p>
-      <p id="report-drones"><b>{r.launched}</b> drones launched · <b>{r.intercepted}</b> intercepted · <b>{r.leaked}</b> got through · <b>{r.left}</b> turned away</p>
+      <p id="report-drones"><b>{r.launched}</b> drones launched · <b>{r.intercepted}</b> intercepted · <b>{r.leaked}</b> got through · <b>{r.struck}</b> struck a system · <b>{r.left}</b> turned away</p>
 
       <h2>Cost of the defence</h2>
       <p id="report-cost">Systems {money(c.systems)} · munitions {money(c.munitions)} · <b>total {money(c.spent)}</b>{c.lost > 0 && <> · systems lost worth {money(c.lost)}</>}</p>

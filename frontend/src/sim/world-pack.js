@@ -8,7 +8,7 @@ import { gridRef } from './grids.js';
 
 const ID = /^pack:([0-9a-f]{32}):(\d{6}):(\d{7}):real$/;
 const CELL = 20, MAX_N = 4001, WATER = 4; // 80 km at most
-const MAX_BUILDINGS = 500000;
+const MAX_BUILDINGS = 500000, MAX_HEIGHT = 20000; // metres: no ground is that high or deep, so anything past it is damage
 
 export const parseWorldId = (world) => {
   const m = ID.exec(world || '');
@@ -31,8 +31,9 @@ export function parsePack(header, grids, features) {
   const size = N * N;
   for (const name of ['ground', 'canopy', 'bldg', 'cover']) if (grids[name]?.length !== size) throw new Error('This pack has a grid of the wrong length.');
   // a NaN compares false in the line of sight test, which would silently report a clear line
-  for (let i = 0; i < size; i++) if (!Number.isFinite(grids.ground[i])) throw new Error('This pack has a height that is not a number.');
+  for (let i = 0; i < size; i++) if (!(Math.abs(grids.ground[i]) < MAX_HEIGHT)) throw new Error('This pack has a height that is not a real one.');
   if (!Array.isArray(features?.buildings) || features.buildings.length > MAX_BUILDINGS || !Array.isArray(features.lines)) throw new Error('This pack has unreadable features.');
+  if (!features.buildings.every((b) => finiteList(b, 6)) || !features.lines.every((l) => Array.isArray(l) && l.every((p) => finiteList(p, 2)))) throw new Error('This pack has unreadable features.');
   return { hash: gridsSha256.slice(0, 32), header, grids, features };
 }
 

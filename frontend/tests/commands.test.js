@@ -36,6 +36,19 @@ describe('placing and selling', () => {
     expect(sim.commands.place('laser', u(500), 0)).toMatch(/Not enough budget/);
   });
 
+  it('stops at as many systems as a save can hold', () => {
+    fresh();
+    sim.state.budget = 1e9;
+    const free = [];
+    for (let r = 300; free.length < BUILD.maxSystems + 1 && r < BUILD.maxDist; r += 70) {
+      const n = Math.floor((2 * Math.PI * r) / 70); // evenly round the ring, so the last spot is as far from the first as any other
+      for (let k = 0, a = 0; k < n; a = (2 * Math.PI * ++k) / n) if (sim.canPlace(u(r * Math.cos(a)), u(r * Math.sin(a)), STRUCTURES.acoustic_l)) free.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    for (const [x, z] of free.slice(0, BUILD.maxSystems)) expect(sim.commands.place('acoustic_l', u(x), u(z))).toBeNull();
+    const [x, z] = free[BUILD.maxSystems];
+    expect(sim.commands.place('acoustic_l', u(x), u(z))).toMatch(/No more than 200 systems/);
+  });
+
   it('refunds a sale, including the terminal, and ignores a click on nothing', () => {
     fresh();
     sim.commands.place('radar', u(500), 0);
@@ -218,8 +231,12 @@ describe('sandbox', () => {
     expect(sim.state.budget).toBe(budget);
     expect(sim.state.leaks).toBeGreaterThan(0);
     expect(sim.state.sbSpent).toBeGreaterThan(0);
+    sim.commands.launchSandboxAttack({ type: 'fo', count: 2, bearingDeg: 90, gap: 0 });
+    sim.run(40);
+    expect(sim.drones.length).toBeGreaterThan(0);
     sim.commands.clearSandboxDrones();
     expect(sim.drones.length).toBe(0);
+    expect(sim.ledger.flights.filter((f) => !f.end)).toHaveLength(0); // cleared away, so none stays airborne in the figures
     sim.commands.startWave();
     expect(sim.state.wave).toBe(0);
     sim.commands.exitSandbox();

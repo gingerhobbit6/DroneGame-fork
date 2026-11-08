@@ -70,7 +70,7 @@ export function peopleProblem(w, x, z, protection) {
   return null;
 }
 
-const cleanCount = (count) => clamp(Math.round(count), 1, PEOPLE_LIMITS.perGroup);
+export const cleanCount = (count) => clamp(Math.round(count), 1, PEOPLE_LIMITS.perGroup);
 
 // Returns the reason it can't be placed, or null if it was.
 export function placePeople(w, x, z, count, protection, role = 'civilian') {

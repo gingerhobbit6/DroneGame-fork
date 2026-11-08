@@ -173,6 +173,17 @@ describe('bearing-only measurements', () => {
     expect(same.ingest(bearingAt([0, 0, 0], 3000, 3000, 0, 1, 'rf1'), 0)).toBeNull();
   });
 
+  it('give no fix where the bearings cross far beyond what either sensor can hear', () => {
+    // two detectors 500 m apart whose bearings differ by 2 degrees cross about 14 km out; each hears 3.5 km at most
+    const heard = (from, east, north, node) => ({ ...bearingAt(from, east, north, 0, 0, node), reach: 3500 });
+    const tk = newTracker();
+    tk.ingest(heard([0, 0, 0], 0, 1000, 'rf1'), 0);
+    expect(tk.ingest(heard([500, 0, 0], 500 - Math.sin(rad(2)) * 1000, Math.cos(rad(2)) * 1000, 'rf2'), 0)).toBeNull();
+    const near = newTracker(); // the same pair still fixes a drone inside their reach
+    near.ingest(heard([0, 0, 0], 1000, 2000, 'rf1'), 0);
+    expect(near.ingest(heard([500, 0, 0], 1000, 2000, 'rf2'), 0)).not.toBeNull();
+  });
+
   it('triangulate in 3D when both sensors give elevation', () => {
     const tk = newTracker();
     const cam = (from, node) => {

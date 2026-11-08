@@ -10,12 +10,13 @@ import { closeZone, ringZone, undoZonePoint } from '../../zone.js';
 import { zoneScores } from '../coverage.js';
 import { ThreatOptions } from '../ThreatOptions.jsx';
 import { ATTACK_NOTE, CoverageBars } from '../ZonePanel.jsx';
-import { useGame } from '../hooks.js';
+import { km as kmOf, useGame } from '../hooks.js';
 import { PeopleStep } from './PeopleStep.jsx';
 import { Spotlight } from './Spotlight.jsx';
 import { answer, effectorColumns, effectorFor, kindName, kitLeft, sensorChecklist, unanswered, warningAgainst } from './guide.js';
 import { suggestSpot } from './spots.js';
 
+const km = (metres) => kmOf(metres, true);
 const WEAK = 0.5; // below this share of the zone, the wizard calls a drone type a weak spot
 const RF_DEAF = DRONE_CLASSES.filter((d) => !d.rfEmitter).map((d) => d.name).join(' and ');
 const SENSOR_TEXT = {
@@ -24,7 +25,6 @@ const SENSOR_TEXT = {
   camera: 'Narrow view, cued by other sensors. Names what it sees.',
   acoustic: 'Listens for engines, so radio silence does not hide a drone. Short reach against quiet ones.',
 };
-const km = (metres) => `${(metres / 1000).toFixed(1).replace(/\.0$/, '')} km`;
 const planned = () => (view.threat ? [DRONES[view.threat]] : DRONE_CLASSES);
 const warningText = (def, d) => (warningAgainst(def, d) ? `${Math.round(warningAgainst(def, d))} s` : 'none');
 

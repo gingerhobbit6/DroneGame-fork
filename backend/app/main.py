@@ -18,7 +18,7 @@ from app.routes.auth import signed_in
 from app.routes.packs import router as packs_router
 from app.routes.units import router as units_router
 from app.security import ALLOWED_HOSTS, RequestGuard, SecurityHeaders
-from app.services.accounts import Full, Locked, SignInFailed, Taken
+from app.services.accounts import Full, Locked, SameAsUsername, SignInFailed, Taken
 from app.services.packs import PackBuilder, PackLibrary
 from app.services.records import NotFound
 from app.services.units import TooMany
@@ -54,6 +54,7 @@ def create_app(db_path: Path | None = None, game: Path = DEFAULT_GAME) -> FastAP
     refusals = {
         SignInFailed: (401, "Wrong username, password or recovery code"),
         Taken: (409, "That username is taken"),
+        SameAsUsername: (422, "The new password must not be the username"),
         Full: (403, "This server has as many accounts as it allows"),
         TooMany: (409, "You have as many deployment packs as you may keep. Delete one first."),
     }

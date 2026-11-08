@@ -175,6 +175,14 @@ class TestRecovery:
         assert client.post(f"{API}/reset", json=reset).status_code == 200
 
 
+    def test_a_new_password_is_never_the_username(self, anon):
+        code = sign_up(anon, username="sergeant01").json()["recovery_code"]
+        same = anon.post(f"{API}/password", json={"current_password": PASSWORD, "new_password": "SERGEANT01"})
+        assert same.status_code == 422 and "username" in same.json()["detail"]
+        assert anon.post(f"{API}/reset", json={"username": "sergeant01", "recovery_code": code, "new_password": "Sergeant01"}).status_code == 422
+        assert sign_in(anon, username="sergeant01").status_code == 200  # the password stayed as it was
+
+
 class TestProfile:
     def test_edits_the_profile(self, client):
         made = client.put(f"{API}/me", json={"display_name": " Sgt Smith ", "rank": "Sergeant", "organisation": "16 Regiment RA"})

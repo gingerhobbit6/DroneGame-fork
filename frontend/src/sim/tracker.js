@@ -164,6 +164,9 @@ export function createTracker(newId) {
       if (tr.heard.has(m.node) && tr.heard.get(m.node).scan === m.scan) continue; // one measurement per sensor scan
       predict(tr, t);
       const { z, R } = asMeasurement(m, tr.pos);
+      // d2 is at least |y|^2 / trace(S), so a track that bound already puts past the best cannot win: skip inverting S
+      const y = v.sub(z, tr.pos), traceS = tr.P11[0] + R[0] + tr.P11[4] + R[4] + tr.P11[8] + R[8];
+      if (v.dot(y, y) > bd * traceS * (1 + 1e-9)) continue;
       const inn = innovation(tr, z, R);
       if (inn.d2 < bd) { bd = inn.d2; best = { tr, z, R, inn }; }
     }
@@ -186,11 +189,12 @@ export function createTracker(newId) {
     return { mid: v.mul(v.add(pa, pb), 0.5), miss: v.len(v.sub(pa, pb)), s, t, flat };
   }
 
+  const beyond = (m, dist) => m.reach != null && dist > 1.5 * m.reach; // with room for the bearing error of a target near its limit
   function tryTriangulate(m) {
     for (const c of cands) {
       if (c.node === m.node || m.t - c.t > TRACKER.candidateLife * slackOf(c)) continue;
       const x = triangulate(c, m);
-      if (!x) continue;
+      if (!x || beyond(c, x.s) || beyond(m, x.t)) continue; // nearly parallel bearings cross far past where either sensor hears
       const tol = 2.5 * (x.s * c.sigAz + x.t * m.sigAz) + 40;
       if (x.miss > tol) continue;
       const sig = Math.max(60, 0.04 * Math.max(x.s, x.t), x.miss);
@@ -225,7 +229,7 @@ export function createTracker(newId) {
       else cands.push({ ...m, id: ++candSeq });
     }
     if (tr) {
-      tr.lastT = t;
+      tr.lastT = Math.max(tr.lastT, t); // a report that queued longer can arrive after a newer one
       tr.heard.set(m.node, { scan: m.scan, t, slack: slackOf(m) });
       tr.nodes.add(m.node);
       tr.ranged ||= hasRange(m);

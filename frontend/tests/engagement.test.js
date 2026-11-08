@@ -50,6 +50,28 @@ describe('engagements', () => {
   }, 60000);
 });
 
+describe('engagement authority', () => {
+  it('keeps an engagement going while a re-task to a more urgent drone waits for approval, one request at a time', () => {
+    start(MIXED);
+    sim.commands.setAuthority('all');
+    let heldOn = 0;
+    for (let n = 0; n < 12000 && !sim.state.over; n++) {
+      sim.step();
+      if (!sim.state.waveActive) sim.commands.startWave();
+      const pending = [...sim.net.pendingRequests];
+      for (const s of sim.structures) {
+        const mine = pending.filter((p) => p.s === s);
+        expect(mine.length).toBeLessThanOrEqual(1);
+        if (mine.length && s.task) heldOn++;
+      }
+      // the first request each effector raises is approved, so later ones are re-tasks of a running engagement, left unanswered
+      for (const req of pending) if (!req.s.task && !req.answered) { req.answered = true; sim.commands.decide(req.id, true); }
+    }
+    expect(heldOn).toBeGreaterThan(0);
+    sim.commands.setAuthority('auto');
+  }, 120000);
+});
+
 describe('tracks', () => {
   it('two bearing-only sensors cannot confirm a track, because their lines always cross somewhere', () => {
     start([['rf', 900, 0], ['rf', -900, 0], ['interceptor', 490, 99]]);

@@ -116,19 +116,25 @@ class PackBuilder:
         name = f"area_{east // 1000}_{north // 1000}"
         estonian = in_estonia(east, north)
         lidar_km = 0 if not lidar else PACK_KM if estonian else WORLD_KM  # Estonian lidar is already on this machine by then, so the whole pack can have it
-        self.library.folder.mkdir(parents=True, exist_ok=True)
         command = [
-            "uv", "run", "--quiet", "--directory", str(BUILDER), "python", "-m", "mapbuild",
+            "uv", "run", "--quiet", "--frozen", "--directory", str(BUILDER), "python", "-m", "mapbuild",
             "--centre", f"{east},{north}", "--name", f"Area around {east // 1000}, {north // 1000}",
             "--data", str(self.library.root / ("estonia" if estonian else "os")), "--out", str(self.library.folder / f"{name}.sgmap"), "--fetch", "--size", str(PACK_KM), "--lidar-km", str(lidar_km),
         ]
         try:
+            self.library.folder.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return self._failed("The map folder could not be made.")
+        try:
             process = self.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
         except OSError:
-            with self.lock:
-                self.state = {"running": False, "ok": False, "message": "The map builder could not start. It needs uv installed."}
-            return self.status()
+            return self._failed("The map builder could not start. It needs uv installed.")
         threading.Thread(target=self._watch, args=(process,), daemon=True).start()
+        return self.status()
+
+    def _failed(self, message: str) -> dict[str, Any]:
+        with self.lock:
+            self.state = {"running": False, "ok": False, "message": message}
         return self.status()
 
     def _watch(self, process) -> None:

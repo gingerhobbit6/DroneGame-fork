@@ -302,9 +302,9 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
           if (live?.stale) return;
           view.mapLoading = false;
           bump();
-          if (live?.total && live.failed === live.total) { view.baseMap = 'os'; toast('The live map could not load: it needs an internet connection'); gameView.refreshMap(); bump(); }
+          if (live?.total && live.failed === live.total) { view.baseMap = 'os'; toast('The live map could not load: it needs an internet connection'); gameView.refreshMap().catch(() => {}); bump(); }
           else if (live?.failed) toast(`${live.failed} of ${live.total} map tiles could not load`);
-        });
+        }).catch(() => { view.mapLoading = false; toast('The map could not be drawn'); bump(); });
       }
       bump();
     },

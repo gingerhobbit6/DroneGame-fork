@@ -36,6 +36,10 @@ class Taken(Exception):
     """That username already has an account."""
 
 
+class SameAsUsername(Exception):
+    """A new password may not be the username, as at sign-up."""
+
+
 class Full(Exception):
     """This server holds as many accounts as it allows."""
 
@@ -141,6 +145,8 @@ class AccountService:
     def change_password(self, user_id: int, current: str, new: str, token: str) -> None:
         """Every other session is signed out, so a stolen session cannot outlive the change."""
         self._confirm(user_id, current)
+        if new.lower() == self.store.profile(user_id)["username"].lower():
+            raise SameAsUsername
         self.store.update(user_id, password_hash=hash_secret(new), failed_attempts=0)
         self.store.drop_sessions(user_id, keep=token_hash(token))
 

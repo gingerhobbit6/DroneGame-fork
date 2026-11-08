@@ -10,7 +10,7 @@ export function createFusion(core, { raiseAlert }) {
   let trackSeq = 0, fusedT = 0;
 
   function feed(s, f) {
-    const tr = tracker.ingest(f.meas, T());
+    const tr = tracker.ingest(f.meas, f.meas.t); // at the moment it was measured: a report that queued on a busy link describes the past
     if (!tr) return;
     tr.sources.set(s.nodeId, { ...f.source, lastT: T() });
     if (!tr.cls || classDepth(f.source.cls) >= classDepth(tr.cls)) tr.cls = f.source.cls; // classification is remembered

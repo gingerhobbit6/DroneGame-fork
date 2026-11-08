@@ -40,6 +40,8 @@ export async function decodePack(buffer) {
     return bytes.subarray(start + s.offset, start + s.offset + s.length);
   };
   const section = (name) => { const s = header.sections.find((x) => x.name === name); if (!s) throw new Error('This map pack is missing a section.'); return s; };
+  const cells = section('canopy').rawLength; // every grid has one value a post, and a height is 4 bytes, so sizes are checked before anything is unpacked
+  if (section('ground').rawLength !== 4 * cells || section('bldg').rawLength !== cells || section('cover').rawLength !== cells) throw new Error('This map pack is damaged.');
   const raw = {};
   for (const name of ['ground', 'canopy', 'bldg', 'cover']) raw[name] = await gunzip(slice(section(name)), section(name).rawLength);
 
@@ -119,7 +121,11 @@ export function createPackStore({ api, idb = globalThis.indexedDB, fetchFile = (
 
   // A pack file the player chose. It is checked in full before it is kept.
   async function importFile(file) {
-    const decoded = await decodePack(await file.arrayBuffer());
+    const decoded = await decodePack(await file.arrayBuffer()), { hash } = decoded.pack;
+    const stored = !loaded.has(hash) && idb ? await inStore(idb, 'readonly', (s) => s.getKey(hash)).catch(() => undefined) : undefined;
+    const kept = loaded.get(hash) ?? (stored ? await load({ hash, source: 'browser' }) : null);
+    // the same ground with other features or pictures would change worlds already saved against this pack
+    if (kept && JSON.stringify(kept.pack.header) !== JSON.stringify(decoded.pack.header)) throw new Error('A different map pack with the same ground is already here.');
     loaded.set(decoded.pack.hash, decoded);
     const entry = summary(decoded.pack, 'browser');
     if (idb) {

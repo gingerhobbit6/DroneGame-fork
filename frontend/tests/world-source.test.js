@@ -122,12 +122,19 @@ describe('a world from any source', () => {
 
 describe('generated ground', () => {
   it('is made once for a seed and kept, and made afresh for another seed or other figures', () => {
-    const a = generateTerrain('cache-a');
-    expect(generateTerrain('cache-a')).toBe(a);
-    const b = generateTerrain('cache-b');
-    expect(b).not.toBe(a);
-    const relief = TERRAIN.relief;
-    TERRAIN.relief = relief + 1;
-    try { expect(generateTerrain('cache-b')).not.toBe(b); } finally { TERRAIN.relief = relief; }
-  }, 60000);
+    // a small world, as building a full one takes seconds and this checks only what is kept; the size is part of the key
+    const radius = WORLD.radius, relief = TERRAIN.relief;
+    WORLD.radius = 3000;
+    try {
+      const a = generateTerrain('cache-a');
+      expect(generateTerrain('cache-a')).toBe(a);
+      const b = generateTerrain('cache-b');
+      expect(b).not.toBe(a);
+      TERRAIN.relief = relief + 1;
+      expect(generateTerrain('cache-b')).not.toBe(b);
+      TERRAIN.relief = relief;
+      WORLD.radius = radius;
+      expect(generateTerrain('cache-b')).not.toBe(b);
+    } finally { WORLD.radius = radius; TERRAIN.relief = relief; }
+  });
 });

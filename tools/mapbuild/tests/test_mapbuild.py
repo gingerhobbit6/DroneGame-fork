@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import shapely
 
-from mapbuild import estonia, estonia_files, features, fit, packfile, pictures, terrain
+from mapbuild import download, estonia, estonia_files, features, fit, packfile, pictures, terrain
 from mapbuild.grid import Window, parse_grid_ref, square_letters
 
 
@@ -502,3 +502,24 @@ def test_an_etak_layer_only_gives_what_is_in_the_window(tmp_path):
     _etak_theme(tmp_path, estonia.UTILITIES, "E_601_elektriliin_j", "nimipinge", [110])
     far_away = estonia.Etak(str(tmp_path), Window(500000, 6500000, 1000))
     assert len(far_away.read(estonia.UTILITIES, "E_601_elektriliin_j")[0]) == 0
+
+
+def test_an_os_download_comes_only_from_os_and_never_runs_past_its_size(tmp_path, monkeypatch):
+    class Endless:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self, _):
+            return b"x" * 1000  # a reply that never ends
+
+    monkeypatch.setattr(download.urllib.request, "urlopen", lambda *a, **k: Endless())
+    good = {"fileName": "t50.zip", "size": 2500, "url": "https://api.os.uk/downloads/v1/products/Terrain50/downloads?area=GB"}
+    for bad in ({"url": "http://api.os.uk/x"}, {"url": "https://example.com/x"}, {"size": "2500"}):
+        with pytest.raises(SystemExit, match="did not describe"):
+            download._fetch({**good, **bad}, str(tmp_path), lambda _: None)
+    with pytest.raises(SystemExit, match="did not download"):
+        download._fetch(good, str(tmp_path), lambda _: None)
+    assert list(tmp_path.iterdir()) == []  # nothing half-written is left

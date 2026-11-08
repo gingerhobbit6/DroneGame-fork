@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FIGURE_FIELDS, PATROL, PATROL_VEHICLES, RESEARCHED, exportFigures, resetAllFigures } from '../src/sim/config/index.js';
+import { FIGURE_FIELDS, PATROL, PEOPLE_LIMITS, PATROL_VEHICLES, RESEARCHED, exportFigures, resetAllFigures } from '../src/sim/config/index.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { columnProblem, routeProblem } from '../src/sim/patrol.js';
 import { inCorridor, nearest, pointAt } from '../src/sim/route.js';
@@ -81,6 +81,13 @@ describe('the column', () => {
 });
 
 describe('setting a patrol', () => {
+  it('caps its people as any group is, whatever the figure says, and a bad figures file changes nothing', () => {
+    expect(() => sim.commands.importFigures({ patrol: { foot: { groupSize: 1e9 } }, structures: { radar: { cost: 1 }, camera: null } })).toThrow();
+    expect(FOOT.groupSize).toBe(RESEARCHED.patrol.foot.groupSize); // nothing applied, not even the parts before the bad one
+    sim.commands.importFigures({ patrol: { foot: { groupSize: 1e9 } } });
+    expect(sim.commands.setPatrol(ROUTE)).toBeNull();
+    expect(sim.getPatrol().group.count).toBe(PEOPLE_LIMITS.perGroup);
+  });
   it('adds the escort and the people, paid from the budget, and refunds them when cleared', () => {
     const before = sim.state.budget;
     expect(sim.commands.setPatrol(ROUTE)).toBeNull();
@@ -96,6 +103,20 @@ describe('setting a patrol', () => {
     expect(sim.structures).toHaveLength(0);
     expect(sim.people).toHaveLength(0);
     expect(sim.state.budget).toBe(before);
+  });
+
+  it('keeps the old route when a change is too dear, and a deployment pack only counts the cost', () => {
+    const moved = square(22, 20, 10);
+    expect(routeProblem(moved)).toBeNull();
+    expect(sim.commands.setPatrol(ROUTE)).toBeNull();
+    const dearer = [...FOOT.column, FOOT.column[0]];
+    expect(columnProblem(dearer)).toBeNull();
+    sim.state.budget = 0; // what is left once the escort is bought, so only the same escort is affordable
+    expect(sim.commands.setPatrol(moved, dearer)).toMatch(/Not enough budget for the escort/);
+    expect(sim.getPatrol().route).toEqual(ROUTE);
+    sim.commands.setPacked(true);
+    expect(sim.commands.setPatrol(moved, dearer)).toBeNull();
+    expect(sim.getPatrol().route).toEqual(moved);
   });
 
   it('refuses a bad route, leaving nothing behind', () => {

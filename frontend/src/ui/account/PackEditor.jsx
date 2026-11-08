@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ECHELONS, PEOPLE, PEOPLE_LIMITS, STRUCTURES, TOOLBAR, UNIT_LIMITS, PATROL_VEHICLES } from '../../sim/config/index.js';
 import { money } from '../../sim/economy.js';
+import { km as kmOf } from '../hooks.js';
 import { NumberInput } from '../NumberInput.jsx';
 import { UnitField } from '../UnitEditor.jsx';
 import { fieldsFor, setSetting, settingValue, unitCost, unitDef } from '../../sim/unit-config.js';
@@ -10,7 +11,7 @@ import { TextField, useRequest } from './parts.jsx';
 import { bump, describeTotals, packTotals, withSettings } from './pack.js';
 
 const CALLSIGN = /^[A-Za-z0-9][A-Za-z0-9 -]{0,11}$/; // Callsign in backend/app/schemas.py
-const km = (m) => `${(m / 1000).toFixed(1).replace(/\.0$/, '')} km`;
+const km = (m) => kmOf(m, true);
 
 function Stepper({ label, count, onChange }) {
   return (

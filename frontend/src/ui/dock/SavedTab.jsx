@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { GAME_VERSION } from '../../sim/config/index.js';
 import { zoneFromSpec } from '../../zone.js';
 import { parseWorldId, worldLabel } from '../../sim/world-pack.js';
-import { useArmed, useGame, useLoad } from '../hooks.js';
+import { attemptWith, useArmed, useGame, useLoad } from '../hooks.js';
 
 const when = (iso) => new Date(iso).toLocaleString();
 
@@ -17,15 +17,7 @@ export function SavedTab({ active }) {
   const load = useArmed(), remove = useArmed(), replace = useArmed();
   const count = sim.currentLaydown().structures.length;
 
-  // run one request, showing its outcome here so a refusal or a dead server is never silent
-  const attempt = async (fn, done) => {
-    try {
-      const result = await fn();
-      setNote(typeof done === 'function' ? done(result) : done);
-      await reload();
-      return true;
-    } catch (e) { setNote(e.message); return false; }
-  };
+  const attempt = attemptWith(setNote, reload);
   const body = (n) => ({ name: n, world: sim.state.terrainSeed, spec: sim.currentLaydown(), game_version: GAME_VERSION });
 
   const save = (e) => {

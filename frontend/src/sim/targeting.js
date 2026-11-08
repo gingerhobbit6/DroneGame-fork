@@ -101,7 +101,7 @@ export function hitStructure(w, d, s) {
   state.hits++;
   logEnd(w, d, 'struck');
   removeDrone(w, d);
-  net.raiseAlert('critical', `${d.def.name} struck ${s.name}: ${Math.max(Math.round(s.health), 0)}% health left`, s.pos, 'DISCRETE_PRIORITY_HIGH');
+  net.raiseAlert('critical', `${d.def.name} struck ${s.name}: ${Math.max(Math.round((100 * s.health) / (s.def.health || 30)), 0)}% health left`, s.pos, 'DISCRETE_PRIORITY_HIGH');
   if (s.health <= 0) {
     tally(ledger.lost, s.def.id); ledger.lostValue += s.def.cost;
     w.rec.event('lost', `${s.name} destroyed`);

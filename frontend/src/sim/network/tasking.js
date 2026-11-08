@@ -124,6 +124,12 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
 
   function assign(s, tr, approved = false) {
     if (!approved && authority().needsApproval(s)) { if (!authority().isPending(s, tr)) authority().requestApproval(s, tr); return; }
+    if (s.task?.trackId === tr.id) return; // already on it
+    if (s.task) { // a re-task: the engagement it replaces stops only once the new one may go ahead
+      const cur = tracker.tracks.get(s.task.trackId);
+      sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${cur ? cur.short : 'task'}`, 'Re-tasked to a more urgent threat');
+      completeTask(s, 'TASK_STATUS_COMPLETED', ['re-tasked']);
+    }
     const { id, res: sent } = sendTask(s, {
       control: 'CONTROL_START',
       command: { request: 'Engage', command_parameter: tr.id },
@@ -158,7 +164,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   function eligible(s, tr) {
     const def = s.def;
     if (!canMeet(s, tr)) return false; // its rounds could not catch it
-    if (s.denied.has(tr.id) || authority().isPending(s, tr)) return false;
+    if (s.denied.has(tr.id) || authority().pending.some((p) => p.s === s)) return false; // one request at a time for each effector
     if (T() < (s.rejected.get(tr.id) ?? 0) || T() < (tr.emptyUntil ?? 0)) return false;
     if (!takesAirframe(def, tr.airframe)) return false; // already known to be beyond this effector
     if (def.fire === 'guided' && leaveToJammer(tr)) return false; // soft kill first
@@ -292,9 +298,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
       if (!best || s.task.trackId === best.id) continue;
       const cur = tracker.tracks.get(s.task.trackId);
       if (cur && !ctx.roundsCover(s, cur.drone) && bd > urgency(cur) * (1 - FUSION.retaskGain)) continue;
-      sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${cur ? cur.short : 'task'}`, 'Re-tasked to a more urgent threat');
-      completeTask(s, 'TASK_STATUS_COMPLETED', ['re-tasked']);
-      assign(s, best);
+      if (!authority().pending.some((p) => p.s === s)) assign(s, best); // keeps the current engagement while a re-task waits for approval
     }
     pair(free, live);
   }
@@ -331,5 +335,5 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     }
   }
 
-  return { assign, tasking };
+  return { assign, tasking, reset: () => softKill.clear() };
 }

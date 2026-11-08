@@ -12,14 +12,13 @@ import { CHANNELS, IDENTIFY_PX, RECOGNISE_PX, hasZoom } from '../sim/camera-mode
 import { LIBRARIES, covers, libraryKnows } from '../sim/rf-model.js';
 import { canFollow } from '../sim/jamming.js';
 import { terrainState } from '../sim/terrain.js';
-import { fmtTime, hex, useGame, useTick } from './hooks.js';
+import { fmtTime, hex, km, useGame, useTick } from './hooks.js';
 import { view } from '../render/view.js';
 import { stateWord } from './dock/NetworkSide.jsx';
 import { SiteRange } from './SiteRange.jsx';
 import { UnitEditor } from './UnitEditor.jsx';
 import { Movable } from './Movable.jsx';
 
-const km = (metres) => `${(metres / 1000).toFixed(1)} km`;
 const plural = (n, word) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
 const names = (ids) => ids.map((id) => DRONES[id].name).join(', ');
 const PD_AT_REACH = Math.round(100 / (1 + Math.pow(1 / SENSING.pdEdge, SENSING.pdSlope)));

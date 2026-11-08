@@ -59,11 +59,12 @@ function frameOf(g, west, top, span, size) {
   return { g, west, top, span, size, px: (metres) => (metres / span) * size };
 }
 
-async function paintPictures(f, pictures, layer, still) {
+export async function paintPictures(f, pictures, layer, still) {
   const { g, west, top, span, px } = f;
   for (const p of pictures) {
     if (p.layer !== layer || p.west >= west + span || p.west + p.width <= west || p.top <= top - span || p.top - p.height >= top) continue;
-    const bitmap = await createImageBitmap(p.blob);
+    const bitmap = await createImageBitmap(p.blob).catch(() => null); // a picture the browser cannot read is left out, not the whole map
+    if (!bitmap) continue;
     if (!still()) { bitmap.close(); return; } // a newer choice took over, and must not be drawn over
     g.drawImage(bitmap, px(p.west - west), px(top - p.top), px(p.width), px(p.height));
     bitmap.close();

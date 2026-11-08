@@ -181,7 +181,7 @@ export function createSensors(core, feed) {
       sent,
       meas: {
         node: s.nodeId, color: def.color, from, az: rad(azM), el: n.el != null ? rad(elM) : null, range: n.range != null ? rngM : null,
-        sigAz: rad(errAz), sigEl: n.el != null ? rad(errEl) : null, sigRange: errRange || 0, t: T(), scan: s.scanId, every: def.sapient.interval,
+        sigAz: rad(errAz), sigEl: n.el != null ? rad(errEl) : null, sigRange: errRange || 0, t: T(), scan: s.scanId, every: def.sapient.interval, reach,
       },
       source: { name: s.name, objectId, ts: S.timestamp(), conf, rb, from: { east: from[0], north: from[1], up: from[2] }, color: def.color, vel, cls: report.classification, rangeErr: errRange, hasRange: n.range != null },
     };

@@ -154,11 +154,15 @@ describe('checking a pack', () => {
     expect(() => parsePack(header(), { ...parts.grids, bldg: new Uint8Array(3) }, parts.features)).toThrow(/wrong length/);
     expect(() => parsePack(header(), parts.grids, { lines: [] })).toThrow(/features/);
   });
-  it('refuses a height that is not a number, which would silently report clear sight lines', () => {
+  it.each([NaN, Infinity, 1e6])('refuses a height of %s, which would silently report clear sight lines', (bad) => {
     const ground = parts.grids.ground.slice();
-    ground[1234] = NaN;
-    expect(() => parsePack(header(), { ...parts.grids, ground }, parts.features)).toThrow(/not a number/);
+    ground[1234] = bad;
+    expect(() => parsePack(header(), { ...parts.grids, ground }, parts.features)).toThrow(/not a real one/);
   });
+  it.each([
+    ['a building with a missing number', { buildings: [[1, 2, 3, 4, 5]] }], ['a building that is not numbers', { buildings: [[1, 2, 3, 4, 5, 'x']] }],
+    ['a line point that is not numbers', { lines: [[[0, 0], [null, 1]]] }], ['a line that is not a list', { lines: [5] }],
+  ])('refuses %s', (_, change) => { expect(() => parsePack(header(), parts.grids, { ...parts.features, ...change })).toThrow(/features/); });
 });
 
 describe('cutting a world', () => {

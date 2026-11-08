@@ -108,7 +108,11 @@ export function exportFigures() {
   for (const [k, v] of Object.entries(RESEARCHED.adapt)) if (ADAPT[k] !== v) out.adapt[k] = ADAPT[k];
   return out;
 }
+const isRecord = (x) => x != null && typeof x === 'object' && !Array.isArray(x);
 export function importFigures(json) {
+  // the whole file is checked before anything is applied, so one that cannot be read changes nothing
+  const unreadable = (group) => group != null && (!isRecord(group) || !Object.values(group).every(isRecord));
+  if (!isRecord(json) || KINDS.some((kind) => unreadable(json[kind]))) throw new Error('This is not a figures file.');
   for (const kind of KINDS) {
     for (const [id, vals] of Object.entries(json[kind] || {})) {
       // own properties only: the JSON is untrusted, and "constructor" would otherwise reach the Object function

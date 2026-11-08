@@ -6,7 +6,7 @@
 // independent test results. Edit freely, or use the in-game Tuning panel.
 
 // Stored with saved laydowns and runs. Raise it when a change means old saves no longer replay the same.
-export const GAME_VERSION = '0.19.0';
+export const GAME_VERSION = '0.19.1';
 
 export const WORLD = {
   metresPerUnit: 20,     // 3D scene scale: 1 scene unit = this many metres
@@ -36,7 +36,7 @@ export const SITE = {
   maxHealth: 100,
 };
 
-export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, lockAfterStart: true };
+export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, lockAfterStart: true, maxSystems: 200 }; // maxSystems: what a save holds (MAX_SYSTEMS in backend/app/schemas.py)
 
 // Procedural terrain. The terrain seed is separate from the scenario seed, so you can change the attack
 // without changing the ground (or the other way round). Heights are metres above the station base.

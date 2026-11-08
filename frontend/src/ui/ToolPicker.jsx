@@ -9,7 +9,7 @@ import { standingAt } from '../sim/sensor-model.js';
 import { terrainState } from '../sim/terrain.js';
 import { fieldsFor, settingValue, unitDef } from '../sim/unit-config.js';
 import { view } from '../render/view.js';
-import { useGame, useTick } from './hooks.js';
+import { km, useGame, useTick } from './hooks.js';
 import { UnitField } from './UnitEditor.jsx';
 import { PeoplePicker } from './PeoplePicker.jsx';
 import { PanelHead, SystemCard } from './SystemCard.jsx';
@@ -17,7 +17,6 @@ import { UnitTray } from './account/UnitTray.jsx';
 import { useAccount } from './account/pack.js';
 import { Movable } from './Movable.jsx';
 
-const km = (m) => `${(m / 1000).toFixed(1)} km`;
 
 // What the spot under the cursor really gets, against the open-field figure.
 function AtCursor({ def, spot, centre }) {

@@ -3,9 +3,11 @@
 import hashlib
 import json
 import os
+import urllib.parse
 import urllib.request
 
 API = "https://api.os.uk/downloads/v1/products/{}/downloads"
+HOST = "api.os.uk"  # the listing is untrusted input too: a file is only fetched from OS itself, over https
 
 
 def _pick(product: str, area: str, fmt: str, sub: str | None) -> dict | None:
@@ -19,6 +21,9 @@ def _fetch(item: dict, folder: str, say) -> None:
     name = os.path.basename(item["fileName"])
     if name != item["fileName"] or name.startswith("."):
         raise SystemExit(f"refusing an odd file name from OS: {name!r}")
+    url = urllib.parse.urlsplit(str(item.get("url", "")))
+    if url.scheme != "https" or url.hostname != HOST or not isinstance(item.get("size"), int) or item["size"] <= 0:
+        raise SystemExit(f"refusing a download OS did not describe properly: {name}")
     os.makedirs(folder, exist_ok=True)
     target = os.path.join(folder, name)
     if os.path.exists(target) and os.path.getsize(target) == item["size"]:
@@ -28,9 +33,11 @@ def _fetch(item: dict, folder: str, say) -> None:
     part = target + ".part"
     with urllib.request.urlopen(item["url"], timeout=120) as reply, open(part, "wb") as out:
         while chunk := reply.read(1 << 20):
+            done += len(chunk)
+            if done > item["size"]:  # never more than OS said, so a bad reply cannot fill the disc
+                break
             out.write(chunk)
             digest.update(chunk)
-            done += len(chunk)
     if done != item["size"] or (item.get("md5") and digest.hexdigest().lower() != item["md5"].lower()):
         os.remove(part)
         raise SystemExit(f"{name} did not download correctly")

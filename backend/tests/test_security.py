@@ -255,6 +255,7 @@ def test_the_names_the_api_accepts_match_the_game():
     assert set(Protection.__args__) == set(re.findall(r"^  (\w+): \{ name: ", levels, re.M))
     assert {"military"} == set(re.findall(r"^  (\w+): \{ name: ", roles, re.M)) - {"civilian"}  # civilians are saved with no role
     assert f"groups: {MAX_PEOPLE_GROUPS}, perGroup: {MAX_PEOPLE_PER_GROUP}" in people
+    assert f"maxSystems: {MAX_SYSTEMS} }}" in (config / "world.js").read_text(encoding="utf-8")  # the game stops placing before a save would be refused
     patrol = (config / "patrol.js").read_text(encoding="utf-8")
     vehicles = patrol.split("export const PATROL_VEHICLES")[1].split("};")[0]
     assert set(PatrolVehicle.__args__) == set(re.findall(r"^  (\w+): \{ name: ", vehicles, re.M))

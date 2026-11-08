@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { GAME_VERSION, exportFigures } from '../../sim/config/index.js';
-import { useArmed, useGame, useLoad } from '../hooks.js';
+import { attemptWith, useArmed, useGame, useLoad } from '../hooks.js';
 
 export function FigureSets({ active, onApplied }) {
   const { api, commands } = useGame();
@@ -11,9 +11,7 @@ export function FigureSets({ active, onApplied }) {
   const { data, error, reload } = useLoad(() => api.figureSets.list(), active);
   const remove = useArmed(), apply = useArmed();
 
-  const attempt = async (fn, done) => {
-    try { await fn(); setNote(done); await reload(); return true; } catch (e) { setNote(e.message); return false; }
-  };
+  const attempt = attemptWith(setNote, reload);
   const save = (e) => {
     e.preventDefault();
     if (!name.trim()) return;

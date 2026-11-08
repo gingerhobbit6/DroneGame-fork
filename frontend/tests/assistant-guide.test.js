@@ -178,6 +178,14 @@ describe('zone coverage', () => {
     expect(scores[0].share).toBeLessThanOrEqual(scores[scores.length - 1].share);
     expect(coverageGrid(sim, 'fo')).toBe(coverageGrid(sim, 'fo'));
   });
+  it('keeps a share for each outline, and works it out again when the outline moves', () => {
+    setUp(sim, { seed: '1', laydown: MIXED });
+    const near = { closed: true, points: [[-20, -20], [20, -20], [20, 20], [-20, 20]] };
+    const far = { closed: true, points: [[600, 600], [640, 600], [640, 640], [600, 640]] }; // about 12 km out, where nothing reaches
+    expect(zoneShare(sim, 'fpv', near)).toBeGreaterThan(0);
+    expect(zoneShare(sim, 'fpv', far)).toBe(0);
+    expect(zoneShare(sim, 'fpv', { ...near })).toBe(zoneShare(sim, 'fpv', near)); // the same outline in a new object is not scanned again
+  });
   it('scores nothing for a zone too small to hold a cell', () => {
     expect(zoneShare(sim, 'fpv', { points: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]], closed: true })).toBe(0);
   });

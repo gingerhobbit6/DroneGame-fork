@@ -9,7 +9,7 @@ import { useGame, useTick } from '../hooks.js';
 import { STEP_IDS, firstOpen, stepStatus, undone } from './guide.js';
 import { STEPS } from './steps.jsx';
 import { useMovable } from '../useMovable.js';
-import { runStats } from '../../sim/stats.js';
+import { liveStats } from '../../sim/stats.js';
 import { StatsHeadline } from '../RunStats.jsx';
 
 const DOCK_TAB = { network: 'network', coverage: 'plan', refine: 'systems' };
@@ -55,7 +55,7 @@ function MovedBack({ id, onGo, onStay }) {
 
 // Opened during a run: what got through so far, and only what can still change.
 function RunCard({ openDock }) {
-  const { sim } = useGame(), { state, ledger } = sim, stats = runStats(sim);
+  const { sim } = useGame(), { state, ledger } = sim, stats = liveStats(sim);
   const leaks = Object.entries(ledger.leaked).filter(([, n]) => n > 0);
   return (
     <>

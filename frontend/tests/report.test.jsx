@@ -28,6 +28,8 @@ describe('the deployment report', () => {
     play(game.sim, 2);
     const r = game.sim.report(), { ledger, state } = game.sim;
     expect(r.intercepted).toBe(state.kills);
+    const airborne = game.sim.ledger.flights.filter((f) => !f.end).length, missed = game.sim.ledger.flights.filter((f) => f.end === 'missed').length;
+    expect(r.intercepted + r.leaked + r.struck + r.left + airborne + missed).toBe(r.launched); // every drone launched is accounted for
     expect(r.cost.spent).toBe(ledger.capex + ledger.consumables);
     expect(r.waves).toBe(2);
   }, 60000);

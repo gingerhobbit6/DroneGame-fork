@@ -15,7 +15,7 @@ export function deploymentReport(w) {
   return {
     outcome: state.ended ? 'ended' : w.patrol ? 'patrol' : 'site',
     waves: wavesCompleted(state),
-    launched: sum(ledger.launched), intercepted, leaked: sum(ledger.leaked), left: sum(ledger.escaped),
+    launched: sum(ledger.launched), intercepted, leaked: sum(ledger.leaked), struck: state.hits, left: sum(ledger.escaped),
     cost: {
       systems: ledger.capex, munitions: ledger.consumables, lost: ledger.lostValue, spent,
       enemy: enemyCost(ledger.launched), destroyed: enemyCost(ledger.killed),

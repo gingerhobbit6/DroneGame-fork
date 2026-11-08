@@ -13,6 +13,7 @@ export function useHotkeys() {
     if (covered) return undefined;
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return; // Ctrl+C, Ctrl+P and the like belong to the browser, and a card's Space to the card
       const replay = game.getReplay();
       const reviewing = replay && replay.active();
       if (e.key === 'ArrowLeft' && replay) { replay.stepBack(); e.preventDefault(); return; }

@@ -24,10 +24,8 @@ export function mulberry32(seed) {
 }
 
 const streams = { sim: mulberry32(1), ids: mulberry32(2) };
-export let currentSeed = 1;
 
 export function seedAll(seed) {
-  currentSeed = seed;
   streams.sim = mulberry32(hashSeed(`${seed}:sim`));
   streams.ids = mulberry32(hashSeed(`${seed}:ids`));
 }

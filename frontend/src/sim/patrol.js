@@ -6,7 +6,7 @@ import { COMMS, MAX_ESCORTS, MAX_ESCORT_GAP, MAX_ESCORT_SIDE, MOUNTS, PATROL, PA
 import { SITE_POS, hereU, u } from './units.js';
 import { buyTerminal, money } from './economy.js';
 import { addStructure, designLocked, removeStructure, wireFusion, wireNode } from './laydown.js';
-import { addGroup } from './people.js';
+import { addGroup, cleanCount } from './people.js';
 import { FORMATIONS, placeIn, soldierSpot } from './formation.js';
 import { legEnds, routeProblem, widthProblem } from './route.js';
 
@@ -60,7 +60,7 @@ function startPatrol(w, route, column, plan) {
     return { s, gap, side };
   });
   wireFusion(w, 'starlink', true);
-  const group = addGroup(w, x, z, Math.max(1, Math.round(FOOT.groupSize)), 'open', 'military');
+  const group = addGroup(w, x, z, cleanCount(FOOT.groupSize), 'open', 'military'); // a figure, so it gets the same cap as any group
   group.patrol = true;
   w.patrol = {
     route, ends: legEnds(route), width: plan.width, formation: plan.formation, dist: 0, dir: 1, phase: 'home', wait: 0, homeWave: 0, trips: 0,
@@ -95,13 +95,13 @@ export function setPatrol(w, points, column = w.patrol?.column ?? FOOT.column, p
   if (designLocked(w)) return 'The patrol is locked once the first wave starts';
   const problem = points == null ? null : w.state.zone ? 'Clear the area to defend first: with a patrol, the patrol is what the enemy attacks' : routeProblem(points) || columnProblem(column) || planProblem(plan);
   if (problem) return problem;
-  const before = w.patrol && { column: w.patrol.column, plan: planOf(w.patrol) };
+  const before = w.patrol && { route: w.patrol.route, column: w.patrol.column, plan: planOf(w.patrol) };
   clearPatrol(w);
   if (points == null) return null;
   const route = points.map(([x, z]) => [x, z]);
-  if (w.state.budget < escortCost(w, column)) {
+  if (!w.state.packed && w.state.budget < escortCost(w, column)) { // a deployment pack's budget only counts, as for systems
     const need = escortCost(w, column);
-    if (before) startPatrol(w, route, before.column, before.plan); // a change that is too dear leaves the patrol as it was
+    if (before) startPatrol(w, before.route, before.column, before.plan); // a change that is too dear leaves the patrol as it was
     return `Not enough budget for the escort (${money(need)} needed, ${money(w.state.budget)} left)`;
   }
   startPatrol(w, route, cleanColumn(column), { width: plan.width, formation: plan.formation });

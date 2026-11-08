@@ -29,6 +29,14 @@ export function coverageGrid(sim, threat) {
 // The share of the zone at least one sensor can see (0 to 1). With no zone drawn, it scores everything inside the build limit.
 export function zoneShare(sim, threat, zone) {
   const g = coverageGrid(sim, threat), mpu = WORLD.metresPerUnit;
+  // panels ask on every refresh, and the scan tests every cell against the outline, so it is kept with the grid it was made from
+  const area = zone && zone.closed ? JSON.stringify(zone.points) : `within ${BUILD.maxDist}`;
+  g.shares ??= new Map();
+  if (!g.shares.has(area)) g.shares.set(area, scanShare(g, zone, mpu));
+  return g.shares.get(area);
+}
+
+function scanShare(g, zone, mpu) {
   const inside = zone && zone.closed ? (xm, zm) => inZone(zone.points, xm / mpu, zm / mpu) : (xm, zm) => Math.hypot(xm, zm) <= BUILD.maxDist;
   let cells = 0, seen = 0;
   for (let j = 0; j < g.n; j++) for (let i = 0; i < g.n; i++) {

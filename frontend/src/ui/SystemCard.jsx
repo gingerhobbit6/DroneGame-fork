@@ -6,9 +6,8 @@ import { money } from '../sim/economy.js';
 import { reachFor } from '../sim/site-range.js';
 import { unitDef } from '../sim/unit-config.js';
 import { DRAG_TYPE } from '../drag.js';
-import { useGame } from './hooks.js';
+import { km, useGame } from './hooks.js';
 
-const km = (m) => `${(m / 1000).toFixed(1)} km`;
 // A sensor's range is against a small drone: the second figure shows how much further it sees a large one. A missile cannot engage
 // anything closer than its minimum range.
 export const reachText = (def) => (def.role === 'sensor' ? `${km(def.range)} small drone · ${km(reachFor(def, DRONES.spotter))} large`

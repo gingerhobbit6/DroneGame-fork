@@ -47,6 +47,7 @@ export function createRunSaver({ api, storage, notify, onChange }) {
     if (!failure) {
       savedCount++;
       say('Run saved to your history.', false);
+      if (waiting().length) await flush(); // the server is back, so the runs kept while it was down go now too
     } else if (!failure.retryable) say(`This run could not be saved: ${failure.message}`);
     else if (id && failure.status === 401) say('You are signed out, so this run is being kept in this browser. It will be saved when you sign in again.');
     else if (id) say('The save server is not running, so this run is being kept in this browser. It will be saved when the server is back.');

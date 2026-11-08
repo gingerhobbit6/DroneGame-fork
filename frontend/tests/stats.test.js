@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
 import { STRUCTURES } from '../src/sim/config/index.js';
-import { RANGE_BINS, runStats, spread, wavesFlown } from '../src/sim/stats.js';
+import { liveStats, RANGE_BINS, runStats, spread, wavesFlown } from '../src/sim/stats.js';
 import { JAMMERS, MIXED, play, setUp } from './support/scenarios.js';
 
 const total = (obj) => Object.values(obj).reduce((a, b) => a + b, 0);
@@ -32,6 +32,14 @@ describe('after two waves against the mixed laydown', () => {
     expect(all.drones.leaked).toBe(total(ledger.leaked));
     expect(all.drones.left).toBe(total(ledger.escaped));
     expect(all.drones.killed + all.drones.leaked + all.drones.struck + all.drones.left + all.drones.airborne).toBe(all.drones.launched);
+  });
+
+  it('keeps the live figures within a sim-second, then works them out again', () => {
+    const first = liveStats(sim);
+    expect(first).toEqual(runStats(sim));
+    expect(liveStats(sim)).toBe(first);
+    sim.run(20); // a sim-second
+    expect(liveStats(sim)).not.toBe(first);
   });
 
   it('splits the run into its waves, which add up to it', () => {

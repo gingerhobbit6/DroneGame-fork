@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { zoomMax } from '../src/sim/camera-model.js';
 import { createGame } from '../src/game.js';
-import { STRUCTURES, TOOLBAR, firstClass, resetAllFigures, sizeButtons } from '../src/sim/config/index.js';
+import { STRUCTURES, TOOLBAR, firstClass, resetAllFigures } from '../src/sim/config/index.js';
 import { GameContext } from '../src/ui/hooks.js';
 import { Toolbar } from '../src/ui/Toolbar.jsx';
 import { useHotkeys } from '../src/ui/useHotkeys.js';
@@ -15,6 +15,7 @@ import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 let game;
 const $ = (sel) => document.querySelector(sel);
 const group = (kind) => TOOLBAR.find((g) => g.kind === kind);
+const sizeButtons = ({ classes }) => classes.filter((id) => STRUCTURES[id].size && !STRUCTURES[id].variantOf); // a row's standard S, M and L, not its other real systems
 
 beforeEach(() => {
   game = createGame({ seed: '1', terrainSeed: '1', api: createFakeApi(), storage: createFakeStorage() });
@@ -97,6 +98,14 @@ describe('the hotkeys', () => {
   const Keys = () => { useHotkeys(); return null; };
   const press = (key) => fireEvent.keyDown(window, { key });
   const show = () => render(<GameContext.Provider value={game}><Keys /></GameContext.Provider>);
+
+  it('leave keys with Ctrl, Cmd or Alt held to the browser', () => {
+    show();
+    for (const held of ['ctrlKey', 'metaKey', 'altKey']) fireEvent.keyDown(window, { key: '1', [held]: true });
+    expect(game.getTool()).toBeFalsy();
+    press('1');
+    expect(game.getTool()).toBe('radar');
+  });
 
   it('picks medium, then cycles through the sizes', () => {
     show();

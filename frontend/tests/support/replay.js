@@ -9,6 +9,8 @@ import { MIXED, setUp } from './scenarios.js';
 export function replayRun(sim, record) {
   sim.state.seed = record.scenario_seed;
   sim.commands.applyFigures(record.figures);
+  // settings logged at step 0, such as a deployment pack that lifts the budget, must hold before the laydown loads
+  for (const { step, name, args } of record.commands) if (step === 0 && name !== 'endRun') sim.commands[name](...args);
   sim.commands.loadLaydown(record.spec, record.world);
   sim.state.warnedWire = true; // the first press of Start wave only warned, and that is not in the log
   for (const { step, name, args } of record.commands) {

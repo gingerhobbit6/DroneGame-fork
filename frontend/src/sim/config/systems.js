@@ -22,8 +22,6 @@ export const TOOLBAR = [
   { kind: 'laser', name: 'Laser', key: '7', classes: ['laser_rfdew', 'laser_s', 'laser', 'laser_l'] },
 ];
 export const firstClass = ({ classes }) => classes.find((id) => STRUCTURES[id].size === 'M' && !STRUCTURES[id].variantOf) ?? classes[0];
-// A row's standard small, medium and large systems, leaving out further real systems of a size.
-export const sizeButtons = ({ classes }) => classes.filter((id) => STRUCTURES[id].size && !STRUCTURES[id].variantOf);
 
 // game range = published range x WORLD.rangeScale. Call again after changing the scale.
 export function applyRangeScale() {

@@ -4,11 +4,11 @@
 import { useState } from 'react';
 import { money } from '../sim/economy.js';
 import { RANGE_BINS, runStats, wavesFlown } from '../sim/stats.js';
-import { hex, useGame, useTick } from './hooks.js';
+import { hex, km as kmOf, useGame, useTick } from './hooks.js';
 import './run-stats.css';
 
 const NONE = '–';
-const km = (m) => (m == null ? NONE : `${(m / 1000).toFixed(1)} km`);
+const km = (m) => (m == null ? NONE : kmOf(m));
 const pct = (k) => (k == null ? NONE : `${Math.round(k * 100)}%`);
 const secs = (s) => (s == null ? NONE : s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${Math.round(s)} s`);
 const cost = (v) => (v == null ? NONE : money(v));
@@ -54,7 +54,7 @@ function KillRangeChart({ bins }) {
   );
 }
 
-const List = ({ rows }) => <dl className="st-list">{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>;
+const List = ({ rows }) => <dl className="st-list">{rows.map(([k, v], i) => <div key={i}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>; // a fixed list, and two rows share a label
 
 function used(e) {
   if (e.fire === 'jam') return e.jam == null ? NONE : `${secs(e.jam)} jamming`;
