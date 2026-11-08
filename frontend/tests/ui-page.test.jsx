@@ -46,7 +46,7 @@ describe('timeline', () => {
     const replay = withReplay();
     game.sim.state.warnedWire = true;
     game.sim.commands.startWave();
-    game.sim.run(6000);
+    game.sim.run(13000);
     show(<Timeline />);
     expect($('#review-banner').className).toBe('hidden');
     expect(Number($('#tl-range').max)).toBe(game.sim.rec.frames.length - 1);
@@ -134,7 +134,8 @@ describe('the whole page', () => {
     fireEvent.click($('#btn-deploy'));
     fireEvent.click($('#btn-sandbox'));
     expect($('#tuning').className).toContain('hidden');
-    expect($('#hud-bottom-left summary').textContent).toBe('Legend');
+    expect($('#hud-bottom-left .mv-title').textContent).toBe('Legend');
+    expect($('#hud-bottom-left').className).toContain('minimised'); // it starts shrunk to its title
   });
 });
 

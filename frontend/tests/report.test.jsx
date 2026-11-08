@@ -15,7 +15,6 @@ import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 let game;
 const $ = (sel) => document.querySelector(sel);
 const show = (ui) => render(<GameContext.Provider value={game}>{ui}</GameContext.Provider>);
-const sum = (list, key) => list.reduce((n, x) => n + x[key], 0);
 
 beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = () => null;
@@ -24,16 +23,11 @@ beforeEach(() => {
 afterEach(() => { cleanup(); resetAllFigures(); });
 
 describe('the deployment report', () => {
-  it('adds up what was fired, jammed, stopped and spent, from the ledger', () => {
+  it('adds up what was stopped and spent, from the ledger', () => {
     setUp(game.sim, { seed: '1', laydown: MIXED });
     play(game.sim, 2);
     const r = game.sim.report(), { ledger, state } = game.sim;
     expect(r.intercepted).toBe(state.kills);
-    expect(sum(r.killers, 'n')).toBe(r.intercepted);
-    expect(sum(r.fired, 'cost')).toBe(Object.values(ledger.shots).reduce((n, s) => n + s.cost, 0));
-    expect(r.fired.length).toBeGreaterThan(0);
-    expect(r.jammed.map((j) => j.id)).toEqual(['jammer']); // MIXED has two, of one type
-    expect(r.jammed[0].seconds).toBeGreaterThan(0);
     expect(r.cost.spent).toBe(ledger.capex + ledger.consumables);
     expect(r.waves).toBe(2);
   }, 60000);
@@ -49,7 +43,7 @@ describe('the deployment report', () => {
     expect(game.sim.state).toMatchObject({ over: true, ended: true });
     expect($('.card h1').textContent).toBe('DEPLOYMENT ENDED');
     expect($('#deployment-report').textContent).toContain('after 1 full wave(s)');
-    expect($('#report-used').textContent).toContain('jamming');
+    expect($('#stats-effectors').textContent).toContain('jamming'); // the run's statistics follow the report
   }, 60000);
 
   it('cannot end a deployment that has not started', () => {

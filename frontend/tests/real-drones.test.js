@@ -95,7 +95,7 @@ describe('the rules of a type apply to its real drones', () => {
     setUp(sim, { seed: '1', laydown: MIXED });
     sim.commands.enterSandbox();
     sim.commands.launchSandboxAttack({ type: 'kvn', count: 6, bearingDeg: 0, gap: 3 });
-    sim.run(4000);
+    for (let n = 0; n < 24000 && (sim.drones.length || sim.state.sbQueue.length); n += 500) sim.run(500); // they start 12 to 15 km out
     expect(sim.ledger.launched.kvn).toBe(6);
     expect((sim.ledger.killed.kvn || 0) + (sim.ledger.leaked.kvn || 0) + (sim.ledger.escaped.kvn || 0)).toBeGreaterThan(0);
   }, 60000);

@@ -5,6 +5,7 @@ import { PEOPLE, PEOPLE_LIMITS, PEOPLE_ROLES } from '../sim/config/index.js';
 import { view } from '../render/view.js';
 import { hex, useGame } from './hooks.js';
 import { NumberInput } from './NumberInput.jsx';
+import { Movable } from './Movable.jsx';
 
 const LOOK_DISTANCE = 4; // scene units: close enough to make out each person
 
@@ -52,12 +53,12 @@ export function PeopleChoice() {
 
 export function PeoplePicker({ onHide }) {
   return (
-    <div id="tool-picker" className="panel" role="region" aria-label="Place simulated people">
+    <Movable id="tool-picker" title="People" role="region" aria-label="Place simulated people">
       <div className="up-head" style={{ borderLeftColor: hex(PEOPLE[view.people.protection].color) }}>
         <b>People: place a group</b>
         <button id="picker-close" aria-label="Hide this list" title="Hide this list. Keep clicking the map to place." onClick={onHide}>×</button>
       </div>
       <PeopleChoice />
-    </div>
+    </Movable>
   );
 }

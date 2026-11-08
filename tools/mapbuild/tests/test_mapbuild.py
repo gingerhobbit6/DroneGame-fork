@@ -170,6 +170,16 @@ def test_feature_lists_use_scene_axes():
     assert lists["names"][0] == ["Town", "Populated Place", "Large", 10.0, 10.0]
 
 
+def test_a_city_keeps_the_buildings_nearest_the_middle(monkeypatch):
+    monkeypatch.setattr(features, "MAX_BUILDINGS", 2)
+    window = Window(1000, 2000, 100)
+    houses = np.array([shapely.box(1000 + x, 2000, 1005 + x, 2005) for x in (60, -30, 10)])
+    bldg = np.zeros((window.side, window.side), "uint8")
+    empty = {"CLASSIFICA": np.array([])}
+    lists = features.feature_lists(window, houses, np.array([]), np.array([]), empty, np.array([]), {"DISTNAME": [], "CLASSIFICA": [], "FONTHEIGHT": []}, bldg)
+    assert [row[0] for row in lists["buildings"]] == [12.5, -27.5]
+
+
 def test_the_fit_is_accurate_on_a_smooth_surface():
     window = Window(400000, 200000, 15000)
     grid = np.linspace(-15000, 15000, 21)

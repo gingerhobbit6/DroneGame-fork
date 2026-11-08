@@ -4,6 +4,7 @@ import { BUILD, STRUCTURES, TOOLBAR } from '../sim/config/index.js';
 import { money } from '../sim/economy.js';
 import { hex, useGame, useTick } from './hooks.js';
 import { useAccount } from './account/pack.js';
+import { Movable } from './Movable.jsx';
 
 const cheapest = (group) => Math.min(...group.classes.map((id) => STRUCTURES[id].cost));
 
@@ -23,8 +24,9 @@ export function Toolbar() {
   useTick();
   const game = useGame();
   const tool = game.getTool(), budget = game.sim.state.budget, open = game.catalogue(), kit = game.sim.state.kit;
+  const packed = game.sim.state.packed, refund = Math.round(BUILD.sellRefund * 100); // with a pack there is no budget, so no refund to show
   return (
-    <div id="toolbar" className="panel">
+    <Movable id="toolbar" title="Place systems">
       <PackRow />
       {TOOLBAR.map((group) => {
         const picked = group.classes.includes(tool) ? STRUCTURES[tool] : null, from = cheapest(group);
@@ -47,9 +49,11 @@ export function Toolbar() {
       <button data-tool="people" className={`tool${tool === 'people' ? ' active' : ''}`} title="Place groups of simulated people, to see what an attack would do to them" onClick={() => game.setTool('people')}>
         <div className="n">People</div><div className="c">{game.sim.people.reduce((sum, g) => sum + g.count, 0) || ''}</div><div className="k">[9] simulated</div>
       </button>
-      <button id="tool-sell" className={`tool${tool === 'sell' ? ' active' : ''}`} title="Click a structure to sell it for a refund" onClick={() => game.setTool('sell')}>
-        <div className="n">Sell</div><div className="c">{Math.round(BUILD.sellRefund * 100)}%</div><div className="k">[X]</div>
+      <button id="tool-sell" className={`tool${tool === 'sell' ? ' active' : ''}`} onClick={() => game.setTool('sell')}
+        title={packed ? 'Click a system on the map to take it off, back into your pack' : `Click a system on the map to take it off, with ${refund}% of its price back`}>
+        <div className="n"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>Remove</div>
+        <div className="c">{packed ? '' : `${refund}% back`}</div><div className="k">[X] then click a system</div>
       </button>
-    </div>
+    </Movable>
   );
 }

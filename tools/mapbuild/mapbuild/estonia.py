@@ -19,6 +19,7 @@ from rasterio.transform import from_origin
 from rasterio.windows import from_bounds
 from shapely.geometry import mapping
 
+from . import copernicus, geonames
 from .estonia_files import AGENT, BUILDINGS, CRS, HEIGHTS, LAND, PLACES, SURFACE, TRANSPORT, UTILITIES, WATER, _retrying, ensure  # noqa: F401 - ensure is part of this module's face
 from .grid import CELL, Window
 
@@ -226,7 +227,7 @@ class Inputs:
     """What every source hands to the rest of the build."""
 
     base: np.ndarray  # heights at every post, with no gaps
-    no_data: np.ndarray  # posts with no height at all, which count as water
+    no_data: np.ndarray  # posts that count as water: with no height at all, or water in Copernicus's mask past the border
     wood: np.ndarray
     houses: np.ndarray
     power: np.ndarray
@@ -236,14 +237,34 @@ class Inputs:
     names: np.ndarray
     name_fields: dict
     lidar: dict[str, np.ndarray] | None
+    copernicus: bool = False  # whether Copernicus heights filled any posts past the border
+    past: np.ndarray | None = None  # the posts Copernicus heights filled, where the basic map may be blank
+    geonames: bool = False  # whether any names past the border came from GeoNames
 
 
-def gather(data_root: str, window: Window, lidar_km: int, say) -> Inputs:
+def beyond_border(data_root: str, window: Window, ground: np.ndarray, fetch: bool, say) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Fills the posts past the border from Copernicus heights. Returns the heights, the posts that count as water, and the posts filled."""
+    no_data = ~np.isfinite(ground)
+    if not no_data.any():
+        return ground, no_data, no_data
+    if fetch:
+        copernicus.ensure(data_root, window, say)
+    far, wet = copernicus.heights(data_root, window)
+    use = no_data & np.isfinite(far)
+    if not use.any():
+        say("no Copernicus heights on this machine, so ground past the border counts as water. --fetch gets them.")
+        return ground, no_data, use
+    say(f"Copernicus heights fill {use.mean():.1%} of the posts, of which {(use & wet).sum() / use.sum():.0%} is water in its mask")
+    return np.where(use, far, ground), (no_data & ~use) | (use & wet), use
+
+
+def gather(data_root: str, window: Window, lidar_km: int, say, fetch: bool = False) -> Inputs:
     ground = ground_posts(data_root, window)
     no_data = ~np.isfinite(ground)
     say(f"heights: {window.side} x {window.side} posts, {np.nanmin(ground):.1f} to {np.nanmax(ground):.1f} m, {no_data.mean():.1%} with no data")
     if no_data.mean() > 0.9:
         raise SystemExit("There is no Estonian height data here. It stops at the national border.")
+    base, no_data, past = beyond_border(data_root, window, ground, fetch, say)
     etak = Etak(data_root, window)
     wood, _ = etak.read(LAND, "E_305_puittaimestik_a", ["tyyp"], f"tyyp = {FOREST}")
     houses, _ = etak.read(BUILDINGS, "E_401_hoone_ka")
@@ -253,13 +274,24 @@ def gather(data_root: str, window: Window, lidar_km: int, say) -> Inputs:
     roads, classes = road_rows(road_shapes, road_fields["tyyp"])
     names, name_fields = place_names(data_root, window)
     say(f"ETAK: {len(houses)} buildings, {len(wood)} woods, {len(roads)} roads, {len(power)} power lines. Settlements: {len(names)}")
+    if fetch and past.any():
+        geonames.ensure(data_root, say)
+    far_names, far_fields = geonames.place_names(data_root, window) if past.any() else ([], {})
+    if len(far_names):
+        say(f"GeoNames: {len(far_names)} settlements past the border")
+        names, name_fields = np.concatenate([names, far_names]), {k: np.concatenate([v, far_fields[k]]) for k, v in name_fields.items()}
     power = shapely.get_parts(power)
-    return Inputs(np.nan_to_num(ground).astype("float32"), no_data, wood, houses, power, np.concatenate(water), roads, classes, names, name_fields,
-                  lidar(data_root, window, lidar_km * 500, ground, houses) if lidar_km else None)
+    return Inputs(np.nan_to_num(base).astype("float32"), no_data, wood, houses, power, np.concatenate(water), roads, classes, names, name_fields,
+                  lidar(data_root, window, lidar_km * 500, ground, houses) if lidar_km else None, bool(past.any()), past, bool(len(far_names)))
 
 
-def credits(lidar_km: int, year: int) -> dict[str, str]:
-    """The licence asks for the owner, the title and the age of the data, and for the licence itself to travel with data given to others."""
+def credits(lidar_km: int, year: int, copernicus_heights: bool = False, russian_names: bool = False) -> dict[str, str]:
+    """The licence asks for the owner, the title and the age of the data, and for the licence itself to travel with data given to others.
+    Copernicus heights and GeoNames names need their own notices, shown whatever the base map."""
     found = {"osmap": f"Estonian basic map {year}, topographic data, and administrative and settlement units: {OWNER}. Licence: {LICENCE}"}
     found["lidar"] = f"Elevation data 2020-2023: {OWNER}" if lidar_km else f"Elevation data: {OWNER}"
+    if copernicus_heights:
+        found["heights"] = copernicus.CREDIT
+    if russian_names:
+        found["names"] = geonames.CREDIT
     return found

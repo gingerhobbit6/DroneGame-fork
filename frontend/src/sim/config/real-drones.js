@@ -36,7 +36,7 @@ export const REAL_DRONES = {
     },
   },
   lancet3: {
-    variantOf: 'fw', origin: 'Russia', name: 'Lancet-3 (loitering munition)', label: 'Lancet-3',
+    variantOf: 'fw', origin: 'Russia', name: 'Lancet-3 (loitering munition)', label: 'Lancet-3', launch: 'long', // about 40 km of range, so not from off the map
     evade: 0.75, speed: 26, alt: [500, 800], size: 1, rcs: 0.05, sound: 1, warhead: 4, cost: 35000, seeksEmitters: true,
     links: { control: 'control900', gnss: true }, rfEmitter: true, protocol: 'tactical',
     usedBy: 'Russia.',
@@ -188,7 +188,7 @@ export const REAL_DRONES = {
 
   // ---------- China ----------
   ch901: {
-    variantOf: 'fw', origin: 'China', name: 'CH-901 (loitering munition)', label: 'CH-901',
+    variantOf: 'fw', origin: 'China', name: 'CH-901 (loitering munition)', label: 'CH-901', launch: 'short', // 10 to 15 km of range
     evade: 0.75, speed: 39, alt: [100, 150], size: 1, rcs: 0.05, sound: 1, warhead: 3,
     usedBy: 'China. Fielding with the PLA is not confirmed.',
     published: 'Cruise 100 to 180 km/h (game uses 140). Defense Update gives a loiter at 100 to 150 m; other sources say up to 450 m. Range 10 to 15 km, 40 to 120 minutes. 9 kg. Warhead about 3 kg. Wingspan is not public, so size is assumed. Press and analyst figures, which often disagree.',

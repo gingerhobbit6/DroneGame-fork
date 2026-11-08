@@ -4,6 +4,7 @@
 import { DRONES, THREAT_GROUPS } from '../sim/config/index.js';
 import { DEFAULT_MIX, isDefaultMix } from '../sim/attack-mix.js';
 import { hex, useGame, useTick } from './hooks.js';
+import { Movable } from './Movable.jsx';
 
 // A short name for the mix, for the button that opens this.
 export function mixLabel(mix) {
@@ -20,7 +21,7 @@ export function AttackMix({ onClose }) {
   const set = (ids) => { const problem = commands.setAttack(ids); if (problem) game.toast(problem); };
   const toggle = (id, on) => set(on ? [...mix, id] : mix.filter((x) => x !== id));
   return (
-    <div id="attack-mix" className="panel" role="region" aria-label="Which drones attack">
+    <Movable id="attack-mix" title="Attack" role="region" aria-label="Which drones attack">
       <div className="up-head">
         <b>Which drones attack</b>
         <button id="attack-close" aria-label="Close" title="Close" onClick={onClose}>×</button>
@@ -51,6 +52,6 @@ export function AttackMix({ onClose }) {
       <div className="row">
         <button id="attack-generic" disabled={locked || isDefaultMix(mix)} onClick={() => set(DEFAULT_MIX)}>Back to the generic types</button>
       </div>
-    </div>
+    </Movable>
   );
 }

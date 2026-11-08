@@ -31,7 +31,7 @@ function reportsFrom(laydown, settings = {}) {
   sim.state.warnedWire = true;
   sim.commands.startWave();
   const id = sim.structures.find((s) => s.def.kind === 'camera').nodeId; // the wave rebuilt every unit, with new node ids
-  sim.run(4000);
+  for (let n = 0; n < 16000 && sim.state.waveActive; n++) sim.step();
   return sim.bus.entries.filter((e) => e.type === 'detection_report' && e.msg.node_id === id).map((e) => e.msg.detection_report);
 }
 const named = (r) => !!r.classification?.[0]?.sub_class?.[0]?.sub_class;
@@ -51,7 +51,8 @@ describe('pixels on the drone', () => {
     expect(reports.some((r) => !named(r))).toBe(true);
   }, 60000);
   it('name the model once the drone is identified, and the track carries it', () => {
-    const reports = reportsFrom([['radar', 600, 0], ['camera', 378, 589]]), labels = Object.values(DRONES).map((d) => d.label ?? d.name);
+    // a second radar keeps the track after the strikes reach the first, so the camera can still look close up
+    const reports = reportsFrom([['radar', 600, 0], ['radar', -600, 0], ['camera', 378, 589]]), labels = Object.values(DRONES).map((d) => d.label ?? d.name);
     const models = reports.map(modelOf).filter(Boolean);
     expect(models.length).toBeGreaterThan(0);
     expect(models.every((t) => labels.includes(t))).toBe(true);

@@ -160,7 +160,7 @@ describe('checking a pack', () => {
 describe('cutting a world', () => {
   it('puts the site at height zero and the grid in the right place', () => {
     const w = cutWorld(pack(), E, N);
-    expect(w.N).toBe(701);
+    expect(w.N).toBe(2701);
     expect(w.groundAt(0, 0)).toBe(0);
     expect(w.geo).toMatchObject({ e0: E, n0: N, H0: 100, tier: 'lidar' });
     expect(w.groundAt(0, -4000)).toBeCloseTo(0.3 * 1000); // north is -z, and the hill is to the north
@@ -182,7 +182,7 @@ describe('cutting a world', () => {
     expect(siteProblem(p, E + 10, N)).toMatch(/20 m/);
     expect(siteProblem(p, E, N)).toBeNull();
     const wet = { ...p, grids: { ...p.grids, cover: p.grids.cover.slice() } };
-    wet.grids.cover[400 * 801 + 400] = 4;
+    wet.grids.cover[1400 * 2801 + 1400] = 4;
     expect(siteProblem(wet, E, N)).toMatch(/water/);
     expect(() => cutWorld(p, E + 2000, N)).toThrow(/edge/);
     expect(snap(422013)).toBe(422020);

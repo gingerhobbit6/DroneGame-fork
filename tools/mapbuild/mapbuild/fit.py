@@ -6,7 +6,8 @@ from pyproj.transformer import TransformerGroup
 
 from .grid import Window
 
-MAX_ERROR_M = 2  # a 60 km pack reaches 0.9 to 1.6 m at its corners, measured across Britain. Well under a 20 m cell, and a 30 km pack stays near 0.1 m.
+MAX_ERROR_M = 5  # a 60 km pack reaches 0.9 to 1.6 m at its corners, measured across Britain, and the error grows with the fourth power of the size,
+# so a 70 km pack reaches about 3 m. A quarter of a 20 m cell; a 30 km pack stays near 0.1 m.
 SAMPLES = 61
 METRES_PER_DEGREE = 111_320
 

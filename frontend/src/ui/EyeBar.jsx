@@ -2,6 +2,7 @@
 
 import { view } from '../render/view.js';
 import { useGame, useTick } from './hooks.js';
+import { Movable } from './Movable.jsx';
 
 export function EyeBar() {
   useTick();
@@ -9,9 +10,9 @@ export function EyeBar() {
   if (!s) return null;
   const t = s.task && !s.task.drone.dead ? s.task.drone : null;
   return (
-    <div id="eye-bar" className="panel" role="status">
+    <Movable id="eye-bar" title="Ground view" role="status">
       Ground view from <b>{s.short}</b>{t ? `, engaging a ${t.def.name}` : ''} · drag to look round
       <button id="eye-back" onClick={() => game.lookFrom(null)}>Back to the map (Esc)</button>
-    </div>
+    </Movable>
   );
 }

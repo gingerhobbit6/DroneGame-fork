@@ -15,6 +15,7 @@ import { PeoplePicker } from './PeoplePicker.jsx';
 import { PanelHead, SystemCard } from './SystemCard.jsx';
 import { UnitTray } from './account/UnitTray.jsx';
 import { useAccount } from './account/pack.js';
+import { Movable } from './Movable.jsx';
 
 const km = (m) => `${(m / 1000).toFixed(1)} km`;
 
@@ -65,7 +66,7 @@ function KindList({ game, group, tool, withWizard }) {
   const left = (id) => kit[id] - game.sim.structures.filter((s) => s.def.id === id).length;
   const picked = classes.includes(tool) ? tool : null;
   return (
-    <div id="tool-picker" className={`panel${withWizard ? ' with-wizard' : ''}`} role="region" aria-label={`Choose a ${group.name}`}>
+    <Movable id="tool-picker" title={group.name} className={`panel${withWizard ? ' with-wizard' : ''}`} role="region" aria-label={`Choose a ${group.name}`}>
       <PanelHead title={kit ? `${group.name}: ${classes.length} in your pack` : `${group.name}: ${group.classes.length} real systems`} color={STRUCTURES[picked ?? classes[0] ?? game.toolChoice(group)].color} onHide={() => game.openCatalogue(group.kind, false)} />
       <p className="pick-hint" id="pick-hint">
         {picked
@@ -83,6 +84,6 @@ function KindList({ game, group, tool, withWizard }) {
       </div>
       {picked && <Settings tool={picked} />}
       <p className="muted">Click a placed system to change it, or to rename it. Esc closes this list.</p>
-    </div>
+    </Movable>
   );
 }

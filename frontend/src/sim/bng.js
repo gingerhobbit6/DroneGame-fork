@@ -37,17 +37,19 @@ export function wgs84ToBng(latDeg, lonDeg) {
   const a = 6377563.396, b = 6356256.909, e2 = 1 - (b * b) / (a * a), p = Math.hypot(X, Y);
   let phi = Math.atan2(Z, p * (1 - e2));
   for (let i = 0; i < 8; i++) phi = Math.atan2(Z + (e2 * a * Math.sin(phi)) / Math.sqrt(1 - e2 * Math.sin(phi) ** 2), p);
-  const lambda = Math.atan2(Y, X);
+  return transverseMercator(phi, Math.atan2(Y, X), { a, b, f0: 0.9996012717, phi0: 49 * rad, lam0: -2 * rad, e0: 400000, n0: -100000 }); // the national grid's own origin
+}
 
-  // Transverse Mercator, on the national grid's own origin
-  const f0 = 0.9996012717, phi0 = 49 * rad, lam0 = -2 * rad, n = (a - b) / (a + b), sinP = Math.sin(phi), cosP = Math.cos(phi), tanP = Math.tan(phi);
+// Transverse Mercator by the series OS publishes, on any ellipsoid (a, b) and origin. Angles in radians. MGRS uses it too (mgrs.js).
+export function transverseMercator(phi, lambda, { a, b, f0, phi0, lam0, e0, n0 }) {
+  const e2 = 1 - (b * b) / (a * a), n = (a - b) / (a + b), sinP = Math.sin(phi), cosP = Math.cos(phi), tanP = Math.tan(phi);
   const nu = (a * f0) / Math.sqrt(1 - e2 * sinP * sinP), rho = (a * f0 * (1 - e2)) / (1 - e2 * sinP * sinP) ** 1.5, eta2 = nu / rho - 1;
   const dp = phi - phi0, sp = phi + phi0;
   const M = b * f0 * ((1 + n + 1.25 * n * n + 1.25 * n ** 3) * dp - (3 * n + 3 * n * n + 2.625 * n ** 3) * Math.sin(dp) * Math.cos(sp)
     + (1.875 * n * n + 1.875 * n ** 3) * Math.sin(2 * dp) * Math.cos(2 * sp) - (35 / 24) * n ** 3 * Math.sin(3 * dp) * Math.cos(3 * sp));
   const dl = lambda - lam0, t2 = tanP * tanP;
-  const northing = M - 100000 + (nu / 2) * sinP * cosP * dl ** 2 + (nu / 24) * sinP * cosP ** 3 * (5 - t2 + 9 * eta2) * dl ** 4 + (nu / 720) * sinP * cosP ** 5 * (61 - 58 * t2 + t2 * t2) * dl ** 6;
-  const easting = 400000 + nu * cosP * dl + (nu / 6) * cosP ** 3 * (nu / rho - t2) * dl ** 3 + (nu / 120) * cosP ** 5 * (5 - 18 * t2 + t2 * t2 + 14 * eta2 - 58 * t2 * eta2) * dl ** 5;
+  const northing = M + n0 + (nu / 2) * sinP * cosP * dl ** 2 + (nu / 24) * sinP * cosP ** 3 * (5 - t2 + 9 * eta2) * dl ** 4 + (nu / 720) * sinP * cosP ** 5 * (61 - 58 * t2 + t2 * t2) * dl ** 6;
+  const easting = e0 + nu * cosP * dl + (nu / 6) * cosP ** 3 * (nu / rho - t2) * dl ** 3 + (nu / 120) * cosP ** 5 * (5 - 18 * t2 + t2 * t2 + 14 * eta2 - 58 * t2 * eta2) * dl ** 5;
   return { e: easting, n: northing };
 }
 

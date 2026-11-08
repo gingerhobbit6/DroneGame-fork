@@ -47,7 +47,7 @@ function Screen() {
     <>
       <GameCanvas />
       <div id="left-col">
-        <Hud />
+        <Hud openDock={openDock} />
         <Toolbar />
       </div>
       <Minimap />

@@ -8,10 +8,12 @@ import { view } from '../render/view.js';
 import { parseWorldId } from '../sim/world-pack.js';
 import { Debrief } from './assistant/Debrief.jsx';
 import { DeploymentReport } from './DeploymentReport.jsx';
+import { RunStats } from './RunStats.jsx';
 import { useGame, useTick } from './hooks.js';
 import { WorldPicker } from './WorldPicker.jsx';
 import { ConditionsPicker } from './ConditionsPicker.jsx';
 import { PackPicker } from './account/PackPicker.jsx';
+import { Movable } from './Movable.jsx';
 
 const STAGES = [['1. See', 'Place sensors'], ['2. Stop', 'Place effectors'], ['3. Connect', 'Network it all'], ['4. Prove', 'Rehearse, then fight']];
 
@@ -44,7 +46,7 @@ function StartCard({ openDock }) {
     if (deploy()) game.setViewOption('wizard', 'open');
   };
   return (
-    <div className={wantReal ? 'card welcome picking' : 'card welcome'}>
+    <Movable className={wantReal ? 'card welcome picking' : 'card welcome'} title="Start">
       <div className="wz-debrief-head">SITE GUARD</div>
       <h1>Defend a site</h1>
       <p className="lead">You place and network sensors and weapons, from a deployment pack or on a {money(ECONOMY.budget)} budget, then watch your system try to find and stop inbound drones. The heart of it is the gap between where drones really are and where your system believes they are.</p>
@@ -71,7 +73,7 @@ function StartCard({ openDock }) {
         <button id="btn-deploy" disabled={notChosen} onClick={deploy}>{notChosen ? 'Choose where to defend' : 'I know the game, just deploy'}</button>
         {openDock && <button id="btn-load-saved" className="quiet" disabled={notChosen} onClick={() => { if (deploy()) openDock('saved'); }}>Load a saved laydown</button>}
       </div>
-    </div>
+    </Movable>
   );
 }
 
@@ -87,7 +89,7 @@ function GameOverCard({ onReview }) {
   const { sim, commands, saver } = useGame();
   const { state } = sim;
   return (
-    <div className="card game-over">
+    <Movable className="card game-over" title="Results">
       <div>
         <DeploymentReport report={sim.report()} />
         {sim.people.length > 0 && <p id="casualty-summary">Simulated <b>{state.killed}</b> killed and <b>{state.injured}</b> injured of {sim.people.reduce((sum, g) => sum + g.count, 0)}: {casualtySummary(sim.people)}. Each warhead's lethal and injury radii come from assumed figures (see Sources), not real data.</p>}
@@ -96,7 +98,8 @@ function GameOverCard({ onReview }) {
         <button id="btn-restart-clear" onClick={() => commands.reset('clear')}>Clear map</button>
       </div>
       <Debrief onReview={onReview} />
-    </div>
+      <RunStats />
+    </Movable>
   );
 }
 

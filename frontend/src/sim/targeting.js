@@ -8,6 +8,7 @@ import { tally } from './economy.js';
 import { removeStructure } from './laydown.js';
 import { removeDrone, spotterBonus } from './drones.js';
 import { blastOnGround } from './people.js';
+import { logEnd } from './flight-log.js';
 import { patrolAim } from './patrol.js';
 import { aimInZone, inZone } from './attack-area.js';
 import { terrainState } from './terrain.js';
@@ -94,6 +95,7 @@ export function hitStructure(w, d, s) {
   blastOnGround(w, d, s.pos.x, s.pos.z);
   if (!state.sandbox) s.health -= d.def.damage * (1 + spotterBonus(w)); // the sandbox protects the laydown too
   state.hits++;
+  logEnd(w, d, 'struck');
   removeDrone(w, d);
   net.raiseAlert('critical', `${d.def.name} struck ${s.name}: ${Math.max(Math.round(s.health), 0)}% health left`, s.pos, 'DISCRETE_PRIORITY_HIGH');
   if (s.health <= 0) {

@@ -13,7 +13,7 @@ import { createRecorder, takeSnapshot, SNAPSHOT_EVERY } from './recorder.js';
 import { runRecord } from './run-record.js';
 import { SITE_POS, u } from './units.js';
 import { DEFAULT_MIX } from './attack-mix.js';
-import { affordable, createLedger, resetLedger } from './economy.js';
+import { affordable, createLedger, resetLedger, tally } from './economy.js';
 import * as laydown from './laydown.js';
 import { siteIsFree } from './attack-area.js';
 import * as people from './people.js';
@@ -52,6 +52,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     drones: w.drones,
     getTime: () => state.time,
     siteCentre: () => state.zoneCentre,
+    onFalseAlarm(id) { tally((w.ledger.falseAlarms[state.wave] ||= {}), id); },
     monitoring: () => state.wave > 0 || state.sandbox, // the fusion node only chases lost contact once the attack has started
     onApprovalRequest() { emit('approvalRequest'); emit('toast', 'Engagement request: your decision is needed'); },
     onApprovalDecided() { emit('approvalDecided'); },
@@ -235,7 +236,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     let h = 0x811c9dc5;
     const feed = (s) => { for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } };
     for (const e of bus.entries) feed(JSON.stringify(e.msg));
-    feed(JSON.stringify([state.kills, state.health, state.budget, state.leaks, state.time, bus.seq, { ...w.ledger, jamTime: undefined }])); // jamTime came later: left out so recorded digests still match
+    feed(JSON.stringify([state.kills, state.health, state.budget, state.leaks, state.time, bus.seq, { ...w.ledger, jamTime: undefined, flights: undefined, falseAlarms: undefined }])); // these came later: left out so recorded digests still match
     if (w.people.length) feed(JSON.stringify(w.people.map((g) => g.hits))); // with no people, a run's digest stays as it was
     if (w.patrol) feed(String(w.patrol.dist));
     return (h >>> 0).toString(16);

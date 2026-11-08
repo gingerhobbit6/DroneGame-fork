@@ -35,7 +35,7 @@ describe('regressions', () => {
     setUp(sim, { seed, laydown: GNSS_RING, gnss: true });
     sim.state.sandbox = true;
     for (let i = 0; i < 60; i++) sim.spawnDrone('fw', (i / 60) * Math.PI * 2);
-    sim.run(20000);
+    for (let n = 0; n < 50000 && sim.drones.length; n += 500) sim.run(500); // from the map edge, up to 38 km out; one that drifts can circle a while
     expect(sim.drones.length).toBe(0);
   }, 60000);
 });

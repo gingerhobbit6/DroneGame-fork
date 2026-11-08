@@ -101,7 +101,7 @@ def test_a_build_runs_with_fixed_arguments_and_no_shell(root):
     command, options = calls[0]
     assert isinstance(command, list) and "shell" not in options
     assert "422000,166000" in command and "--fetch" in command
-    assert command[command.index("--lidar-km") + 1] == "14"
+    assert command[command.index("--lidar-km") + 1] == "54" and command[command.index("--size") + 1] == "70"
     assert command[command.index("--out") + 1].endswith("area_422_166.sgmap")
     assert wait_finished(builder) == {"running": False, "ok": True, "message": "Finished"}
 
@@ -186,7 +186,7 @@ def test_an_estonian_build_uses_its_own_folder_and_lidar_across_the_whole_pack(r
     jobs.start(611700, 6570700, True)
     command = calls[0]
     assert command[command.index("--data") + 1] == str(root / "estonia")
-    assert command[command.index("--lidar-km") + 1] == "30"
+    assert command[command.index("--lidar-km") + 1] == "70"
     assert command[command.index("--centre") + 1] == "611700,6570700"
 
 

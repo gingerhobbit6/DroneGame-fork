@@ -51,19 +51,21 @@ export function updateWaves(w, dt, beginRun) {
   }
 }
 
-// Returns [{ t, type, bearing, jitter, altFrac }] sorted by spawn time (seconds into the wave).
-// `rng` is the wave's own seeded stream (rng.js waveStream), so a wave looks the same however it is reached. `mix` is the drone types
-// ticked (attack-mix.js): each slot's drones take turns, starting at a different one each wave so every one is seen.
+// Returns [{ t, type, bearing, dist, jitter, altFrac }] sorted by spawn time (seconds into the wave). `dist` is how far across its
+// launch band (WORLD.launchBand) a drone starts. `rng` is the wave's own seeded stream (rng.js waveStream), so a wave looks the same
+// however it is reached. `mix` is the drone types ticked (attack-mix.js): each slot's drones take turns, starting at a different one
+// each wave so every one is seen.
 export function makeWave(n, rng, mix = DEFAULT_MIX) {
   const slots = slotsFor(mix), take = (list, i) => list[(i + n) % list.length];
   const out = [];
-  const plan = (spawn) => { rng(); out.push(spawn); }; // each drone once rolled a radio band here; it now comes from its links, but the roll stays so every wave flies as before
+  const plan = (spawn) => { const dist = rng(); out.push({ dist, ...spawn }); }; // a drone on its own starts where this roll puts it
   const groups = Math.min(1 + Math.floor(n / 3), 3);
-  const bearings = Array.from({ length: groups }, () => rng() * Math.PI * 2);
+  const sites = Array.from({ length: groups }, () => ({ bearing: rng() * Math.PI * 2, dist: rng() })); // launch areas: a group comes from one
   const add = (slot, count, start, span) => {
     const list = slots[slot];
     for (let i = 0; i < count && list.length; i++) {
-      plan({ t: start + (span * i) / Math.max(count, 1), type: take(list, i), bearing: bearings[i % groups], jitter: (rng() - 0.5) * 0.3, altFrac: rng() });
+      const { bearing, dist } = sites[i % groups];
+      plan({ t: start + (span * i) / Math.max(count, 1), type: take(list, i), bearing, dist, jitter: (rng() - 0.5) * 0.3, altFrac: rng() });
     }
   };
   // first-person-view strikes, or what stands in for them, arrive one at a time, each from its own direction, WAVES.fpvGap seconds apart

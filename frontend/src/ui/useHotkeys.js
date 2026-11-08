@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { TOOLBAR } from '../sim/config/index.js';
 import { view } from '../render/view.js';
 import { useAccount } from './account/pack.js';
-import { mapName, nextBaseMap } from './MapControls.jsx';
+import { mapName, nextBaseMap, nextGrid } from './MapControls.jsx';
 import { useGame } from './hooks.js';
 
 export function useHotkeys() {
@@ -31,7 +31,7 @@ export function useHotkeys() {
       if (e.key === '9') { game.setTool('people'); return; }
       if (e.key === 'p' || e.key === 'P') { game.setViewOption('planView', !view.planView); return; }
       if (game.sim.state.terrainSeed.startsWith('pack:')) {
-        if (e.key === 'g' || e.key === 'G') { game.setViewOption('mapGrid', !view.mapGrid); return; }
+        if (e.key === 'g' || e.key === 'G') { game.setViewOption('mapGrid', nextGrid(view.mapGrid)); return; }
         if (e.key === 'c' || e.key === 'C') { game.setViewOption('mapContours', !view.mapContours); return; }
         if (e.key === 'm' || e.key === 'M') {
           const next = nextBaseMap(view.baseMap, game.mapSource(game.sim.state.terrainSeed));

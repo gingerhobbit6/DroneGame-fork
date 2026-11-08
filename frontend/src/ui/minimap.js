@@ -22,7 +22,7 @@ function traceRange(g, s, x, y, px) {
 }
 
 export function createMinimap(sim, canvas, camera, controls) {
-  const mm = { span: 6500, drag: false };
+  const mm = { span: WORLD.radius - 500, drag: false };
   const g = canvas.getContext('2d');
   const mmXY = (xm, zm) => [(xm / mm.span + 1) * canvas.width / 2, (zm / mm.span + 1) * canvas.width / 2];
   let tick = 0;
@@ -96,7 +96,7 @@ export function createMinimap(sim, canvas, camera, controls) {
   canvas.addEventListener('pointerdown', (e) => { mm.drag = true; canvas.setPointerCapture(e.pointerId); goTo(e); });
   canvas.addEventListener('pointermove', (e) => { if (mm.drag) goTo(e); });
   canvas.addEventListener('pointerup', () => { mm.drag = false; });
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); mm.span = clamp(mm.span * (e.deltaY > 0 ? 1.15 : 0.87), 1500, 9000); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); mm.span = clamp(mm.span * (e.deltaY > 0 ? 1.15 : 0.87), 1500, WORLD.radius + 2000); }, { passive: false });
 
   return { draw };
 }

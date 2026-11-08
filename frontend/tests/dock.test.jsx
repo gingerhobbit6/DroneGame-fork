@@ -120,7 +120,7 @@ describe('messages tab', () => {
   }, 30000);
 
   it('summarises every message type', () => {
-    running(MIXED, 6000);
+    running(MIXED, 15000); // drones start 13 km out
     const seen = new Set();
     for (const e of game.sim.bus.entries) { expect(typeof summary(e)).toBe('string'); seen.add(e.type); }
     expect(seen.size).toBeGreaterThan(4);

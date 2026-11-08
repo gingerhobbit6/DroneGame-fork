@@ -6,12 +6,16 @@
 // independent test results. Edit freely, or use the in-game Tuning panel.
 
 // Stored with saved laydowns and runs. Raise it when a change means old saves no longer replay the same.
-export const GAME_VERSION = '0.16.0';
+export const GAME_VERSION = '0.18.0';
 
 export const WORLD = {
   metresPerUnit: 20,     // 3D scene scale: 1 scene unit = this many metres
-  radius: 7000,          // size of the ground disc
-  spawnDist: 6000,       // drones appear this far from the site
+  radius: 27000,         // the ground reaches this far from the middle: a square 54 km across
+  spawnDist: 26000,      // the furthest a drone starts from the site, 1 km inside the edge; a spotter that gets this far out has left
+  // How far out a drone starts. A quadcopter has the range of its radio or fibre, about 12 to 15 km (short), and a fixed-wing
+  // drone starts anywhere out to spawnDist (long); a drone's `launch` can name another band. A wave's launch areas each roll a
+  // share of the band. Long-range one-way attack drones, the Shahed class, have launch: 'edge' and fly in from off the map.
+  launchBand: { short: [12000, 15000], long: [12000, 26000] },
   timeScale: 5,          // game seconds per real second at 1x (distances are real-scale, so time is compressed)
   droneVisualScale: 4,   // zoomed right out, drones are drawn at most this much larger than the models' units (render/drone-models.js)
   // Closer in, a drone or system keeps at least this share of the screen's height (a Shahed's span, a system's height),
@@ -19,6 +23,7 @@ export const WORLD = {
   droneOnScreen: 0.06, systemOnScreen: 0.05,
   rangeScale: 1,         // game range = published range x this. 1 = published figures.
 };
+export const WORLD_KM = (2 * WORLD.radius) / 1000; // the world's width, for wording
 
 // Simulated geodetic origin used to turn scene positions into the lat/lon that SAPIENT messages carry.
 // Deliberately fictional (0,0). North is -z in the scene, east is +x.
@@ -45,11 +50,11 @@ export const TERRAIN = {
   riverWidth: 0.08,      // river valley width in noise units (bigger = wider rivers)
   snowLine: 0.72,        // snow above this fraction of the relief
   treeLine: 0.55,        // no trees above this fraction of the relief
-  meshStride: 3,         // drawn terrain vertex every this many grid cells (smaller = finer, slower)
+  meshStride: 3,         // drawn terrain vertex at least every this many grid cells (smaller = finer, slower); a bigger world draws coarser
   forestThreshold: 0.56, // higher = less forest
   canopyMin: 12, canopyMax: 20, // tree height range (m)
   clearRadius: 450,      // no trees within this of the station (m)
-  hamlets: 3,            // small clusters of buildings
+  hamlets: 48,           // small clusters of buildings
   treeStep: 40,          // one drawn tree per this many metres of forest
   rfCanopyLength: 300,   // a network link's signal falls by 1/e for each three of these through canopy. Detection and jamming use propagation.js.
   opticalCanopyTol: 40,  // radar/EO/guns are blocked by more than this many metres of canopy on the path

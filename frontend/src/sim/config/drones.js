@@ -59,6 +59,7 @@ export const DRONES = {
   },
   fw: {
     name: 'Fixed-wing strike drone', label: 'Fixed-wing strike', model: 'fw', hp: 60, speed: 45, damage: 30, evade: 0.8,
+    launch: 'edge', // the Shahed class flies hundreds of km, so it comes in from off the map (WORLD.launchBand)
     links: { gnss: true }, // autonomous, navigates by GNSS
     rfEmitter: false, airframe: 'Fixed wing', color: 0xd500f9, alt: [150, 300], minAgl: 30, jamResist: 0.5, adapt: 0.7,
     cost: 35000, rcs: 0.2, size: 2.5, rfPower: 1, warhead: 30, sound: 5,

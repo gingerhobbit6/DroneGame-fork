@@ -2,10 +2,11 @@
 // The drawing stays in site-map.js, as the minimap's stays in minimap.js.
 
 import { useEffect, useRef, useState } from 'react';
+import { WORLD_KM } from '../sim/config/index.js';
 import { MAP_STYLES, NO_LIVE_MAP, createSiteMap } from './site-map.js';
 
 const LOADED = [['packs', 'Maps ready to play'], ['lidar', 'Lidar heights'], ['downloads', 'Data downloaded'], ['osmap', 'Map pictures'], ['satellite', 'Satellite pictures']];
-const MARKS = [['world', 'Your 14 km world'], ['plan', 'Map a build would make']];
+const MARKS = [['world', `Your ${WORLD_KM} km world`], ['plan', 'Map a build would make']];
 const STYLE_HELP = { Satellite: 'From EOX, which then sees the area you view', Hybrid: 'From EOX, which then sees the area you view', [NO_LIVE_MAP]: 'Asks no outside server, and shows only the pictures in your map packs' };
 
 export function SiteMap({ packs, downloads, point, planned, elsewhere, moving, onPick }) {

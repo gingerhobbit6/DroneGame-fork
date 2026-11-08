@@ -21,7 +21,7 @@ describe('the route', () => {
   it('refuses water, the edge of the map and malformed waypoints', () => {
     expect(routeProblem(WET)).toMatch(/water/);
     expect(routeProblem(square(130, 0, 10)) ?? '').not.toMatch(/station|build zone/); // fine, or refused for the ground, never the distance
-    expect(routeProblem(square(345, 0, 10))).toMatch(/off the map/);
+    expect(routeProblem(square(1370, 0, 10))).toMatch(/off the map/);
     expect(routeProblem([[1, 1]])).toMatch(/2 to 32/);
     expect(routeProblem([[1, 1], [2, 'x']])).toMatch(/2 to 32/);
     expect(routeProblem([[1, 1], [1, 1]])).toMatch(/no length/);
@@ -133,7 +133,7 @@ describe('walking', () => {
     const p = sim.getPatrol();
     sim.spawnDrone('fw', 0);
     const launcher = p.escorts[1].s;
-    for (let n = 0; n < 6000 && !launcher.task; n++) sim.step();
+    for (let n = 0; n < 20000 && !launcher.task; n++) sim.step(); // the Shahed class comes in from the edge, 27 km out
     expect(launcher.task).toBeTruthy();
     const held = p.dist;
     sim.step();

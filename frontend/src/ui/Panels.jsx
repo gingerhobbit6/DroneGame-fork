@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ADAPT, WORLD } from '../sim/config/index.js';
 import { useGame, useTick } from './hooks.js';
 import { NumberInput } from './NumberInput.jsx';
-import { useMovable } from './useMovable.js';
+import { Movable } from './Movable.jsx';
 
 export function Tuning({ open }) {
   const { commands } = useGame();
@@ -12,14 +12,14 @@ export function Tuning({ open }) {
     <label>{label}<NumberInput value={ADAPT[key]} step={step} onCommit={(v) => commands.setAdapt(key, v)} /></label>
   );
   return (
-    <div id="tuning" className={`panel${open ? '' : ' hidden'}`}>
+    <Movable id="tuning" title="Tuning" className={`panel${open ? '' : ' hidden'}`}>
       <div className="label">GAME</div>
       <label>Time scale (x)<NumberInput value={WORLD.timeScale} step={0.5} min={0.5} onCommit={(v) => { WORLD.timeScale = v; }} /></label>
       <div className="muted" style={{ margin: '6px 0' }}>Ranges, prices and drone figures are in the SAPIENT panel, Sources tab.</div>
       <div className="label">ENEMY LEARNING (per wave)</div>
       {adaptField('Evade gain', 'evadePerWave', 0.01)}
       {adaptField('Jam resist gain', 'jamResistPerWave', 0.01)}
-    </div>
+    </Movable>
   );
 }
 
@@ -34,12 +34,11 @@ const LEGEND = [
 ];
 export function Legend() {
   return (
-    <details id="hud-bottom-left" className="panel">
-      <summary>Legend</summary>
+    <Movable id="hud-bottom-left" title="Legend" startMin>
       <div className="label">THREATS</div>
       {LEGEND.map(([c, text]) => <div key={c}><i style={{ background: c }} />{text}</div>)}
       <div className="hint">Click a system for details · drag to move · right-drag or Shift-drag to turn · scroll or pinch to zoom</div>
-    </details>
+    </Movable>
   );
 }
 
@@ -59,12 +58,11 @@ export function Approvals() {
   useTick();
   const { sim, commands } = useGame();
   const list = sim.net.pendingRequests;
-  const { style, handle } = useMovable();
   return (
-    <div id="approval" className={`panel${list.length ? '' : ' hidden'}`} data-movable style={style} {...handle}>
+    <Movable id="approval" title="Authorise engagement" className={`panel${list.length ? '' : ' hidden'}`}>
       {list.map((r) => (
         <div className="req" key={r.id}>
-          <div className="req-h" title="Drag to move. Double-click to put it back.">AUTHORISE ENGAGEMENT?</div>
+          <div className="req-h">AUTHORISE ENGAGEMENT?</div>
           <div>{r.text}</div>
           <div className="req-b">
             <button className="primary" onClick={() => commands.decide(r.id, true)}>Approve</button>
@@ -72,6 +70,6 @@ export function Approvals() {
           </div>
         </div>
       ))}
-    </div>
+    </Movable>
   );
 }

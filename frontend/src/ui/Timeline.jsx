@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 import { fmtTime, useGame, useTick } from './hooks.js';
+import { Movable } from './Movable.jsx';
+import { pounds } from '../sim/economy.js';
 
 const MARKER = { kill: '#66bb6a', leak: '#ff5252', spotter: '#ffd600', lost: '#ff9100', casualty: '#e040fb', empty: '#ffcf66' };
 
@@ -29,7 +31,7 @@ export function Timeline() {
   const act = (fn) => () => { if (replay) { fn(replay); game.bump(); } };
   return (
     <>
-      <div id="timeline" className="panel">
+      <Movable id="timeline" title="Timeline">
         <div className="tl-row">
           <button id="tl-live" className="primary" title="Back to the live run" onClick={act((r) => r.exit())}>LIVE</button>
           <button id="tl-back" title="Back 0.5 s (Left arrow)" onClick={act((r) => r.stepBack())}>◀|</button>
@@ -41,9 +43,9 @@ export function Timeline() {
           </div>
           <span id="tl-time">{f ? fmtTime(f.t) : '0:00'}</span>
         </div>
-      </div>
+      </Movable>
       <div id="review-banner" className={reviewing && f ? '' : 'hidden'}>
-        {reviewing && f && <>REPLAY <b>{fmtTime(f.t)}</b> · wave {f.wave} · budget ${Math.round(f.budget).toLocaleString('en-US')} · kills {f.kills} · leaks {f.leaks}</>}
+        {reviewing && f && <>REPLAY <b>{fmtTime(f.t)}</b> · wave {f.wave} · budget {pounds(f.budget)} · kills {f.kills} · leaks {f.leaks}</>}
       </div>
     </>
   );

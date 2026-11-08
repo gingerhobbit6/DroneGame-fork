@@ -22,13 +22,21 @@ function roomToEdge(centre, dx, dz) {
   return Math.min(along(centre.x, dx), along(centre.z, dz));
 }
 
-// Where a drone starts: out from what is being defended along its bearing, and always on the map. Defending near the map's edge,
-// a bearing may have no room to fly in, so it uses the opposite one. In a corner both can be short, and the middle of the map never is.
-export function launchPoint(centre, angle) {
+// How far out, in metres, a drone of this kind starts: `share` (0 to 1) of the way across its launch band (WORLD.launchBand).
+export function launchDistance(def, share) {
+  if (def.launch === 'edge') return Infinity; // flown from far off the map, so it comes in at the edge (launchPoint stops it there)
+  const [near, far] = WORLD.launchBand[def.launch ?? (def.model === 'quad' ? 'short' : 'long')];
+  return near + share * (far - near);
+}
+
+// Where a drone starts: `dist` metres out from what is being defended along its bearing, and always on the map. Defending near
+// the map's edge, a bearing may have no room to fly in, so it uses the opposite one. In a corner both can be short, and the
+// middle of the map never is.
+export function launchPoint(centre, angle, dist) {
   const cos = Math.cos(angle), sin = Math.sin(angle), toMiddle = Math.hypot(centre.x, centre.z);
   const options = [[cos, sin], [-cos, -sin], [-centre.x / toMiddle, -centre.z / toMiddle]];
   const [dx, dz] = options.find(([x, z]) => roomToEdge(centre, x, z) >= u(MIN_RUN));
-  const reach = Math.min(u(WORLD.spawnDist), roomToEdge(centre, dx, dz));
+  const reach = Math.min(u(dist), roomToEdge(centre, dx, dz));
   return { x: centre.x + dx * reach, z: centre.z + dz * reach };
 }
 

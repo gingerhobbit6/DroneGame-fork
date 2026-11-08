@@ -8,7 +8,8 @@ import { u, hdist, clamp, groundM, hereU, onMap } from './units.js';
 import { tally } from './economy.js';
 import { chooseAim, pickTarget, hitStructure } from './targeting.js';
 import { blastInAir, blastOnGround, blastOnSite } from './people.js';
-import { launchPoint } from './attack-area.js';
+import { launchDistance, launchPoint } from './attack-area.js';
+import { logEnd, logLaunch } from './flight-log.js';
 
 const _v = new Vector3();
 const SPOTTER_CLEARANCE = 30; // metres
@@ -27,8 +28,9 @@ export function spawnDrone(w, type, bearing, rolls = {}) {
   // chance is pre-rolled by the wave's seeded stream; ad-hoc spawns (console, tests) draw from the sim stream
   const jitter = rolls.jitter ?? (rand() - 0.5) * 0.3;
   const altFrac = rolls.altFrac ?? rand();
+  const dist = rolls.dist ?? rand(); // how far across its launch band it starts
   const a = bearing + jitter;
-  const { x: sx, z: sz } = launchPoint(w.state.zoneCentre, a);
+  const { x: sx, z: sz } = launchPoint(w.state.zoneCentre, a, launchDistance(def, dist));
   // metres above the ground at the spawn point: the roll picks one of its height bands, if it flies more than one, then a height in it
   const bands = def.altModes ?? [def.alt], b = Math.min(bands.length - 1, Math.floor(altFrac * bands.length)), [lo, hi] = bands[b];
   const agl = lo + (altFrac * bands.length - b) * (hi - lo);
@@ -44,6 +46,7 @@ export function spawnDrone(w, type, bearing, rolls = {}) {
     vel: new Vector3(), track: null, nav: 0, videoJammed: false, targetStructure: null, aim,
   };
   w.drones.push(d);
+  logLaunch(w, d);
   w.rec.event('launch', `${def.name} launched`, d.uid);
   return d;
 }
@@ -55,20 +58,22 @@ export function removeDrone(w, d) {
   if (i >= 0) w.drones.splice(i, 1);
 }
 
-// `by` is the id of whatever did the damage ('laser', 'interceptor', 'missile', ...), for the cost ledger.
-function recordKill(w, d, by) {
+// `by` is the id of whatever did the damage ('laser', 'interceptor', 'missile', ...), for the cost ledger. src: the system that
+// did it, if known, for the statistics.
+function recordKill(w, d, by, src) {
   blastInAir(w, d);
+  logEnd(w, d, 'killed', src?.def.id ?? by, src);
   w.rec.event('kill', `${d.def.name} destroyed by ${by}`, d.uid);
   w.state.kills++;
   tally(w.ledger.killed, d.type);
   w.ledger.killedBy[by] = w.ledger.killedBy[by] || {};
   tally(w.ledger.killedBy[by], d.type);
 }
-export function damageDrone(w, d, amount, by) {
+export function damageDrone(w, d, amount, by, src) {
   if (d.dead) return;
   d.hp -= amount;
   if (d.hp <= 0) {
-    recordKill(w, d, by);
+    recordKill(w, d, by, src);
     w.emit('explosion', { pos: d.pos, r: u(80), color: 0xffcc66 });
     removeDrone(w, d);
   }
@@ -83,6 +88,7 @@ function impact(w, d, onPatrol) {
   w.rec.event('leak', `${d.def.name} hit the ${onPatrol ? 'patrol' : 'site'}`, d.uid);
   if (onPatrol) blastOnGround(w, d, onPatrol.x, onPatrol.z); else blastOnSite(w, d);
   state.leaks++; tally(ledger.leaked, d.type);
+  logEnd(w, d, 'leaked');
   if (!state.sandbox) state.health = Math.max(state.health - d.def.damage * (1 + spotterBonus(w)), 0);
   w.emit('siteHit');
   net.raiseAlert('critical', `${onPatrol ? 'Patrol' : 'Site'} impact by ${d.def.name}: integrity ${Math.round(state.health)}%`, d.pos, 'DISCRETE_PRIORITY_HIGH');
@@ -112,14 +118,15 @@ function moveSpotter(w, d, spd, dt) {
   } else {
     _v.set(d.pos.x - c.x, 0, d.pos.z - c.z).normalize().multiplyScalar(spd);
     d.pos.add(_v);
-    if (hdist(d.pos, c) > u(WORLD.spawnDist) || !onMap(d.pos.x, d.pos.z)) { tally(w.ledger.escaped, d.type); removeDrone(w, d); return false; }
+    if (hdist(d.pos, c) > u(WORLD.spawnDist) || !onMap(d.pos.x, d.pos.z)) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); removeDrone(w, d); return false; }
   }
   return true;
 }
 
 // Strike: fly at the target, hugging the terrain. Returns false if it was removed.
 function moveStrike(w, d, spd) {
-  if (hdist(d.pos, w.state.zoneCentre) > u(WORLD.radius) || !onMap(d.pos.x, d.pos.z)) { tally(w.ledger.escaped, d.type); w.rec.event('escaped', `${d.def.name} left the area`, d.uid); removeDrone(w, d); return false; } // GNSS drift can turn it away for good
+  // GNSS drift can turn it away for good. Only a drifted drone is held to the circle: one from off the map can start at a corner, further out.
+  if (!onMap(d.pos.x, d.pos.z) || (d.nav && hdist(d.pos, w.state.zoneCentre) > u(WORLD.radius))) { tally(w.ledger.escaped, d.type); logEnd(w, d, 'left'); w.rec.event('escaped', `${d.def.name} left the area`, d.uid); removeDrone(w, d); return false; }
   const tgt = pickTarget(w, d);
   const hrem = Math.hypot(tgt.x - d.pos.x, tgt.z - d.pos.z);
   if (tgt.structure || d.aim || tgt.patrol ? hrem < u(30) : hrem < u(SITE.radius)) { if (tgt.structure) hitStructure(w, d, tgt.structure); else impact(w, d, tgt.patrol && tgt); return false; }
@@ -143,7 +150,7 @@ function moveStrike(w, d, spd) {
 // jammed GNSS makes a navigating drone drift off course (and the drift stays). A reactive jammer breaks a link sooner.
 // Returns the speed multiplier, or null if the drone crashed.
 function applyJamming(w, d, dt) {
-  let ctrl = false, vid = false, gnss = false, killTime = Infinity, ctrlSlow = 1, rate = 1;
+  let ctrl = false, vid = false, gnss = false, killTime = Infinity, ctrlSlow = 1, rate = 1, src = null;
   for (const s of w.structures) {
     if (s.def.kind !== 'jammer' || s.mode !== 'Jam') continue;
     const j = jamming(s, d, w.structures);
@@ -151,7 +158,7 @@ function applyJamming(w, d, dt) {
     if (j.control) { ctrl = true; ctrlSlow = Math.min(ctrlSlow, s.def.slow); }
     if (j.video) vid = true;
     if (j.gnss) gnss = true;
-    killTime = Math.min(killTime, s.def.killTime);
+    if (s.def.killTime < killTime) { killTime = s.def.killTime; src = s; } // the quickest one gets the credit
     rate = Math.max(rate, j.rate);
   }
   const eff = 1 - d.jamResist;
@@ -161,7 +168,7 @@ function applyJamming(w, d, dt) {
     slow = 1 - (1 - (ctrl ? ctrlSlow : 0.7)) * eff;
     d.jamT += dt * eff * jamRate * rate;
     if (d.jamT >= killTime) {
-      recordKill(w, d, 'jammer');
+      recordKill(w, d, 'jammer', src);
       w.emit('explosion', { pos: d.pos, r: u(80), color: 0xba68c8 });
       removeDrone(w, d);
       return null;

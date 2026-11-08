@@ -24,7 +24,7 @@ describe('zone', () => {
   it('ignores a double-click before there are three points, and clicks off the ground', () => {
     const zone = addZonePoint(null, 0, 0);
     expect(addZonePoint(zone, 0.5, 0.5)).toBe(zone);
-    expect(addZonePoint(zone, 999, 0)).toBe(zone);
+    expect(addZonePoint(zone, 1500, 0)).toBe(zone);
   });
   it('starts again after a closed zone, and closes itself at the point limit', () => {
     expect(addZonePoint(square, 10, 10)).toEqual({ points: [[10, 10]], closed: false });

@@ -1,7 +1,7 @@
-// A small hand-made map pack: 16 km across, around SU 22 66, with a hill to the north, sea to the east, a wood and a building.
+// A hand-made map pack: 56 km across, so a 54 km world fits with 1 km to spare, around SU 22 66, with a hill to the north, sea to the east, a wood and a building.
 
 export const CENTRE = { east: 422000, north: 166000 };
-const N = 801, HALF = 8000;
+const N = 2801, HALF = 28000;
 
 export function fixtureParts() {
   const ground = new Float32Array(N * N), canopy = new Uint8Array(N * N), bldg = new Uint8Array(N * N), cover = new Uint8Array(N * N);
@@ -20,7 +20,7 @@ export function fixtureParts() {
     lonFit: [-1.72, 0.1436, 0.0005, 0, 0, 0], latFit: [51.41, -0.0005, 0.0899, 0, 0, 0], geoidSeparation: 48.5,
   };
   const features = {
-    buildings: [[-1000, 1000, 40, 30, 9, 0.5], [7900, 7900, 10, 10, 8, 0]],
+    buildings: [[-1000, 1000, 40, 30, 9, 0.5], [27900, 27900, 10, 10, 8, 0]],
     lines: [[[0, 3000], [260, 3000], [520, 3000]]],
     roads: [['A Road', [[-100, 0], [100, 0]]]],
     names: [['Testville', 'Populated Place', 'Large', 10, 10]],

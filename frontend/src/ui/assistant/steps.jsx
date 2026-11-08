@@ -318,7 +318,7 @@ export const STEPS = {
   ] },
   effectors: { title: 'Stop what you can see', Body: EffectorsStep, why: [
     ['Why not buy the most expensive one?', `The budget is ${money(ECONOMY.budget)} for the whole run, shots included, and the attack is far cheaper than your answer to it.`],
-    ['What if I cannot afford them all?', 'Selling gives a full refund until the first wave, so you can change your mind.'],
+    ['What if I cannot afford them all?', 'Removing a system gives a full refund until the first wave, so you can change your mind.'],
   ] },
   network: { title: 'Connect it', Body: NetworkStep, why: [
     ['What happens without it?', 'An unwired system is offline: it cannot report what it sees or be told what to engage.'],

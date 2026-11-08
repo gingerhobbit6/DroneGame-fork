@@ -37,7 +37,7 @@ describe('engagements', () => {
 
   it('are refused when nothing is at the cued position', () => {
     start(MIXED);
-    for (let n = 0; n < 6000; n++) { sim.step(); if (!sim.state.waveActive) sim.commands.startWave(); }
+    for (let n = 0; n < 13000; n++) { sim.step(); if (!sim.state.waveActive) sim.commands.startWave(); }
     const reasons = reports('task_ack').flatMap((a) => a.reason || []);
     expect(reasons).toContain('nothing found at the cued position');
   }, 60000);
@@ -45,7 +45,7 @@ describe('engagements', () => {
   it('a refused track is not offered to that effector again straight away, and others still are', () => {
     start([['radar', 600, 0], ['rf', 900, 0], ['rf', -900, 0], ['camera', 378, 589], ['interceptor', 490, 99]]);
     const int = sim.structures.find((s) => s.def.id === 'interceptor');
-    for (let n = 0; n < 6000 && int.rejected.size < 2; n++) sim.step();
+    for (let n = 0; n < 13000 && int.rejected.size < 2; n++) sim.step();
     expect(int.rejected.size).toBeGreaterThan(1);
   }, 60000);
 });
@@ -103,7 +103,7 @@ describe('behaviour', () => {
     setUp(sim, { seed: '1', laydown: [['radar', 2000, 0], ['radar', -2000, 0], ['radar', 0, 2000], ['radar', 0, -2000]] });
     sim.state.sandbox = true;
     sim.spawnDrone('fw', 0.7, {});
-    sim.run(1500);
+    sim.run(14000); // from the map edge at this bearing it is 34 km out; this brings it to about 2 km
     sim.state.sandbox = false;
     expect(reports('alert').some((a) => /loitering/.test(a.description))).toBe(false);
     expect(reports('detection_report').some((r) => r.state && r.behaviour[0].type === 'Approaching')).toBe(true);

@@ -2,14 +2,15 @@
 // the list of downloads, so the position itself never leaves the browser until the player presses Build.
 
 import { useEffect, useState } from 'react';
-import { WORLD } from '../sim/config/index.js';
+import { WORLD, WORLD_KM } from '../sim/config/index.js';
 import { squaresAround } from '../sim/bng.js';
 import { gridRef, isEstonian } from '../sim/grids.js';
 import { BUILT_HALF } from '../sim/world-pack.js';
 import { useGame } from './hooks.js';
 
-// Sizes as measured: docs/REAL_MAPPING_PLAN.md, and the largest square downloaded so far (TQ). English lidar is 14 km of 1 m squares, and is not kept.
-const TERRAIN_GB = 0.16, SQUARE_GB = 0.55, LIDAR_GB = 0.5;
+// Sizes as measured: docs/REAL_MAPPING_PLAN.md, and the largest square downloaded so far (TQ). English lidar covers the world in 1 m squares, about
+// 7.1 GB for 54 km (scaled by area from 2.2 GB for 30 km), and is not kept.
+const TERRAIN_GB = 0.16, SQUARE_GB = 0.55, LIDAR_GB = 2.2 * (WORLD_KM / 30) ** 2;
 // Estonia's national files, as measured. They are fetched once and serve every Estonian map.
 const ESTONIA_HEIGHTS_GB = 2.2, ESTONIA_FEATURES_GB = 1.3, ESTONIA_SURFACE_GB = 3.8;
 const roundGb = (gb) => `${gb.toFixed(gb < 1 ? 2 : 1)} GB`;
@@ -40,13 +41,13 @@ function needs(point, downloads, lidar) {
 const WORDS = {
   british: {
     fetched: ['Satellite picture'],
-    lidar: 'Include lidar heights: about 10 minutes, England only. Without it, about 2 minutes, with assumed tree and building heights.',
+    lidar: 'Include lidar heights across the world: about 2.5 hours, England only. Without it, about 8 minutes, with assumed tree and building heights.',
     reveals: 'Building reveals this region to the Environment Agency and AWS.',
   },
   estonian: {
     fetched: ['Basic map tiles', 'Satellite picture'],
     lidar: 'Include lidar heights, across the whole map. Without it, assumed tree and building heights.',
-    reveals: 'The national files say nothing about where you are building, but the map tiles and satellite picture reveal this region to the Estonian mapping agency and AWS. Estonian data stops at the national border, so any ground beyond it counts as water.',
+    reveals: 'The national files say nothing about where you are building, but the map tiles and satellite picture reveal this region to the Estonian mapping agency and AWS. Estonian data stops at the national border, so near it Copernicus 30 m heights are fetched from AWS for each whole degree square. They include woods and buildings, so none are drawn past the border.',
   },
 };
 
@@ -101,7 +102,7 @@ export function SiteStatus({ site, decoded, wanted, downloads, onBuilt }) {
   return (
     <div id="site-info">
       <b className="site-ok">Ready to play, nothing to download</b>
-      Start point <b>{gridRef(site.e, site.n, 8)}</b> on {header.name}. The red square is your 14 km world. {allLidar ? 'Lidar heights across this world.' : 'Part or all of this world has no lidar, so its tree and building heights are assumed.'}
+      Start point <b>{gridRef(site.e, site.n, 8)}</b> on {header.name}. The red square is your {WORLD_KM} km world. {allLidar ? 'Lidar heights across this world.' : 'Part or all of this world has no lidar, so its tree and building heights are assumed.'}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { affordable, spend, tally } from './economy.js';
 import { damageDrone } from './drones.js';
 import { canFire, updateMagazine, useRound } from './magazine.js';
 import { crewTask, crewed } from './crew.js';
+import { logShot } from './flight-log.js';
 
 const _v = new Vector3(), _m = new Vector3(), _from = new Vector3(), _near = new Vector3();
 const MISS_COLOUR = 0x90a4ae;
@@ -29,7 +30,7 @@ export function opticalLos(s, d) {
 
 const aimAt = (s, t) => { s.aim = Math.atan2(t.pos.x - s.pos.x, t.pos.z - s.pos.z); };
 
-function launchMissile(w, s, t) {
+function launchMissile(w, s, t, shot) {
   const speed = u(s.def.missileSpeed), track = s.task && w.net.tracks.get(s.task.trackId);
   const pos = muzzle(s).clone();
   // a gun fires straight at its target; a missile or interceptor leaves its launcher climbing, then steers in
@@ -37,6 +38,7 @@ function launchMissile(w, s, t) {
   w.missiles.push({
     def: s.def, pos, vel, target: t, life: (s.def.range / s.def.missileSpeed) * 1.5,
     from: s.pos.distanceTo(t.pos) * WORLD.metresPerUnit, cueError: track?.estErr ?? 0, // what its chance depends on, as it was fired
+    src: s, shot, // for the statistics: who fired it, and the tally its hit counts in
   });
 }
 
@@ -60,13 +62,13 @@ const FIRE = {
     if (t) { aimAt(s, t); s.layT += dt; }
     const firing = !!t && s.layT >= layTime(def) && affordable(w, s) && canFire(s);
     s.beamTarget = firing ? t : null;
-    if (firing && !s.beamOn) { spend(w, s); useRound(w, s); s.beamT = 0; } // a shot is charged when the beam starts, then every second it stays on
+    if (firing && !s.beamOn) { spend(w, s); useRound(w, s); logShot(w, t, def); s.beamT = 0; } // a shot is charged when the beam starts, then every second it stays on
     s.beamOn = firing;
     if (!firing) return;
     s.beamT = (s.beamT || 0) + dt; // a "shot" is a second of beam time
-    while (s.beamT >= 1) { s.beamT -= 1; spend(w, s); useRound(w, s); }
+    while (s.beamT >= 1) { s.beamT -= 1; spend(w, s); useRound(w, s); logShot(w, t, def); }
     const rate = def.dps * evasionFactor(t.evade) * beamFactor(def, s.pos.distanceTo(t.pos) * WORLD.metresPerUnit); // evasion and distance spoil its dwell
-    damageDrone(w, t, rate * dt, def.id);
+    damageDrone(w, t, rate * dt, def.id, s);
   },
   guided(w, s, t) {
     if (t && s.cd <= 0 && !opticalLos(s, t)) t = null;
@@ -78,7 +80,7 @@ const FIRE = {
     if (enoughInAir(w, s, t)) { s.cd = 0.3; return; }
     spend(w, s);
     useRound(w, s);
-    launchMissile(w, s, t);
+    launchMissile(w, s, t, logShot(w, t, def));
   },
   // a jammer's effect is applied to each drone it covers (see drones.js)
   jam(w, s, t, dt) { if (s.mode === 'Jam') s.jamTime = (s.jamTime || 0) + dt; },
@@ -130,8 +132,9 @@ export function updateMissiles(w, dt) {
     if (fuzed || m.life <= 0 || m.pos.y < hereU(m.pos.x, m.pos.z) + 0.2) {
       const hit = fuzed && rand() < hitChance(m.def, { speed: m.target.def.speed, evade: m.target.evade }, m.from, m.cueError);
       if (hit) { // it reaches its target, and its blast anything else close by. A miss costs the round and does nothing.
+        if (m.shot) m.shot.hits++;
         const r = u(m.def.splash);
-        for (const d of drones.slice()) if (d === m.target || d.pos.distanceTo(m.pos) < r) damageDrone(w, d, m.def.damage, m.def.id);
+        for (const d of drones.slice()) if (d === m.target || d.pos.distanceTo(m.pos) < r) damageDrone(w, d, m.def.damage, m.def.id, m.src);
       }
       w.emit('explosion', { pos: m.pos, r: u(m.def.splash) * (hit ? 1 : 0.5), color: hit ? 0xff8844 : MISS_COLOUR });
       missiles.splice(i, 1);

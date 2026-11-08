@@ -2,11 +2,11 @@
 
 import { describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
-import { terrainState } from '../src/sim/terrain.js';
+import { generateTerrain, terrainState } from '../src/sim/terrain.js';
 import { makeWorld, pickMasts, rasterBox } from '../src/sim/world.js';
 import { hereU } from '../src/sim/units.js';
 import { mulberry32 } from '../src/sim/rng.js';
-import { COMMS, STRUCTURES } from '../src/sim/config/index.js';
+import { COMMS, STRUCTURES, TERRAIN, WORLD } from '../src/sim/config/index.js';
 import { MIXED, setUp } from './support/scenarios.js';
 
 const u = (m) => m / 20;
@@ -76,9 +76,10 @@ describe('a world from any source', () => {
 
   // no station, heights relative to the site, a ridge to the north, and a cliff down to sea to the east
   function handMadeWorld() {
-    const grids = emptyGrids(701, 20, 7000);
-    for (let j = 0; j < 701; j++) for (let i = 0; i < 701; i++) {
-      const x = -7000 + i * 20, z = -7000 + j * 20, k = j * 701 + i;
+    const N = 2 * WORLD.radius / 20 + 1; // as big as a real world, so drones start on it
+    const grids = emptyGrids(N, 20, WORLD.radius);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const x = -WORLD.radius + i * 20, z = -WORLD.radius + j * 20, k = j * N + i;
       let h = -0.004 * z + 25 * Math.sin(x / 700) * Math.sin(z / 900);
       if (z < -3000) h += Math.min(330, (-z - 3000) * 0.3);
       if (x > 1700 && x < 2000) h += (2000 - x) * 0.9;
@@ -117,4 +118,16 @@ describe('a world from any source', () => {
     expect(first.lowest).toBeGreaterThan(0);
     expect(play()).toEqual(first);
   }, 120000);
+});
+
+describe('generated ground', () => {
+  it('is made once for a seed and kept, and made afresh for another seed or other figures', () => {
+    const a = generateTerrain('cache-a');
+    expect(generateTerrain('cache-a')).toBe(a);
+    const b = generateTerrain('cache-b');
+    expect(b).not.toBe(a);
+    const relief = TERRAIN.relief;
+    TERRAIN.relief = relief + 1;
+    try { expect(generateTerrain('cache-b')).not.toBe(b); } finally { TERRAIN.relief = relief; }
+  }, 60000);
 });

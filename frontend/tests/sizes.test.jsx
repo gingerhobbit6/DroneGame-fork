@@ -72,9 +72,9 @@ describe('the toolbar', () => {
     fireEvent.click($('[data-catalogue="radar"]'));
     expect(game.getTool()).toBeNull();
     expect(game.catalogue()).toBe('radar');
-    expect($('.tool.active').textContent).toContain('from $');
+    expect($('.tool.active').textContent).toContain('from £');
     act(() => game.setTool('radar_l'));
-    expect($('.tool.active').textContent).toContain('$2.5M');
+    expect($('.tool.active').textContent).toContain('£1.88M');
   });
 
   it('the row\'s button closes its open list, and switches placing off', () => {

@@ -13,7 +13,7 @@ import { view } from '../src/render/view.js';
 import { tilesOver } from '../src/render/map-texture.js';
 import { GameContext } from '../src/ui/hooks.js';
 import { Overlay } from '../src/ui/Overlay.jsx';
-import { MapControls, mapName, nextBaseMap } from '../src/ui/MapControls.jsx';
+import { MapControls, mapName, nextBaseMap, nextGrid } from '../src/ui/MapControls.jsx';
 import { ControlPanel } from '../src/ui/ControlPanel.jsx';
 import { SavedTab } from '../src/ui/dock/SavedTab.jsx';
 import { ringZone } from '../src/zone.js';
@@ -35,7 +35,7 @@ describe('reading a pack file', () => {
     const data = new Uint8Array([1, 2, 3]);
     const { pack, pictures } = await decodePack(await encodePack({ pictures: [{ layer: 'osmap', west: 1, top: 2, width: 3, height: 4, type: 'image/png', data }, { layer: 'evil', west: 1, top: 2, width: 3, height: 4, type: 'text/html', data }] }));
     expect(pack.header.name).toBe('Fixture');
-    expect(pack.grids.ground.length).toBe(801 * 801);
+    expect(pack.grids.ground.length).toBe(2801 * 2801);
     expect(pack.features.names[0][0]).toBe('Testville');
     expect(pictures.map((p) => p.layer)).toEqual(['osmap']);
   });
@@ -52,7 +52,7 @@ describe('reading a pack file', () => {
   });
   it('stops at the declared size, so a small file cannot expand without limit', async () => {
     await expect(damaged((h) => { h.sections[1].rawLength = 10; })).rejects.toThrow(/longer/);
-    await expect(damaged((h) => { h.sections[1].rawLength = 801 * 801 + 5; })).rejects.toThrow(/shorter/);
+    await expect(damaged((h) => { h.sections[1].rawLength = 2801 * 2801 + 5; })).rejects.toThrow(/shorter/);
     await expect(damaged((h) => { h.sections[0].rawLength = 2 ** 40; })).rejects.toThrow(/unreasonable/);
   });
   it('refuses sections outside the file, or missing', async () => {
@@ -65,7 +65,7 @@ describe('the pack store', () => {
   it('lists what the server has, loads once, and survives a stopped server', async () => {
     const buffer = await encodePack();
     const { pack } = await decodePack(buffer);
-    const api = { packs: { list: async () => [{ file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'A', east: CENTRE.east, north: CENTRE.north, half: 8000 }] } };
+    const api = { packs: { list: async () => [{ file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'A', east: CENTRE.east, north: CENTRE.north, half: 28000 }] } };
     const fetchFile = vi.fn(async () => ({ ok: true, blob: async () => new NodeBlob([buffer]) }));
     const store = createPackStore({ api, idb: null, fetchFile });
     const { packs } = await store.list();
@@ -150,13 +150,13 @@ describe('choosing a world', () => {
     HTMLCanvasElement.prototype.getContext = () => null;
     buffer = await encodePack();
     const { pack } = await decodePack(buffer);
-    entry = { file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'Fixture', east: CENTRE.east, north: CENTRE.north, half: 8000, tier: 'lidar', lidarHalf: 7000 };
+    entry = { file: 'a.sgmap', hash: pack.header.gridsSha256, name: 'Fixture', east: CENTRE.east, north: CENTRE.north, half: 28000, tier: 'lidar', lidarHalf: 7000 };
     const api = createFakeApi();
     api.packs = { list: vi.fn(async () => [entry]), downloads: vi.fn(async () => ({ terrain50: true, squares: ['TF'] })), build: vi.fn(async () => ({ running: true, message: 'Starting' })), buildStatus: vi.fn(async () => ({ running: false, ok: true, message: 'Finished' })) };
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, blob: async () => new NodeBlob([buffer]) })));
     vi.stubGlobal('indexedDB', undefined);
     game = createGame({ seed: '1', terrainSeed: '1', api, storage: createFakeStorage() });
-    Object.assign(view, { baseMap: 'os', mapRoads: false, mapGrid: true, mapContours: false, scenery: true, mapPanel: true, mapLoading: false, startAt: null, planView: false, me: null, osm: false, zone: null, wizard: 'closed' });
+    Object.assign(view, { baseMap: 'os', mapRoads: false, mapGrid: 'national', mapContours: false, scenery: true, mapPanel: true, mapLoading: false, startAt: null, planView: false, me: null, osm: false, zone: null, wizard: 'closed' });
     history.replaceState(null, '', '/');
   });
   afterEach(() => { cleanup(); resetAllFigures(); vi.unstubAllGlobals(); });
@@ -296,16 +296,17 @@ describe('choosing a world', () => {
     await until(() => $('#pack-needs'));
     expect(rows()[0]).toContain('On this computer');
     expect(rows()[1]).toMatch(/OS maps of TF.*On this computer/);
-    expect(rows()[2]).toMatch(/Lidar.*Download, up to about 0\.50 GB/);
-    expect($('#pack-build').textContent).toContain('Up to about 0.50 GB to download');
+    expect(rows()[2]).toMatch(/OS maps of TG.*Download, up to about 0\.55 GB/); // a 70 km pack here reaches into TG
+    expect(rows()[3]).toMatch(/Lidar.*Download, up to about 7\.1 GB/);
+    expect($('#pack-build').textContent).toContain('Up to about 7.7 GB to download');
     type('#site-ref', '56.8, -5'); // in NN, which it does not
     fireEvent.click($('#site-ref-go'));
     await until(() => $('#pack-build').textContent.includes('NN'));
-    expect(rows()[1]).toMatch(/OS maps of NN.*Download, up to about 0\.55 GB/);
-    expect($('#pack-build').textContent).toContain('Up to about 1.1 GB to download');
+    expect(rows()[1]).toMatch(/OS maps of NG, NH, NM, NN.*Download, up to about 2\.2 GB/); // a 70 km pack here reaches into three more
+    expect($('#pack-build').textContent).toContain('Up to about 9.3 GB to download');
     fireEvent.click($('#pack-lidar'));
     expect(rows().join()).not.toContain('Lidar');
-    expect($('#pack-build').textContent).toContain('Up to about 0.55 GB to download');
+    expect($('#pack-build').textContent).toContain('Up to about 2.2 GB to download');
   }, 30000);
   it('offers an Estonian map with its own downloads, and sends the build on the Estonian grid', async () => {
     game.api.packs.downloads = vi.fn(async () => ({ terrain50: true, squares: ['SU'], estonia: { heights: true, features: false, surface: false } }));
@@ -495,6 +496,23 @@ describe('choosing a world', () => {
       expect($('#map-overlay-scenery').getAttribute('aria-pressed')).toBe('false');
       fireEvent.click($('#map-close'));
       expect($('#map-panel')).toBeNull();
+    }, 30000);
+    it('shows the national grid or MGRS, and reads the cursor out on the one showing', async () => {
+      await deployed();
+      const v = fakeView();
+      game.getView = () => v; // one view: a new one each render would restart the map previews for ever
+      game.cursor = () => ({ x: 0, z: 0 });
+      show(<MapControls />);
+      expect($('#map-grid-national').textContent).toBe('OS grid');
+      expect($('#map-grid-national').getAttribute('aria-pressed')).toBe('true');
+      expect($('#map-here').textContent).toMatch(/^SU \d{3} \d{3}, /);
+      fireEvent.click($('#map-grid-mgrs'));
+      expect(view.mapGrid).toBe('mgrs');
+      expect($('#map-grid-mgrs').getAttribute('aria-pressed')).toBe('true');
+      expect($('#map-here').textContent).toMatch(/^30U [A-Z]{2} \d{3} \d{3}, /);
+      fireEvent.click($('#map-grid-mgrs'));
+      expect(view.mapGrid).toBe(false);
+      expect([nextGrid('national'), nextGrid('mgrs'), nextGrid(false)]).toEqual(['mgrs', false, 'national']);
     }, 30000);
     it('leaves the demo credit behind on a real map', async () => {
       await deployed();

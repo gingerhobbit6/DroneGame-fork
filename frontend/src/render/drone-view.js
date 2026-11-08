@@ -7,6 +7,7 @@ import { droneTemplate } from './models.js';
 import { drawScale } from './drone-models.js';
 import { hexCss } from './labels.js';
 import { view } from './view.js';
+import { createTrail } from './trail.js';
 
 const barGeo = new THREE.PlaneGeometry(2, 0.25).translate(1, 0, 0);
 const dropGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)]);
@@ -46,7 +47,7 @@ export function createDroneViews(scene, sim, labels, camera) {
       fibre.frustumCulled = false;
       scene.add(fibre);
     }
-    const v = { group, model, unseen, rotors, bar, fill, fillMat, drop, dropMat, fibre, hp: d.hp, phase: (d.uid * 1.7) % 6, label: labels.make(def.label, hexCss(def.color), 'dlabel') };
+    const v = { group, model, unseen, rotors, bar, fill, fillMat, drop, dropMat, fibre, trail: createTrail(scene, def.color), hp: d.hp, phase: (d.uid * 1.7) % 6, label: labels.make(def.label, hexCss(def.color), 'dlabel') };
     views.set(d, v);
     return v;
   }
@@ -55,7 +56,7 @@ export function createDroneViews(scene, sim, labels, camera) {
     v.label.remove();
     scene.remove(v.group);
     if (v.fibre) { scene.remove(v.fibre); v.fibre.geometry.dispose(); v.fibre.material.dispose(); }
-    v.fillMat.dispose(); v.dropMat.dispose();
+    v.fillMat.dispose(); v.dropMat.dispose(); v.trail.dispose();
     views.delete(d);
   }
 
@@ -66,6 +67,8 @@ export function createDroneViews(scene, sim, labels, camera) {
       const v = views.get(d) || create(d);
       const tracked = d.detected;
       v.group.visible = view.truth;
+      v.trail.push(d.pos); // kept while hidden, so switching it on shows the whole flight
+      v.trail.line.visible = view.trails && view.truth;
       v.model.visible = tracked;
       v.unseen.visible = !tracked;
       v.bar.visible = tracked;
@@ -101,6 +104,6 @@ export function createDroneViews(scene, sim, labels, camera) {
         labels.place(v.label, d.pos.x, d.pos.y + Math.max(d.def.size * v.group.scale.y * 0.7, 0.004 * view.zoom), d.pos.z, view.labels && view.truth && view.replayT == null);
       }
     },
-    hide() { for (const v of views.values()) { v.group.visible = false; if (v.fibre) v.fibre.visible = false; v.label.style.display = 'none'; } },
+    hide() { for (const v of views.values()) { v.group.visible = false; v.trail.line.visible = false; if (v.fibre) v.fibre.visible = false; v.label.style.display = 'none'; } },
   };
 }

@@ -16,6 +16,7 @@ import { view } from '../render/view.js';
 import { stateWord } from './dock/NetworkSide.jsx';
 import { SiteRange } from './SiteRange.jsx';
 import { UnitEditor } from './UnitEditor.jsx';
+import { Movable } from './Movable.jsx';
 
 const km = (metres) => `${(metres / 1000).toFixed(1)} km`;
 const plural = (n, word) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
@@ -251,7 +252,7 @@ function UnitCard({ s, game }) {
   const editing = side === 'configure' && !frame;
   const ranging = side === 'range' && !frame;
   return (
-    <div id="unit-panel" className="panel" role="region" aria-label={`Selected system: ${s.short}`}>
+    <Movable id="unit-panel" title="Selected system" role="region" aria-label={`Selected system: ${s.short}`}>
       <div className="up-head" style={{ borderLeftColor: hex(def.color) }}>
         <b>{s.short} · {s.custom?.name || def.name}</b>
         {!frame && <button id="unit-eye" className="up-eye" aria-pressed={view.eye === s} title="Watch from the top of its mast: what it engages or tracks, and the drones and rounds coming in" onClick={() => game.lookFrom(view.eye === s ? null : s)}>{view.eye === s ? 'Map view' : 'View from here'}</button>}
@@ -283,7 +284,7 @@ function UnitCard({ s, game }) {
       {isEffector && !frame && <Totals def={def} ledger={ledger} />}
       <Row label="Modelled on">{def.ref.analogues.join(', ')}<span className="muted">{def.ref.confidence}</span></Row>
       </>}
-    </div>
+    </Movable>
   );
 }
 

@@ -9,6 +9,8 @@ import { useGame, useTick } from '../hooks.js';
 import { STEP_IDS, firstOpen, stepStatus, undone } from './guide.js';
 import { STEPS } from './steps.jsx';
 import { useMovable } from '../useMovable.js';
+import { runStats } from '../../sim/stats.js';
+import { StatsHeadline } from '../RunStats.jsx';
 
 const DOCK_TAB = { network: 'network', coverage: 'plan', refine: 'systems' };
 const Icon = () => <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6.5" /><path d="M8 8 L13 4" /><circle cx="8" cy="8" r="1" /></svg>;
@@ -35,8 +37,8 @@ function MovedBack({ id, onGo, onStay }) {
   const { sim } = useGame();
   const noRadar = id === 'sensors' && !sim.structures.some((s) => s.def.kind === 'radar');
   const text = {
-    sensors: noRadar ? ['You sold your only radar', 'Your other sensors give direction but no range, so tracks will be vague. Add a radar, or carry on if that is the test you want.'] : ['Your sensors have changed', 'You now have only one kind of sensor, so it will miss what the others would have seen.'],
-    effectors: ['A drone type has no answer now', 'Something you sold was the only answer to one of the drone types.'],
+    sensors: noRadar ? ['You removed your only radar', 'Your other sensors give direction but no range, so tracks will be vague. Add a radar, or carry on if that is the test you want.'] : ['Your sensors have changed', 'You now have only one kind of sensor, so it will miss what the others would have seen.'],
+    effectors: ['A drone type has no answer now', 'Something you removed was the only answer to one of the drone types.'],
     network: ['Something is offline', 'A system has no link, so it cannot report or be tasked.'],
   }[id];
   return (
@@ -52,13 +54,14 @@ function MovedBack({ id, onGo, onStay }) {
 }
 
 // Opened during a run: what got through so far, and only what can still change.
-function RunCard() {
-  const { state, ledger } = useGame().sim;
+function RunCard({ openDock }) {
+  const { sim } = useGame(), { state, ledger } = sim, stats = runStats(sim);
   const leaks = Object.entries(ledger.leaked).filter(([, n]) => n > 0);
   return (
     <>
       <h2>Wave {state.wave} {state.waveActive ? 'in progress' : 'held'}</h2>
       <p>{leaks.length ? `Got through so far: ${leaks.map(([type, n]) => `${n} ${DRONES[type].name}`).join(', ')}.` : 'Nothing has reached the site so far.'}</p>
+      {stats.drones.launched > 0 && <StatsHeadline stats={stats} onOpen={() => openDock('stats')} />}
       <p>The laydown is locked for this run, but you can still change engagement authority and jam bands. Reset run starts again with the same systems.</p>
     </>
   );
@@ -126,7 +129,7 @@ export function Wizard({ openDock, closeDock }) {
         <button aria-label="Collapse the wizard" title="Collapse" onClick={() => game.setViewOption('wizard', 'collapsed')}>_</button>
         <button aria-label="Close the wizard" title="Close" onClick={() => game.setViewOption('wizard', 'closed')}>×</button>
       </div>
-      {live ? <RunCard /> : (
+      {live ? <RunCard openDock={openDock} /> : (
         <>
           <div className="wz-progress">
             {STEP_IDS.map((sid, i) => <button key={sid} aria-label={`Step ${i + 1}: ${STEPS[sid].title}`} title={STEPS[sid].title} className={i <= step ? 'on' : ''} onClick={() => goTo(sid)} />)}

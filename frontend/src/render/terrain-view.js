@@ -21,7 +21,8 @@ export function buildWorldView(scene, data, siteMat) {
   const vs = data.geo ? 1 : TERRAIN.visualScale; // on a real map, models are true to its scale
 
   // ---------- ground ----------
-  const stride = data.geo ? 2 : Math.max(1, TERRAIN.meshStride); // mesh vertex every few grid cells; the sim grid is finer
+  // mesh vertex every few grid cells; the sim grid is finer. At most 540 segments a side keeps a 54 km world near 580,000 triangles
+  const stride = Math.max(1, TERRAIN.meshStride, Math.ceil((data.N - 1) / 540));
   const seg = Math.floor((data.N - 1) / stride);
   const geo = new THREE.PlaneGeometry(u(2 * R), u(2 * R), seg, seg).rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -229,7 +230,7 @@ export function drapedRing(radiusU, thicknessU, color, opacity, segs = 160, lift
 }
 
 // Shaded relief for the plan map: north is up, covering the whole terrain.
-export function makeHillshade(data, size = 320) {
+export function makeHillshade(data, size = Math.round(data.R / 22)) { // about 44 m a pixel, whatever the world's size
   const cv = document.createElement('canvas');
   cv.width = cv.height = size;
   const g = cv.getContext('2d');

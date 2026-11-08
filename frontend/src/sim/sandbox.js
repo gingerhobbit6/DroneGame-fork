@@ -26,9 +26,10 @@ export function launchSandboxWave(w) {
 // bearingDeg is a compass bearing, or 'rand'
 export function launchSandboxAttack(w, { type, count, bearingDeg, gap }) {
   const { state } = w;
+  const dist = rand(); // one launch area for a set bearing; random bearings each roll their own
   for (let i = 0; i < count; i++) {
     const bearing = (bearingDeg === 'rand' ? rand() * 360 : Number(bearingDeg)) * Math.PI / 180 - Math.PI / 2; // compass bearing to a scene angle
-    state.sbQueue.push({ t: state.sbTime + i * gap, type, bearing, jitter: 0, altFrac: rand() });
+    state.sbQueue.push({ t: state.sbTime + i * gap, type, bearing, jitter: 0, altFrac: rand(), dist: bearingDeg === 'rand' ? rand() : dist });
   }
   state.sbQueue.sort(byTime);
 }

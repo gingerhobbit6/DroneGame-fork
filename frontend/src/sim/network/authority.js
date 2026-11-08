@@ -5,9 +5,9 @@
 
 import * as S from '../sapient.js';
 import { FUSION } from '../config/index.js';
+import { pounds } from '../economy.js';
 
 const ALERT = { information: 'ALERT_TYPE_INFORMATION', warning: 'ALERT_TYPE_WARNING', critical: 'ALERT_TYPE_CRITICAL' };
-const usd = (v) => '$' + Math.round(v).toLocaleString('en-US');
 
 export function createAlerts(core) {
   const { mpu, fusion, gui, send } = core;
@@ -36,7 +36,7 @@ export function createAuthority(core, { raiseAlert, ackAlert }, approveEngagemen
   }
   const isPending = (s, tr) => pending.some((p) => p.s === s && p.tr.id === tr.id);
   function requestApproval(s, tr) {
-    const cost = s.def.shotCost ? `, ${usd(s.def.shotCost)} per shot` : '';
+    const cost = s.def.shotCost ? `, ${pounds(s.def.shotCost)} per shot` : '';
     const text = `Authorise ${s.name} to engage ${tr.short} (${tr.model ?? (tr.airframe === 'Unknown' ? 'unclassified' : tr.airframe)})${cost}?`;
     const alertId = raiseAlert('warning', `Engagement request: ${text}`, null, 'DISCRETE_PRIORITY_HIGH', tr, false);
     const req = { id: alertId, alertId, s, tr, t0: T(), text };

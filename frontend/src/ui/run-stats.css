@@ -1,0 +1,33 @@
+/* The run's statistics (RunStats.jsx): in the HUD, the wizard, the SAPIENT dock and the end card. */
+.st-head { margin-top: 8px; }
+.st-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.st-tiles div { background: #13213a; border: 1px solid #22344f; border-radius: 4px; padding: 3px 5px; min-width: 0; }
+.st-tiles b { display: block; color: #fff; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-tiles span { display: block; color: #7f93b2; font-size: 10px; line-height: 12px; }
+.st-open { margin-top: 6px; width: 100%; padding: 3px 8px; font-size: 12px; }
+.run-stats { font-size: 12px; color: #b9c7dc; }
+.run-stats h3 { margin: 12px 0 4px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #7f93b2; }
+.st-waves { display: flex; flex-wrap: wrap; gap: 4px; }
+.st-waves button { padding: 2px 8px; font-size: 12px; }
+.st-waves button.active { border-color: #4fc3f7; color: #fff; }
+.st-drones { margin: 8px 0 0; }
+.st-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 16px; }
+.st-list { margin: 0; }
+.st-list div { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; border-bottom: 1px solid #1a2740; }
+.st-list dt { color: #9fb2cf; }
+.st-list dd { margin: 0; color: #fff; text-align: right; }
+.st-table { overflow-x: auto; }
+.st-table th[scope=row] { color: #dbe4f0; font-weight: 500; white-space: nowrap; }
+.st-table th[scope=row] i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.st-table td { white-space: nowrap; }
+.st-chart { margin: 8px 0 0; }
+.st-bars { display: flex; align-items: flex-end; gap: 2px; height: 72px; border-bottom: 1px solid #2f4468; }
+.st-bar { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.st-bar span { font-size: 10px; color: #dbe4f0; line-height: 12px; }
+.st-bar i { width: 70%; min-height: 0; background: #4fc3f7; border-radius: 4px 4px 0 0; }
+.st-bar:hover i { background: #81d4fa; }
+.st-axis { display: flex; gap: 2px; }
+.st-axis span { flex: 1; text-align: center; font-size: 10px; color: #7f93b2; }
+.st-chart figcaption { font-size: 10px; color: #7f93b2; margin-top: 2px; }
+.st-note { margin-top: 10px; }
+.card.game-over .run-stats { grid-column: 1 / -1; border-top: 1px solid #263754; padding-top: 8px; }

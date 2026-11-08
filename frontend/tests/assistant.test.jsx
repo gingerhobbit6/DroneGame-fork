@@ -36,7 +36,7 @@ describe('getting started', () => {
   it('shows the purpose, and no wizard, before deploying', () => {
     page();
     expect($('.card h1').textContent).toBe('Defend a site');
-    expect($('.card').textContent).toContain('$15M');
+    expect($('.card').textContent).toContain('£11.3M');
     expect($('#btn-wizard')).toBeNull();
     expect($('#wizard')).toBeNull();
   });
@@ -288,7 +288,7 @@ describe('following the game', () => {
     goToStep(5);
     act(() => { game.commands.sell(30, 0); });
     expect($('#wizard').textContent).toContain('BACK TO STEP 2 OF 9');
-    expect(title()).toBe('You sold your only radar');
+    expect(title()).toBe('You removed your only radar');
     click('Carry on');
     expect(title()).toBe('Check what it can see');
   });

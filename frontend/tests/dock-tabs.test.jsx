@@ -76,7 +76,9 @@ describe('learn tab', () => {
   }, 30000);
 
   it('follows a track through its messages', () => {
-    running(MIXED, 3600);
+    running(MIXED, 0);
+    const tracked = () => [...game.sim.net.tracks.values()].some((t) => t.short);
+    for (let n = 0; n < 20000 && !tracked(); n += 200) game.sim.run(200); // drones start 13 km out, so play until one is tracked
     openDock('learn');
     refresh();
     const tr = [...game.sim.net.tracks.values()].find((t) => t.short);
@@ -107,7 +109,7 @@ describe('cost tab', () => {
     const text = $('#cost').textContent;
     expect(text).toContain('Medium radar');
     expect(text).toContain('terminal');
-    expect(text).toMatch(/\$[\d.]+ of shots/);
+    expect(text).toMatch(/£[\d.]+ of shots/);
     expect(text).toContain('Lost to enemy strikes');
     expect($('#cost a')).not.toBeNull();
   }, 60000);

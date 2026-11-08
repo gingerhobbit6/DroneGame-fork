@@ -16,6 +16,7 @@ from .grid import CELL, Window
 
 PYLON_SPACING = 260  # TERRAIN.pylonSpacing in the game
 CORRIDOR_M = 50
+MAX_BUILDINGS = 500_000  # MAX_BUILDINGS in frontend/src/sim/world-pack.js: the game refuses a pack with more
 
 
 class OpenMap:
@@ -85,6 +86,9 @@ def feature_lists(window: Window, houses, power, roads, road_fields, names, name
             if 0 <= i < window.side and 0 <= j < window.side and bldg[j, i]:
                 row[4] = int(bldg[j, i])
             rows.append(row)
+    if len(rows) > MAX_BUILDINGS:  # a city has more: keep the nearest. Line of sight still has them all, from the bldg grid
+        rows.sort(key=lambda r: r[0] ** 2 + r[1] ** 2)
+        del rows[MAX_BUILDINGS:]
     lines = []
     for line in power:
         if line.geom_type == "LineString" and line.length > 0:

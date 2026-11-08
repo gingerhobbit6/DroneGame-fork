@@ -23,7 +23,7 @@ PatrolVehicle = Literal["patria", "hilux", "mule"]  # PATROL_VEHICLES in fronten
 MAX_ESCORTS = 6
 MAX_ESCORT_GAP = 200  # metres along the route, ahead of the people or (negative) behind
 
-WORLD_LIMIT = 350  # scene units: the ground reaches 7 km from the site, at 20 m a unit
+WORLD_LIMIT = 1350  # scene units: the ground reaches 27 km from the site (WORLD.radius), at 20 m a unit
 MAX_SYSTEMS = 200
 MAX_COMMANDS = 20_000
 MAX_UNIT_SETTINGS = 16

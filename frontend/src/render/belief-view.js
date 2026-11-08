@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { WORLD } from '../sim/config/index.js';
 import { u } from '../sim/units.js';
 import { view } from './view.js';
+import { createTrail } from './trail.js';
 
 const CLASS_COLOUR = { Unknown: 0xffffff, Multirotor: 0xff5a3c, 'Fixed wing': 0xe040fb };
 const CLASS_DIM = { Unknown: 0x9aa4b4, Multirotor: 0xa8938e, 'Fixed wing': 0x9d93aa };
@@ -41,13 +42,14 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
     const label = document.createElement('div');
     label.className = 'tlabel';
     labelLayer.appendChild(label);
-    return { group, diamond, ring, link, label, pos: new THREE.Vector3(), placed: false };
+    return { group, diamond, ring, link, label, trail: createTrail(scene, 0x9aa4b4), pos: new THREE.Vector3(), placed: false };
   }
 
   function disposeBelief(b) {
     scene.remove(b.group, b.link);
     b.diamond.material.dispose(); b.ring.material.dispose(); b.link.geometry.dispose(); b.link.material.dispose();
     b.label.remove();
+    b.trail.dispose();
   }
 
   function update() {
@@ -66,6 +68,9 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
       b.diamond.scale.setScalar(size);
       b.group.position.copy(b.pos);
       b.group.visible = true;
+      b.trail.push(b.pos); // what the fusion node believes it has flown
+      b.trail.line.visible = view.trails && !view.truth;
+      b.trail.line.material.color.setHex(colour);
       const errU = Math.max(u(tr.estErr || 0), 0.001);
       b.ring.scale.set(errU, 1, errU);
       b.link.visible = view.truth && !!tr.drone;
@@ -109,7 +114,7 @@ export function createBeliefViews(scene, net, camera, labelLayer) {
     update,
     clear() { for (const b of beliefs.values()) disposeBelief(b); beliefs.clear(); },
     hide() {
-      for (const b of beliefs.values()) { b.group.visible = false; b.link.visible = false; b.label.style.display = 'none'; }
+      for (const b of beliefs.values()) { b.group.visible = false; b.link.visible = false; b.trail.line.visible = false; b.label.style.display = 'none'; }
       for (const r of rayPool) r.visible = false;
     },
   };

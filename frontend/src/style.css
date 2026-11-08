@@ -121,8 +121,6 @@ button:hover { background: #243759; }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: #1565c0; border-color: #1e88e5; color: #fff; font-weight: 600; }
 button.primary:hover:not(:disabled) { background: #1976d2; }
-button.speed { flex: 1; padding: 4px 0; }
-button.speed.active { background: #2f4468; border-color: #5c7bb0; }
 
 #tuning { top: 12px; left: 262px; width: 270px; max-height: calc(100vh - 24px); overflow-y: auto; font-size: 12px; }
 
@@ -217,7 +215,14 @@ table.mini i { display: inline-block; width: 9px; height: 9px; border-radius: 50
 #status .warn { color: #ffb74d; }
 
 #toolbar { display: flex; flex-direction: column; gap: 3px; padding: 6px; flex: 0 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-#tool-sell { position: sticky; bottom: -6px; flex-shrink: 0; background: #1a2740; z-index: 1; }
+/* Remove stands apart from the kit above it: a gap and a rule, and red, as it takes a system off the map */
+#tool-sell { position: sticky; bottom: -6px; flex-shrink: 0; z-index: 1; margin-top: 10px; background: #2a1820; border-color: #5e3440; border-left-color: #e57373;
+  box-shadow: 0 -10px 0 rgba(12, 20, 34, 0.96); }
+#tool-sell::before { content: ''; position: absolute; left: 2px; right: 2px; top: -6px; border-top: 1px solid #2f4468; }
+#tool-sell .n { color: #ff9e8f; display: flex; align-items: center; gap: 5px; }
+#tool-sell .c { color: #c9a0a0; }
+#tool-sell:hover { background: #3a1d27; }
+#tool-sell.active { background: #4a1f29; border-color: #ff8a80; box-shadow: 0 -10px 0 rgba(12, 20, 34, 0.96), 0 0 0 1px #ff8a80 inset; }
 .tool { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "n c" "k s"; align-items: baseline; column-gap: 8px; text-align: left; padding: 3px 8px 3px 9px; border-left-width: 4px; border-top-width: 1px; }
 .tool .n { grid-area: n; font-weight: 600; font-size: 13px; white-space: nowrap; }
 .tool .c { grid-area: c; font-size: 12px; color: #ffd54f; text-align: right; }

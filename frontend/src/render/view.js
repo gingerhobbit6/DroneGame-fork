@@ -9,9 +9,10 @@ export const view = {
   labels: true, // name tags on every system and drone
   rings: true, // range rings on every system
   trackHi: false, // colour tracks by classification instead of drawing them faint and grey
+  trails: false, // a line behind each drone of where it has flown: the real drone with the truth overlay, its track without
   baseMap: 'os', // a real world's picture: 'os', 'light', 'dark', 'satellite', 'hybrid', 'topo', 'relief' or 'live'
   mapRoads: false, // roads and names on the map: with satellite, this is the hybrid view
-  mapGrid: true, // the national grid on the map
+  mapGrid: 'national', // the grid on the map: 'national' (the OS or Estonian grid), 'mgrs', or false for none
   mapContours: false, // height lines on the map
   scenery: true, // the 3D trees and buildings on a real map. Hiding them only changes the picture, not the rules
   mapPanel: false, // the map switcher is open

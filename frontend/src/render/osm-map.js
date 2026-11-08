@@ -3,8 +3,10 @@
 // shortcut: a fixed area and one zoom, needing internet, and the picture does not affect sight lines. Real map packs replace this (docs/REAL_MAPPING_PLAN.md).
 
 import * as THREE from 'three';
+import { WORLD } from '../sim/config/index.js';
 
-export const OSM = { lat: 51.42, lon: -1.73, zoom: 14, halfMetres: 7000, canvas: 2400, url: 'https://tile.openstreetmap.org' };
+export const OSM = { lat: 51.42, lon: -1.73, zoom: 12, halfMetres: WORLD.radius, canvas: 2400, // zoom 12: about 9 x 9 tiles across 54 km
+  url: 'https://tile.openstreetmap.org' };
 const FULL_ROUND = 156543.03392; // metres per pixel at the equator, at zoom 0, for 256 px tiles
 
 // The tiles that cover the square, and where each one goes on a canvas of `size` pixels.

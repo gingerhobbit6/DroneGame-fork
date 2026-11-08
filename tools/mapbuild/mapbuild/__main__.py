@@ -9,9 +9,11 @@ from datetime import date
 
 import numpy as np
 
-from . import download, estonia, features, fit, packfile, pictures, terrain
+from . import beyond, download, estonia, features, fit, packfile, pictures, terrain
 from .estonia import Inputs
 from .grid import Window, parse_grid_ref
+
+WORLD_KM = 54  # a world is this wide (WORLD.radius in frontend/src/sim/config/world.js), so a pack must be wider
 
 SOURCES = {
     "osmap": "Contains OS data © Crown copyright and database right",
@@ -41,13 +43,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", required=True, help="the name shown in the game")
     parser.add_argument("--data", required=True, help="the folder of downloads: terrain50, openmap_su, vmd_su and so on, or the national files for Estonia")
     parser.add_argument("--out", required=True, help="the .sgmap file to write")
-    parser.add_argument("--size", type=int, default=30, help="the width of the pack in km (default 30)")
-    parser.add_argument("--lidar-km", type=int, default=14, help="the width of the middle part with lidar heights, in km. 0 for none. In Great Britain, England only.")
+    parser.add_argument("--size", type=int, default=70, help="the width of the pack in km (default 70: a 54 km world, with 8 km of room to move it each way)")
+    parser.add_argument("--lidar-km", type=int, default=54, help="the width of the middle part with lidar heights, in km. 0 for none. In Great Britain, England only.")
     parser.add_argument("--fetch", action="store_true", help="download any files that are missing from --data")
     parser.add_argument("--no-satellite", action="store_true", help="leave out the satellite picture")
     args = parser.parse_args(argv)
-    if args.size % 2 or args.lidar_km % 2 or not 16 <= args.size <= 60 or args.lidar_km > args.size:
-        parser.error("--size must be even, from 16 to 60, and --lidar-km must be even and no bigger than --size")
+    if args.size % 2 or args.lidar_km % 2 or not WORLD_KM + 2 <= args.size <= 80 or args.lidar_km > args.size:
+        parser.error(f"--size must be even, from {WORLD_KM + 2} to 80, and --lidar-km must be even and no bigger than --size")
 
     began = time.time()
     say = lambda text: print(f"[{time.time() - began:5.0f}s] {text}", flush=True)
@@ -62,19 +64,24 @@ def main(argv: list[str] | None = None) -> int:
         else:
             download.ensure(args.data, window.squares(), say)
 
-    source = estonia.gather(args.data, window, args.lidar_km, say) if estonian else british(args.data, window, args.lidar_km, say)
+    source = estonia.gather(args.data, window, args.lidar_km, say, args.fetch) if estonian else british(args.data, window, args.lidar_km, say)
     cover = features.cover_grid(window, source.wood, source.houses, source.power, source.water, source.no_data)
     ground, canopy, bldg, cover = terrain.combine(window, source.base, source.lidar, cover, cover == 1, cover == 2)
     grids = packfile.Grids(ground, canopy, bldg, cover)
     packfile.check(grids)
 
     feature_lists = features.feature_lists(window, source.houses, source.power, source.roads, source.road_fields, source.names, source.name_fields, bldg)
+    if len(feature_lists["buildings"]) < len(source.houses):
+        say(f"buildings: the {len(feature_lists['buildings'])} nearest the middle are drawn; line of sight has all {len(source.houses)}")
     map_pictures = estonia.base_map(window, say) if estonian else pictures.os_map(args.data, window, say)
+    if estonian and source.past.any():  # the basic map is blank past the border, so the game shades that ground from its heights
+        feature_lists["beyond"] = beyond.rings(window, beyond.reaching(window, beyond.blank_posts(window, map_pictures), source.past))
+        say(f"past the border: {len(feature_lists['beyond'])} outlines to shade from heights")
     this_year = date.today().year
     sat_pictures, sat_year = ([], None) if args.no_satellite else pictures.satellite(window, [this_year - 1, this_year - 2], say, crs)
 
     if estonian:
-        credits = estonia.credits(args.lidar_km, this_year)
+        credits = estonia.credits(args.lidar_km, this_year, source.copernicus, source.geonames)
     else:
         credits = {"osmap": f"{SOURCES['osmap']} {this_year}"}
         if args.lidar_km:

@@ -196,7 +196,7 @@ describe('auto-start', () => {
     sim.state.warnedWire = true;
     sim.commands.setAutoStart(true);
     sim.commands.startWave();
-    for (let i = 0; i < 40 && sim.state.wave < 2; i++) sim.run(200);
+    for (let i = 0; i < 100 && sim.state.wave < 2; i++) sim.run(200);
     sim.commands.setAutoStart(false);
     expect(sim.state.wave).toBe(2);
   }, 30000);
@@ -210,9 +210,9 @@ describe('sandbox', () => {
     const budget = sim.state.budget;
     sim.commands.setSandboxLevel(4);
     sim.commands.launchSandboxWave();
-    sim.commands.launchSandboxAttack({ type: 'fw', count: 3, bearingDeg: 'rand', gap: 1 });
+    sim.commands.launchSandboxAttack({ type: 'fw', count: 8, bearingDeg: 'rand', gap: 0 }); // more than the missile's magazine, so some reach the site
     sim.commands.launchSandboxAttack({ type: 'fo', count: 2, bearingDeg: 90, gap: 0 });
-    sim.run(6000);
+    for (let n = 0; n < 30000 && (sim.drones.length || sim.state.sbQueue.length); n += 500) sim.run(500); // the fixed-wing come from the map edge
     expect(sim.state.health).toBe(100);
     expect(sim.structures.length).toBe(3);
     expect(sim.state.budget).toBe(budget);

@@ -1,4 +1,4 @@
-// Real worlds. A pack holds the grids for a large area, and a world is a 14 km square cut from it around the chosen site.
+// Real worlds. A pack holds the grids for a large area, and a world is a square cut from it around the chosen site, 2 x WORLD.radius across.
 // A world's identity is one short string, so saved laydowns and runs carry it the same way as a terrain seed.
 
 import { WORLD } from './config/index.js';
@@ -7,7 +7,7 @@ import { hashSeed, mulberry32 } from './rng.js';
 import { gridRef } from './grids.js';
 
 const ID = /^pack:([0-9a-f]{32}):(\d{6}):(\d{7}):real$/;
-const CELL = 20, MAX_N = 3001, WATER = 4;
+const CELL = 20, MAX_N = 4001, WATER = 4; // 80 km at most
 const MAX_BUILDINGS = 500000;
 
 export const parseWorldId = (world) => {
@@ -22,7 +22,8 @@ const finiteList = (v, n) => Array.isArray(v) && v.length === n && v.every(Numbe
 // Checks everything the rules will trust. Grids are { ground: Float32Array, canopy, bldg, cover: Uint8Array }.
 export function parsePack(header, grids, features) {
   const { N, cell, half, east, north, gridsSha256 } = header || {};
-  if (!Number.isInteger(N) || N < 701 || N > MAX_N || N % 2 === 0) throw new Error('This pack has an unexpected size.');
+  if (!Number.isInteger(N) || N > MAX_N || N % 2 === 0) throw new Error('This pack has an unexpected size.');
+  if (N < (2 * WORLD.radius) / CELL + 1) throw new Error(`This pack is smaller than a ${(2 * WORLD.radius) / 1000} km world. Build it again at a larger size.`);
   if (cell !== CELL || half !== ((N - 1) * CELL) / 2) throw new Error('This pack has an unexpected grid.');
   if (!Number.isInteger(east) || !Number.isInteger(north) || east % CELL || north % CELL) throw new Error('This pack is not on the national grid.');
   if (!/^[0-9a-f]{64}$/.test(gridsSha256 || '')) throw new Error('This pack has no valid fingerprint.');
@@ -48,7 +49,7 @@ export function siteProblem(pack, e0, n0) {
 }
 
 export const snap = (v) => Math.round(v / CELL) * CELL;
-export const BUILT_HALF = 15000; // how far a pack built from the start screen reaches from its middle: the builder's default of 30 km across
+export const BUILT_HALF = 35000; // how far a pack built from the start screen reaches from its middle: the builder's default of 70 km across
 
 // Longitude and latitude of a point in metres east and north of the site, from the pack's fit.
 export function latLonOf(geo, eastM, northM) {

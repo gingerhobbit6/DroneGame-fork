@@ -9,6 +9,7 @@ import { blindSpeed, classifiesAt, coverArc, elevationBand, inCover, outwardFrom
 import { IDENTIFY_PX, airframeConfidence, hasZoom, pixelsOn } from '../camera-model.js';
 import { LIBRARIES, bandGhz, covers, heardBand, libraryKnows } from '../rf-model.js';
 import { deafAt } from '../jamming.js';
+import { logSeen } from '../flight-log.js';
 import { RB_UNITS, rbDatum, round, clamp } from './core.js';
 
 export { reachFor };
@@ -181,11 +182,12 @@ export function createSensors(core, feed) {
   function scan(s) {
     s.scanId = (s.scanId || 0) + 1;
     const found = [];
+    const c = ctx.siteCentre(), m = mpu();
     for (const d of ctx.drones) {
       const p = pd(s, d);
-      if (p > 0 && rand() < p) found.push(measure(s, d));
+      if (p > 0 && rand() < p) { found.push(measure(s, d)); logSeen(d, s.def.id, T(), rel(s, d).rng, Math.hypot(d.pos.x - c.x, d.pos.z - c.z) * m); }
     }
-    if (s.def.falseAlarm && rand() < s.def.falseAlarm) { const f = measure(s, null); if (f) found.push(f); }
+    if (s.def.falseAlarm && rand() < s.def.falseAlarm) { const f = measure(s, null); if (f) { found.push(f); ctx.onFalseAlarm?.(s.def.id); } }
     s.detections = (s.detections || 0) + found.length; // false alarms included: the sensor cannot tell them apart
     for (const f of found) deliver(f.sent, () => feed(s, f)); // the tracker only hears it when it arrives
   }

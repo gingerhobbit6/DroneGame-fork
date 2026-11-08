@@ -6,6 +6,7 @@ import { PATROL_VEHICLES, PEOPLE, STRUCTURES, carries } from '../../sim/config/i
 import { useGame } from '../hooks.js';
 import { PanelHead, SystemCard, dragProps, onKeys } from '../SystemCard.jsx';
 import { remaining, useAccount } from './pack.js';
+import { Movable } from '../Movable.jsx';
 
 const LIME = 0xc6ff00;
 const toPlace = (l) => (l.left ? `${l.left} of ${l.count} to place` : `All ${l.count} placed`);
@@ -43,7 +44,7 @@ export function UnitTray({ withWizard }) {
   const systems = left.systems.filter((l) => STRUCTURES[l.id]), people = left.people; // a system a later version drops is skipped
   const locked = game.sim.designLocked();
   return (
-    <div id="tool-picker" className={`panel${withWizard ? ' with-wizard' : ''}`} role="region" aria-label={`Deployment pack: ${unit.name}`}>
+    <Movable id="tool-picker" title="Deployment pack" className={`panel${withWizard ? ' with-wizard' : ''}`} role="region" aria-label={`Deployment pack: ${unit.name}`}>
       <PanelHead title={`${unit.callsign ? `${unit.callsign}: ` : ''}${unit.name}`} color={LIME} onHide={() => game.openCatalogue('unit', false)} />
       <p className="pick-hint">Drag each item onto the map to deploy it. The count shows what is still to place. A system or vehicle can also be clicked, then placed by clicking the map.</p>
       <button type="button" id="btn-edit-pack" onClick={account.editPack}>Edit this pack</button>
@@ -74,6 +75,6 @@ export function UnitTray({ withWizard }) {
         </>
       )}
       {!systems.length && !people.length && !left.vehicles.length && <p className="muted">This pack is empty. Add kit to it from your profile.</p>}
-    </div>
+    </Movable>
   );
 }

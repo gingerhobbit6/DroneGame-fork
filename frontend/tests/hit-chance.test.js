@@ -151,7 +151,7 @@ describe('a launcher with rounds in the air', () => {
     sim.spawnDrone('fpv', 0.5, {});
     sim.spawnDrone('fpv', 2.5, {});
     let most = 0;
-    for (let i = 0; i < 4000 && most < 2; i++) {
+    for (let i = 0; i < 10000 && most < 2; i++) {
       sim.step();
       most = Math.max(most, new Set(sim.missiles.map((m) => m.target)).size);
     }

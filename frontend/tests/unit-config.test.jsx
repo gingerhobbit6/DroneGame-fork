@@ -84,7 +84,8 @@ describe('what a setting does', () => {
     expect(unit('radar').def.sapient.interval).toBe(5);
     firstWave();
     let confirmed = false;
-    for (let n = 0; n < 3000 && !confirmed; n++) { sim.step(); confirmed = [...sim.net.tracks.values()].some((tr) => tr.status === 'confirmed'); }
+    // drones start 13 km out
+    for (let n = 0; n < 10000 && !confirmed; n++) { sim.step(); confirmed = [...sim.net.tracks.values()].some((tr) => tr.status === 'confirmed'); }
     expect(confirmed).toBe(true);
   });
 
@@ -176,7 +177,7 @@ describe('price', () => {
     game.commands.configureUnit(sim.structures[0], 'mount', 35);
     render(<GameContext.Provider value={game}><CostTab active /></GameContext.Provider>);
     expect(document.body.textContent).toContain('varies');
-    expect(document.body.textContent).toContain('$1,935,000');
+    expect(document.body.textContent).toContain('£1,451,250');
   });
 });
 
@@ -305,8 +306,8 @@ describe('the Configure side of the panel', () => {
     for (const f of fieldsFor('radar')) expect($(`#unit-${f.key}`)).not.toBeNull();
     expect($('#unit-view')).toBeNull();
     commit($('#unit-mount'), '35');
-    expect($('#unit-editor').textContent).toContain('$1.03M');
-    expect($('#unit-editor').textContent).toContain('+$135k');
+    expect($('#unit-editor').textContent).toContain('£776k');
+    expect($('#unit-editor').textContent).toContain('+£101k');
     commit($('#unit-watts'), '6');
     expect($('#unit-editor').textContent).toContain('2.6 km');
   });

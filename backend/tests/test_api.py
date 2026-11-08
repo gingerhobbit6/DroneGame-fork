@@ -134,7 +134,7 @@ class TestLaydowns:
     def test_a_bad_patrol_column_is_refused(self, client, column):
         assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": column})).status_code == 422
 
-    @pytest.mark.parametrize("route", [[[0, 0]], [[i, i] for i in range(33)], [[0, 0], [351, 0]], [[0, 0], ["a", 0]], "here"])
+    @pytest.mark.parametrize("route", [[[0, 0]], [[i, i] for i in range(33)], [[0, 0], [1351, 0]], [[0, 0], ["a", 0]], "here"])
     def test_a_bad_patrol_route_is_refused(self, client, route):
         assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": route})).status_code == 422
 
@@ -143,7 +143,7 @@ class TestLaydowns:
         [
             [[0, 0], [1, 1]],  # too few to enclose anything
             [[i, i] for i in range(33)],  # too many
-            [[0, 0], [1, 1], [351, 0]],  # outside the world
+            [[0, 0], [1, 1], [1351, 0]],  # outside the world
             [[0, 0], [1, 1], [2]],  # not a point
             [[0, 0], [1, 1], [2, 2, 2]],  # not a point
             [[0, 0], [1, 1], ["a", 0]],  # not numbers
@@ -326,7 +326,7 @@ class TestPeople:
         {"protection": "tank"},
         {"role": "civilian"},
         {"role": "tank"},
-        {"x": 351},
+        {"x": 1351},
         {"extra": 1},
     ])
     def test_refuses_a_bad_group(self, client, change):

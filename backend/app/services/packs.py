@@ -15,6 +15,8 @@ FILE_NAME = re.compile(r"^[A-Za-z0-9_-]{1,64}\.sgmap$")
 BUILDER = Path(__file__).resolve().parents[3] / "tools" / "mapbuild"
 # The national files the builder fetches for Estonia, into their own folder (tools/mapbuild/mapbuild/estonia_files.py).
 ESTONIA_HEIGHTS, ESTONIA_SURFACE = "DTM_10m_eesti.tif", "ndsm_5m_2020-2023_kogu_Eesti.zip"
+# Kilometres across: a pack, as BUILT_HALF in frontend/src/sim/world-pack.js, and a world, as WORLD.radius in frontend/src/sim/config/world.js
+PACK_KM, WORLD_KM = 70, 54
 ESTONIA_FEATURES = (*(f"ETAK_Eesti_SHP_{theme}.zip" for theme in ("ehitised", "kolvikud", "transport", "veekogud", "tehnovorgud")), "asustusyksus_shp.zip")
 
 
@@ -113,12 +115,12 @@ class PackBuilder:
             self.state = {"running": True, "ok": None, "message": "Starting"}
         name = f"area_{east // 1000}_{north // 1000}"
         estonian = in_estonia(east, north)
-        lidar_km = "0" if not lidar else "30" if estonian else "14"  # Estonian lidar is already on this machine by then, so the whole pack can have it
+        lidar_km = 0 if not lidar else PACK_KM if estonian else WORLD_KM  # Estonian lidar is already on this machine by then, so the whole pack can have it
         self.library.folder.mkdir(parents=True, exist_ok=True)
         command = [
             "uv", "run", "--quiet", "--directory", str(BUILDER), "python", "-m", "mapbuild",
             "--centre", f"{east},{north}", "--name", f"Area around {east // 1000}, {north // 1000}",
-            "--data", str(self.library.root / ("estonia" if estonian else "os")), "--out", str(self.library.folder / f"{name}.sgmap"), "--fetch", "--lidar-km", lidar_km,
+            "--data", str(self.library.root / ("estonia" if estonian else "os")), "--out", str(self.library.folder / f"{name}.sgmap"), "--fetch", "--size", str(PACK_KM), "--lidar-km", str(lidar_km),
         ]
         try:
             process = self.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")

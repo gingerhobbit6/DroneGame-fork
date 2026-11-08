@@ -15,8 +15,8 @@ const PATROL_KEYS = ['walkSpeed', 'escortGap', 'groupSize'];
 
 export const FIGURE_FIELDS = {
   published: { label: 'Range', unit: 'm', step: 100, basis: 'research' },
-  cost: { label: 'Price', unit: '$', step: 1000, basis: 'price' },
-  shotCost: { label: 'Per shot', unit: '$', step: 100, basis: 'price' },
+  cost: { label: 'Price', unit: 'US$', step: 1000, basis: 'price' }, // as the sources quote it; shown elsewhere in pounds (economy.js)
+  shotCost: { label: 'Per shot', unit: 'US$', step: 100, basis: 'price' },
   missileSpeed: { label: 'Speed', unit: 'm/s', step: 10, basis: 'research' },
   pk: { label: 'Hit chance', unit: '0–1', step: 0.05, basis: 'assumption' },
   damage: { label: 'Damage', unit: 'hp', step: 5, basis: 'rule' },

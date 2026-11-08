@@ -3,7 +3,8 @@
 
 import * as THREE from 'three';
 import { wgs84ToBng } from '../sim/bng.js';
-import { gridFor } from '../sim/grids.js';
+import { gridFor, toLatLon } from '../sim/grids.js';
+import { band, fromUtm, squareLetters, toUtm, utmZone } from '../sim/mgrs.js';
 import { latLonOf } from '../sim/world-pack.js';
 import { contourLines, topoPixels } from './topo.js';
 
@@ -147,24 +148,68 @@ function paintContours(f, lines, data, baseMap, withLabels) {
   g.textAlign = 'start'; g.textBaseline = 'alphabetic';
 }
 
+// Past a border the national map can be blank. The pack outlines that ground ('beyond', rings in metres from the pack's middle), and it is
+// shaded from the heights there, with contours, so it still shows the lie of the land.
+export function paintBeyond(f, data, rings, topo) {
+  if (!Array.isArray(rings) || !rings.length) return;
+  const { g, west, top, px } = f, { atX, atZ } = packToFrame(f, data);
+  g.save();
+  g.beginPath();
+  for (const ring of rings) if (Array.isArray(ring)) ring.forEach(([x, z], i) => (i ? g.lineTo(atX(x), atZ(z)) : g.moveTo(atX(x), atZ(z))));
+  g.clip('evenodd');
+  g.drawImage(topo.picture, px(data.geo.e0 - data.R - west), px(top - data.geo.n0 - data.R), px(2 * data.R), px(2 * data.R));
+  paintContours(f, topo.lines, data, 'os', true);
+  g.restore();
+}
+
+function gridLabel(g, text, x, y) {
+  g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.fillStyle = '#0b3ea8';
+  g.strokeText(text, x, y); g.fillText(text, x, y);
+}
+const kmDigits = (v) => String(Math.floor(v / 1000) % 100).padStart(2, '0');
+
 function paintGrid({ g, west, top, span, size, px }) {
-  const label = (text, x, y) => {
-    g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.fillStyle = '#0b3ea8';
-    g.strokeText(text, x, y); g.fillText(text, x, y);
-  };
+  const label = (text, x, y) => gridLabel(g, text, x, y);
   g.font = '600 26px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
   for (let e = Math.ceil(west / 1000) * 1000; e <= west + span; e += 1000) {
     g.strokeStyle = 'rgba(30,110,255,0.75)'; g.lineWidth = e % 10000 ? 2 : 4;
     g.beginPath(); g.moveTo(px(e - west), 0); g.lineTo(px(e - west), size); g.stroke();
     const n = Math.ceil((top - span) / 1000) * 1000 + 1000;
-    for (let v = n; v < top; v += 5000) label(String(Math.floor(e / 1000) % 100).padStart(2, '0'), px(e - west) + 6, px(top - v));
+    for (let v = n; v < top; v += 5000) label(kmDigits(e), px(e - west) + 6, px(top - v));
   }
   for (let n = Math.ceil((top - span) / 1000) * 1000; n <= top; n += 1000) {
     g.strokeStyle = 'rgba(30,110,255,0.75)'; g.lineWidth = n % 10000 ? 2 : 4;
     g.beginPath(); g.moveTo(0, px(top - n)); g.lineTo(size, px(top - n)); g.stroke();
-    for (let v = Math.ceil(west / 1000) * 1000 + 1000; v < west + span; v += 5000) label(String(Math.floor(n / 1000) % 100).padStart(2, '0'), px(v - west) + 6, px(top - n) - 2);
+    for (let v = Math.ceil(west / 1000) * 1000 + 1000; v < west + span; v += 5000) label(kmDigits(n), px(v - west) + 6, px(top - n) - 2);
   }
   g.textBaseline = 'alphabetic';
+}
+
+// MGRS, in the UTM zone of the map's middle, carried across the whole map. Its lines sit at an angle to the national grid the map is
+// drawn on, so each goes through points worked out every few km. Each 100 km square is named once, in the middle of what shows of it.
+// shortcut: one zone for the whole map, as no pack yet straddles a zone edge; split the lines at the edge if one ever does.
+export function paintMgrs({ g, west, top, span, px }, data) {
+  const STEP = 5000, toGrid = gridFor(data.geo.n0), zone = utmZone(toLatLon(data.geo.e0, data.geo.n0).lon);
+  const at = (e, n) => { const { lat, lon } = fromUtm(zone, e, n), p = toGrid(lat, lon); return [px(p.e - west), px(top - p.n)]; };
+  const corners = [[west, top], [west + span, top], [west, top - span], [west + span, top - span]].map(([e, n]) => { const c = toLatLon(e, n); return toUtm(c.lat, c.lon, zone); });
+  const e0 = Math.floor(Math.min(...corners.map((c) => c.e)) / 1000) * 1000, e1 = Math.max(...corners.map((c) => c.e));
+  const n0 = Math.floor(Math.min(...corners.map((c) => c.n)) / 1000) * 1000, n1 = Math.max(...corners.map((c) => c.n));
+  const along = (from, to) => { const list = []; for (let v = from; v < to; v += STEP) list.push(v); return [...list, to]; };
+  const line = (points) => { g.beginPath(); points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
+  g.strokeStyle = 'rgba(30,110,255,0.75)';
+  for (let e = e0; e <= e1; e += 1000) { g.lineWidth = e % 10000 ? 2 : 4; line(along(n0, n1).map((n) => at(e, n))); }
+  for (let n = n0; n <= n1; n += 1000) { g.lineWidth = n % 10000 ? 2 : 4; line(along(e0, e1).map((e) => at(e, n))); }
+  g.font = '600 26px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
+  for (let e = e0; e <= e1; e += 1000) for (let v = Math.ceil(n0 / 5000) * 5000; v < n1; v += 5000) { const [x, y] = at(e, v); gridLabel(g, kmDigits(e), x + 6, y); }
+  for (let n = n0; n <= n1; n += 1000) for (let v = Math.ceil(e0 / 5000) * 5000 + 2000; v < e1; v += 5000) { const [x, y] = at(v, n); gridLabel(g, kmDigits(n), x + 6, y - 2); }
+  g.font = '700 44px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let sx = Math.floor(e0 / 100000) * 100000; sx < e1; sx += 100000) {
+    for (let sy = Math.floor(n0 / 100000) * 100000; sy < n1; sy += 100000) {
+      const e = (Math.max(sx, e0) + Math.min(sx + 100000, e1)) / 2, n = (Math.max(sy, n0) + Math.min(sy + 100000, n1)) / 2, [x, y] = at(e, n);
+      gridLabel(g, `${zone}${band(fromUtm(zone, e, n).lat)} ${squareLetters(zone, e, n)}`, x, y);
+    }
+  }
+  g.textAlign = 'start'; g.textBaseline = 'alphabetic';
 }
 
 export function createMapTexture(renderer, relief) {
@@ -197,11 +242,12 @@ export function createMapTexture(renderer, relief) {
     if (baseMap === 'relief') { g.drawImage(relief(data), worldX, worldZ, world, world); return {}; }
     if (baseMap === 'topo') { g.drawImage(topoOf(data).picture, worldX, worldZ, world, world); return {}; }
     await paintPictures(f, source.pictures, usesSatellite(baseMap) ? 'satellite' : 'osmap', still);
+    if (!usesSatellite(baseMap) && still()) paintBeyond(f, data, source.features?.beyond, topoOf(data));
     if (RESTYLE[baseMap] && still()) restyle(f, RESTYLE[baseMap]);
     return {};
   }
 
-  // options: { baseMap: 'os' | 'light' | 'dark' | 'satellite' | 'hybrid' | 'topo' | 'relief' | 'live', roads, grid, contours }.
+  // options: { baseMap: 'os' | 'light' | 'dark' | 'satellite' | 'hybrid' | 'topo' | 'relief' | 'live', roads, grid: 'national' | 'mgrs' | false, contours }.
   // Resolves with { failed, total } for a live map, or { stale: true } if a newer choice took over.
   async function paint(data, source, options) {
     const ticket = ++painting, still = () => ticket === painting;
@@ -217,7 +263,8 @@ export function createMapTexture(renderer, relief) {
     if (!still()) return { stale: true };
     if (options.contours || options.baseMap === 'topo') paintContours(f, topoOf(data).lines, data, options.baseMap, true);
     if (roads) paintRoads(f, source.features, data);
-    if (options.grid) paintGrid(f);
+    if (options.grid === 'mgrs') paintMgrs(f, data);
+    else if (options.grid) paintGrid(f);
     if (roads) paintNames(f, source.features, data);
     texture.needsUpdate = true;
     small.getContext('2d').drawImage(canvas, 0, 0, SMALL, SMALL);

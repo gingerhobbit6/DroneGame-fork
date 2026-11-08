@@ -7,13 +7,13 @@ import { useArmed, useGame, useTick } from './hooks.js';
 import { ResupplyButton } from './ResupplyButton.jsx';
 import { AttackMix, mixLabel } from './AttackMix.jsx';
 import { ConditionsPicker } from './ConditionsPicker.jsx';
-
-const SPEEDS = [[0, '❚❚', 'Pause (Space)'], [1, '1x'], [2, '2x'], [3, '3x']];
+import { SpeedControl } from './SpeedControl.jsx';
+import { Movable } from './Movable.jsx';
 
 export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
   useTick();
   const game = useGame();
-  const { sim, commands, clock } = game;
+  const { sim, commands } = game;
   const { state } = sim;
 
   useEffect(() => { document.body.classList.toggle('track-hi', view.trackHi); });
@@ -28,7 +28,7 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
 
   return (
     <>
-    <div id="hud-top-right" className="panel">
+    <Movable id="hud-top-right" title="Controls">
       <button id="btn-wave" className="primary" disabled={state.waveActive || state.over || state.sandbox} onClick={() => commands.startWave()}>
         {state.sandbox ? 'Exit sandbox to start' : state.waveActive ? `Wave ${state.wave} in progress` : `Start wave ${state.wave + 1}`}
       </button>
@@ -36,16 +36,13 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
       {state.wave > 0 && !state.over && (
         <button id="btn-end" title="Stand the deployment down now and see its report" onClick={end.confirm('end', () => commands.endDeployment())}>{end.armed ? 'Sure? Click again' : 'End deployment'}</button>
       )}
-      <div className="row">
-        {SPEEDS.map(([s, text, title]) => (
-          <button key={s} className={`speed${clock.speed === s ? ' active' : ''}`} data-speed={s} title={title} onClick={() => game.setSpeed(s)}>{text}</button>
-        ))}
-      </div>
+      <SpeedControl />
       <label><input type="checkbox" id="auto" checked={state.autoStart} onChange={(e) => commands.setAutoStart(e.target.checked)} /> Auto-start next wave</label>
       {toggle('rings', 'rings', 'Show ranges (R)')}
       {toggle('truth', 'truth', 'Truth overlay (T)', "On: every drone is drawn where it really is (grey if no sensor has it). Off: you only see what the fusion node believes.")}
       {toggle('labels-toggle', 'labels', 'Labels (L)', 'Name tags on every system and drone')}
       {toggle('track-hi', 'trackHi', 'Highlight tracks', "Tracks are drawn faint grey so they don't crowd the view. Tick to colour them by classification.")}
+      {toggle('trails', 'trails', 'Drone trails', 'A line behind every drone of where it has flown. With the truth overlay, where it really flew; without it, the path of its track.')}
       <label title="Who decides to engage. SAPIENT has no weapon-release message, so this is a C2 policy."> Engagement authority
         <select id="authority" value={FUSION.authority} onChange={(e) => commands.setAuthority(e.target.value)}>
           <option value="auto">Automatic</option><option value="costly">Ask for costly shots</option><option value="all">Ask for every engagement</option>
@@ -62,7 +59,7 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
       </div>
       <button id="btn-sapient" onClick={onToggleDock}>SAPIENT</button>
       <button id="btn-tuning" onClick={onToggleTuning}>Tuning</button>
-    </div>
+    </Movable>
     {mixOpen && <AttackMix onClose={() => setMixOpen(false)} />}
     </>
   );

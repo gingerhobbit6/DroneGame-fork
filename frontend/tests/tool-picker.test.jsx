@@ -148,7 +148,7 @@ describe('the list', () => {
     expect($('#tool-picker').textContent).toContain('2.6 km');
     commit($('#place-mount'), '500');
     expect($('#place-mount').value).toBe('35');
-    expect($('#tool-picker').textContent).toContain('$1.03M');
+    expect($('#tool-picker').textContent).toContain('£776k');
     fireEvent.click($('[aria-label="Reset Mast height"]'));
     expect(game.loadoutFor('radar').mount).toBeUndefined();
   });

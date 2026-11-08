@@ -4,7 +4,10 @@
 import { SITE, ECONOMY, DRONES, ADAPT } from '../sim/config/index.js';
 import { enemyCost, money } from '../sim/economy.js';
 import { parseWorldId, worldLabel } from '../sim/world-pack.js';
+import { runStats } from '../sim/stats.js';
 import { useGame, useTick } from './hooks.js';
+import { StatsHeadline } from './RunStats.jsx';
+import { Movable } from './Movable.jsx';
 
 const pct = (v) => (v > 0 ? Math.max(100 * Math.min(v / ECONOMY.budget, 1), 0.6) : 0).toFixed(2) + '%'; // a sliver stays visible
 const sum = (list, f) => list.reduce((n, x) => n + f(x), 0);
@@ -32,7 +35,7 @@ function Rehearsal({ state, ledger }) {
   );
 }
 
-export function Hud() {
+export function Hud({ openDock }) {
   useTick();
   const { sim } = useGame();
   const { state, ledger } = sim;
@@ -42,9 +45,9 @@ export function Hud() {
     const def = DRONES[type], kk = (next - 1) * (def.adapt ?? 1);
     return Math.max(Math.min(ADAPT.evadeFloor, def.evade), def.evade * (1 - ADAPT.evadePerWave * kk)).toFixed(2);
   };
-  const destroyed = enemyCost(ledger.killed), ammo = ammunition(sim.structures);
+  const destroyed = enemyCost(ledger.killed), ammo = ammunition(sim.structures), stats = runStats(sim);
   return (
-    <div id="hud-top-left" className="panel">
+    <Movable id="hud-top-left" title="Run">
       {state.sandbox && <Rehearsal state={state} ledger={ledger} />}
       <div className="stats">
         <span>Wave <b id="wave">{state.wave}</b></span>
@@ -58,14 +61,15 @@ export function Hud() {
       <div className="stats" id="hud-ammo" title="Rounds left in every launcher and gun, of all they carry, and how many are loaded now. Lasers recharge.">
         {ammo.armed ? <span>Ammunition <b>{ammo.left}</b> of {ammo.total} left · {ammo.loaded} loaded</span> : <span>Ammunition: no launchers or guns placed</span>}
       </div>
+      {stats.drones.launched > 0 && <StatsHeadline stats={stats} onOpen={openDock && (() => openDock('stats'))} />}
       <div className="hud-spend" id="hud-spend">Spent {money(ledger.capex + ledger.consumables)}: systems {money(ledger.capex)}, shots and rounds {money(ledger.consumables)}</div>
       <div id="status" className="hint">
         {spot > 0 && <><span className="warn">Fixed-wing spotter on station: strikes +{Math.round(spot * 100)}%</span><br /></>}
         Enemy attack cost {money(enemyCost(ledger.launched))}
-        {ledger.consumables > 0 && destroyed > 0 && ` · $${(ledger.consumables / destroyed).toFixed(2)} of shots per $1 destroyed`}<br />
+        {ledger.consumables > 0 && destroyed > 0 && ` · £${(ledger.consumables / destroyed).toFixed(2)} of shots per £1 destroyed`}<br />
         Enemy evasion (1.00 = easy to hit): first-person-view {adapted('fpv')} · fixed-wing {adapted('fw')}<br />
         Seed {state.seed} · {parseWorldId(state.terrainSeed) ? worldLabel(state.terrainSeed) : `Terrain ${state.terrainSeed}`}
       </div>
-    </div>
+    </Movable>
   );
 }

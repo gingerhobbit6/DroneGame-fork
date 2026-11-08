@@ -63,7 +63,6 @@ export function useArmed(ms = 3000) {
 }
 
 export const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-export const usd = (v) => '$' + Math.round(v).toLocaleString('en-US');
 export const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 // Offer a file to the player to save.
