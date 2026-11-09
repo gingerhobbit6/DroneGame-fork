@@ -44,4 +44,29 @@ describe('a pack picture the browser cannot read', () => {
     await paintPictures(f, [at('junk', 0), at('good', 200)], 'osmap', () => true);
     expect(calls.filter(([name]) => name === 'drawImage').map((c) => c[2])).toEqual([200]);
   });
+  it('decodes one picture at a time across concurrent map paints', async () => {
+    let release, active = 0, peak = 0;
+    const held = new Promise((resolve) => { release = resolve; });
+    vi.stubGlobal('createImageBitmap', async (blob) => {
+      peak = Math.max(peak, ++active);
+      if (blob === 'first') await held;
+      return { close() { active--; } };
+    });
+    const { g } = recorder(), f = { g, west: 0, top: 1000, span: 1000, px: (m) => m };
+    const picture = (blob) => ({ layer: 'osmap', west: 0, top: 1000, width: 100, height: 100, blob });
+    const first = paintPictures(f, [picture('first')], 'osmap', () => true);
+    const second = paintPictures(f, [picture('second')], 'osmap', () => true);
+    await Promise.resolve();
+    release();
+    await Promise.all([first, second]);
+    expect(peak).toBe(1);
+    expect(active).toBe(0);
+  });
+  it('refuses oversized resize requests before starting the browser decoder', async () => {
+    const decode = vi.fn();
+    vi.stubGlobal('createImageBitmap', decode);
+    const { g } = recorder(), f = { g, west: 0, top: 1000, span: 1000, px: (m) => m };
+    await expect(paintPictures(f, [{ layer: 'osmap', west: 0, top: 1000, width: 80000, height: 80000, blob: 'small' }], 'osmap', () => true)).rejects.toThrow(/picture/);
+    expect(decode).not.toHaveBeenCalled();
+  });
 });

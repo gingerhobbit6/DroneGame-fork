@@ -130,6 +130,7 @@ export function MapControls() {
   const centreOnMe = async () => {
     setLocating(true);
     say('Finding your location...');
+    if (geo && view.baseMap === 'live') game.setViewOption('baseMap', 'os'); // remove live tiles before centring on a private position
     try {
       const mark = (reading, at) => { // the camera only moves once: a better reading moves the pin, and leaves the player's view alone
         view.me = { ...at, accuracy: reading.accuracy / m };
@@ -144,7 +145,7 @@ export function MapControls() {
       } else {
         view.me = null;
         const text = geo ? `outside this world` : 'and this is generated ground';
-        if (onGrid(fix.e, fix.n)) say(`You are at ${where}, ${text}.`, { e: fix.e, n: fix.n, note: `Your location, ${quality}.` });
+        if (onGrid(fix.e, fix.n)) say(`You are at ${where}, ${text}.`, { e: fix.e, n: fix.n, note: `Your location, ${quality}.`, privateLocation: true });
         else say('You appear to be outside Great Britain and Estonia, which these maps cover.');
       }
     } catch (problem) { say(problem.message); }
@@ -190,7 +191,7 @@ export function MapControls() {
         <button id="map-switch" className={`${view.mapPanel ? 'on ' : ''}${view.mapLoading ? 'loading' : ''}`} aria-expanded={view.mapPanel} title="Change the map" onClick={() => game.setViewOption('mapPanel', !view.mapPanel)}>
           <Thumb id={current} pictures={pictures} />
         </button>
-        <button id="map-me" className={`${locating ? 'loading ' : ''}${view.me ? 'on' : ''}`} aria-label="Centre on my location" title="Centre on my location. It stays in this browser." disabled={locating} onClick={centreOnMe}><Icon path={ICONS.me} /></button>
+        <button id="map-me" className={`${locating ? 'loading ' : ''}${view.me ? 'on' : ''}`} aria-label="Centre on my location" title="Centre on my location. Live map tiles switch off first; choosing Live map again shares the viewed area with OpenStreetMap." disabled={locating} onClick={centreOnMe}><Icon path={ICONS.me} /></button>
         <button id="map-site" aria-label="Centre on the site" title="Centre on the site" onClick={() => gameView?.centreOn(0, 0)}><Icon path={ICONS.site} /></button>
         <button id="map-zone" className={zoneOpen ? 'on' : ''} aria-expanded={zoneOpen} aria-label="Draw the area to defend" title="Draw the area to defend" onClick={toggleZone}><Icon path={ICONS.zone} /></button>
         <button id="map-plan" className={view.planView ? 'on' : ''} aria-pressed={view.planView} title="Look straight down (P)" onClick={() => game.setViewOption('planView', !view.planView)}>{view.planView ? '3D' : '2D'}</button>

@@ -127,8 +127,13 @@ function calculate(def, droneDef, world, x, z, alt, open) {
 export function pathReport(def, droneDef, world, x, z, bearing, alt = typicalAltitude(droneDef)) {
   const open = reachFor(def, droneDef), rad = (bearing * Math.PI) / 180;
   const east = Math.sin(rad), south = -Math.cos(rad);
-  let D = Math.max(open > alt ? Math.sqrt(open * open - alt * alt) : 0, world.cell * 2);
-  while (D > world.cell && (Math.abs(x + east * D) > world.R || Math.abs(z + south * D) > world.R)) D -= world.cell;
+  const full = Math.max(open > alt ? Math.sqrt(open * open - alt * alt) : 0, world.cell * 2);
+  // The ray exits the square at the nearer axis. Subtracting one cell at a time can never advance for very large figures.
+  const edge = Math.min(
+    east > 0 ? (world.R - x) / east : east < 0 ? (-world.R - x) / east : Infinity,
+    south > 0 ? (world.R - z) / south : south < 0 ? (-world.R - z) / south : Infinity,
+  );
+  const D = Math.max(world.cell, Math.min(full, Math.max(0, edge)));
   const n = Math.min(120, Math.ceil(D / world.cell));
   const ghz = isRadio(def) ? pathGhz(def, droneDef) : null;
   const a = { x, y: world.groundAt(x, z) + antennaHeight(def), z };

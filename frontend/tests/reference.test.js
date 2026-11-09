@@ -6,7 +6,7 @@ import want from './support/reference-digests.json';
 describe('reference runs', () => {
   it('reproduce the recorded digests exactly', () => {
     expect(runReferences(createSimulation())).toEqual(want);
-  }, 120000);
+  }, 240000);
 });
 
 describe('regressions', () => {

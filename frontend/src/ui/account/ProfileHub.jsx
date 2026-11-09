@@ -44,7 +44,7 @@ function ProfileCard({ api, user, onChange }) {
   );
 }
 
-function SecurityCard({ api, onSignOut, onDeleted }) {
+function SecurityCard({ api, onSignOut, onDeleted, signOutError }) {
   const [open, setOpen] = useState(null); // password | code | delete
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -65,6 +65,7 @@ function SecurityCard({ api, onSignOut, onDeleted }) {
     <section className="acct-box" aria-label="Security">
       <h3>Security</h3>
       {done && <p className="acct-note" role="status">{done}</p>}
+      {signOutError && <p className="acct-error" role="alert">{signOutError}</p>}
       {open ? (
         <form className="acct-form" onSubmit={submit[0]}>
           {open === 'delete' && <p className="acct-error">This deletes your account, your profile and all your deployment packs, and cannot be undone. Shared laydowns and runs stay.</p>}
@@ -147,7 +148,7 @@ export function ProfileHub({ api, account, inGame, onEnter }) {
         <div className="acct-grid">
           <div className="acct-side">
             <ProfileCard api={api} user={user} onChange={account.setUser} />
-            <SecurityCard api={api} onSignOut={account.signOut} onDeleted={() => account.leave('Your account and its deployment packs were deleted.')} />
+            <SecurityCard api={api} onSignOut={account.signOut} onDeleted={() => account.leave('Your account and its deployment packs were deleted.')} signOutError={account.signOutError} />
           </div>
           <Packs api={api} account={account} onEnter={onEnter} />
         </div>

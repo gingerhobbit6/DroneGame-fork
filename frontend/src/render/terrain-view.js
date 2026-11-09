@@ -6,6 +6,7 @@ import { WORLD, TERRAIN, COMMS } from '../sim/config/index.js';
 import { terrainState } from '../sim/terrain.js';
 import { clamp } from '../sim/world.js';
 import { mulberry32, hashSeed } from '../sim/rng.js';
+import { MAX_LINES, MAX_LINE_POINTS } from '../sim/world-pack.js';
 
 const MPU = () => WORLD.metresPerUnit;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -15,6 +16,9 @@ const u = (m) => m / MPU();
 export const groundU = (xu, zu) => terrainState.data.groundAt(xu * MPU(), zu * MPU()) / MPU();
 
 export function buildWorldView(scene, data, siteMat) {
+  if (data.lines.length > MAX_LINES || data.lines.reduce((count, line) => count + line.length, 0) > MAX_LINE_POINTS) {
+    throw new Error('This world has too many power-line points to draw.');
+  }
   const group = new THREE.Group();
   scene.add(group);
   const R = data.R;

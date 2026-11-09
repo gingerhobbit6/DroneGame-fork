@@ -4,12 +4,15 @@
 import { WORLD } from './config/index.js';
 import { makeWorld, pickMasts } from './world.js';
 import { hashSeed, mulberry32 } from './rng.js';
-import { gridRef } from './grids.js';
+import { gridRef, onGrid, toLatLon } from './grids.js';
 
 const ID = /^pack:([0-9a-f]{32}):(\d{6}):(\d{7}):real$/;
 const CELL = 20, MAX_N = 4001, WATER = 4; // 80 km at most
 const MAX_BUILDINGS = 500000, MAX_HEIGHT = 20000; // metres: no ground is that high or deep, so anything past it is damage
 const MAX_SIDE = 1000; // metres: the largest building in a real pack so far is 577 m long, and a vast one would wall off the map
+export const MAX_LINES = 3000, MAX_LINE_POINTS = 30000; // each retained span becomes three rendered conductors
+const MAX_BORDER_RINGS = 1000, MAX_BORDER_POINTS = 50000;
+const MAX_ROADS = 150000, MAX_ROAD_POINTS = 400000, MAX_NAMES = 25000;
 
 export const parseWorldId = (world) => {
   const m = ID.exec(world || '');
@@ -21,9 +24,11 @@ export const worldLabel = (world) => { const id = parseWorldId(world); return id
 const finiteList = (v, n) => Array.isArray(v) && v.length === n && v.every(Number.isFinite);
 const building = (b) => finiteList(b, 6) && [b[2], b[3], b[4]].every((v) => v >= 0 && v <= MAX_SIDE); // x, z, width, depth, height, angle
 const path = (points) => Array.isArray(points) && points.every((p) => finiteList(p, 2));
-const road = (r) => Array.isArray(r) && path(r[1]); // class, points
-const name = (n) => Array.isArray(n) && n.length === 5 && Number.isFinite(n[3]) && Number.isFinite(n[4]); // text, kind, height, x, z
-const optionalList = (v, ok) => v === undefined || (Array.isArray(v) && v.every(ok)); // a pack may have no roads or names
+const road = (r, remaining) => Array.isArray(r) && r.length === 2 && typeof r[0] === 'string' && r[0].length <= 64 &&
+  Array.isArray(r[1]) && r[1].length <= remaining && path(r[1]); // class, points
+const name = (n) => Array.isArray(n) && n.length === 5 && typeof n[0] === 'string' && n[0].length <= 80 &&
+  typeof n[1] === 'string' && n[1].length <= 64 && typeof n[2] === 'string' && n[2].length <= 32 &&
+  Number.isFinite(n[3]) && Number.isFinite(n[4]); // text, kind, height, x, z
 
 // Checks everything the rules will trust. Grids are { ground: Float32Array, canopy, bldg, cover: Uint8Array }.
 export function parsePack(header, grids, features) {
@@ -31,16 +36,46 @@ export function parsePack(header, grids, features) {
   if (!Number.isInteger(N) || N > MAX_N || N % 2 === 0) throw new Error('This pack has an unexpected size.');
   if (N < (2 * WORLD.radius) / CELL + 1) throw new Error(`This pack is smaller than a ${(2 * WORLD.radius) / 1000} km world. Build it again at a larger size.`);
   if (cell !== CELL || half !== ((N - 1) * CELL) / 2) throw new Error('This pack has an unexpected grid.');
-  if (!Number.isInteger(east) || !Number.isInteger(north) || east % CELL || north % CELL) throw new Error('This pack is not on the national grid.');
+  if (!Number.isInteger(east) || !Number.isInteger(north) || east % CELL || north % CELL || !onGrid(east, north)) throw new Error('This pack is not on the national grid.');
   if (!/^[0-9a-f]{64}$/.test(gridsSha256 || '')) throw new Error('This pack has no valid fingerprint.');
   if (!finiteList(header.lonFit, 6) || !finiteList(header.latFit, 6) || !Number.isFinite(header.geoidSeparation)) throw new Error('This pack has no valid position fit.');
+  const geo = { e0: east, n0: north, packEast: east, packNorth: north, lonFit: header.lonFit, latFit: header.latFit };
+  for (const dx of [-half, 0, half]) for (const dy of [-half, 0, half]) {
+    const got = latLonOf(geo, dx, dy), expected = toLatLon(east + dx, north + dy);
+    if (![got.lat, got.lon, expected.lat, expected.lon].every(Number.isFinite) ||
+        Math.abs(got.lat - expected.lat) > 0.2 || Math.abs(got.lon - expected.lon) > 0.2) throw new Error('This pack has no valid position fit.');
+  }
   const size = N * N;
   for (const name of ['ground', 'canopy', 'bldg', 'cover']) if (grids[name]?.length !== size) throw new Error('This pack has a grid of the wrong length.');
   // a NaN compares false in the line of sight test, which would silently report a clear line
   for (let i = 0; i < size; i++) if (!(Math.abs(grids.ground[i]) < MAX_HEIGHT)) throw new Error('This pack has a height that is not a real one.');
-  if (!Array.isArray(features?.buildings) || features.buildings.length > MAX_BUILDINGS || !Array.isArray(features.lines)) throw new Error('This pack has unreadable features.');
-  // the point counts need no cap of their own: the features section is capped in bytes before it is read
-  if (!features.buildings.every(building) || !features.lines.every(path) || !optionalList(features.roads, road) || !optionalList(features.names, name)) throw new Error('This pack has unreadable features.');
+  if (!Array.isArray(features?.buildings) || features.buildings.length > MAX_BUILDINGS || !Array.isArray(features.lines) || features.lines.length > MAX_LINES) throw new Error('This pack has unreadable features.');
+  let linePoints = 0;
+  for (const line of features.lines) {
+    if (!Array.isArray(line) || line.length > MAX_LINE_POINTS - linePoints || !path(line)) throw new Error('This pack has unreadable features.');
+    linePoints += line.length;
+  }
+  if (!features.buildings.every(building)) throw new Error('This pack has unreadable features.');
+  if (features.roads !== undefined) {
+    if (!Array.isArray(features.roads) || features.roads.length > MAX_ROADS) throw new Error('This pack has unreadable features.');
+    let roadPoints = 0;
+    for (const item of features.roads) {
+      if (!road(item, MAX_ROAD_POINTS - roadPoints)) throw new Error('This pack has unreadable features.');
+      roadPoints += item[1].length;
+    }
+  }
+  if (features.names !== undefined && (!Array.isArray(features.names) || features.names.length > MAX_NAMES || !features.names.every(name))) {
+    throw new Error('This pack has unreadable features.');
+  }
+  if (features.beyond !== undefined) {
+    if (!Array.isArray(features.beyond) || features.beyond.length > MAX_BORDER_RINGS) throw new Error('This pack has unreadable features.');
+    let borderPoints = 0;
+    for (const ring of features.beyond) {
+      if (!Array.isArray(ring) || ring.length < 3 || ring.length > MAX_BORDER_POINTS - borderPoints || !path(ring) ||
+          ring.some(([x, z]) => Math.abs(x) > half + CELL || Math.abs(z) > half + CELL)) throw new Error('This pack has unreadable features.');
+      borderPoints += ring.length;
+    }
+  }
   return { hash: gridsSha256.slice(0, 32), header, grids, features };
 }
 

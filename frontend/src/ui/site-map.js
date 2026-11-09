@@ -5,7 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { WORLD } from '../sim/config/index.js';
 import { parseGridRef } from '../sim/bng.js';
-import { fromLatLon, toLatLon } from '../sim/grids.js';
+import { fromLatLon, onGrid, toLatLon } from '../sim/grids.js';
 import { ESTONIA } from '../sim/lest97.js';
 import { BUILT_HALF } from '../sim/world-pack.js';
 
@@ -69,10 +69,11 @@ export function createSiteMap(container, { onPick, onChange = () => {}, storage 
   const satellite = satelliteTiles(), hybridPhoto = satelliteTiles(), hybridLabels = labelTiles();
   const street = tiles(''), light = tiles('tile-light'), dark = tiles('tile-dark');
   const bases = { Street: street, Light: light, Dark: dark, Satellite: satellite, Hybrid: L.layerGroup([hybridPhoto, hybridLabels]), [NO_LIVE_MAP]: L.layerGroup() };
-  const packs = [];
+  const packs = [], drawn = new Set(); // summaries are enough to draw the map outlines
   const offline = { osmap: L.layerGroup(), satellite: L.layerGroup() };
   const layers = { packs: L.layerGroup().addTo(map), lidar: L.layerGroup().addTo(map), downloads: L.layerGroup().addTo(map), ...offline };
   let style = bases[remembered(storage)] ? remembered(storage) : 'Street';
+  let picturePack = null, pictureEpoch = 0;
 
   const state = () => ({ style, layers: Object.fromEntries(Object.entries(layers).map(([name, group]) => [name, map.hasLayer(group)])) });
   function setLayer(name, on) {
@@ -81,9 +82,9 @@ export function createSiteMap(container, { onPick, onChange = () => {}, storage 
   }
 
   // Pictures are only made once they are asked for, as they take a moment.
-  async function fill(layer, decoded) {
+  async function fill(layer, decoded, epoch) {
     const url = await packPicture(decoded, layer);
-    if (!url) return;
+    if (!url || epoch !== pictureEpoch) return;
     const { header } = decoded.pack, corners = square(header.east, header.north, header.half);
     offline[layer].addLayer(L.imageOverlay(url, L.latLngBounds(corners)));
   }
@@ -92,7 +93,7 @@ export function createSiteMap(container, { onPick, onChange = () => {}, storage 
     offline[layer].on('add', () => {
       if (opened.has(layer)) return;
       opened.add(layer);
-      packs.forEach((decoded) => fill(layer, decoded));
+      if (picturePack) fill(layer, picturePack, pictureEpoch);
     });
   }
 
@@ -109,10 +110,18 @@ export function createSiteMap(container, { onPick, onChange = () => {}, storage 
   map.on('zoomend', labelsForZoom);
   labelsForZoom();
   let marks = [], refused = null;
+  const setPictures = (decoded) => {
+    if (picturePack === decoded) return;
+    picturePack = decoded;
+    pictureEpoch++;
+    for (const group of Object.values(offline)) group.clearLayers();
+    if (decoded) for (const layer of opened) fill(layer, decoded, pictureEpoch);
+  };
   return {
     map,
     state,
     setLayer,
+    setPictures,
     setStyle(name) {
       if (!bases[name] || name === style) return;
       bases[style].remove();
@@ -124,20 +133,24 @@ export function createSiteMap(container, { onPick, onChange = () => {}, storage 
     },
     showWorld() { map.setView(WORLD_VIEW, WORLD_ZOOM); },
     showLoaded() {
-      if (packs.length) map.fitBounds(L.latLngBounds(packs.flatMap(({ pack: { header: h } }) => square(h.east, h.north, h.half))).pad(0.2));
+      if (packs.length) map.fitBounds(L.latLngBounds(packs.flatMap((h) => square(h.east, h.north, h.half))).pad(0.2));
     },
     // Show where a map pack can be used, and how much of it has lidar heights. Far out a 30 km square is too small to see or
     // click, so a dot of a fixed size stands in for it, and clicking the dot goes there.
-    addPack(decoded) {
-      if (packs.includes(decoded)) return;
-      packs.push(decoded);
-      const { east, north, half, lidarHalf, name } = decoded.pack.header;
+    addPack(entry) {
+      const header = entry.pack?.header || entry;
+      const { east, north, half, lidarHalf = 0, name } = header;
+      if (![east, north, half, lidarHalf].every(Number.isSafeInteger) || !onGrid(east, north) || half <= 0 || half > 40000 || lidarHalf < 0 || lidarHalf > half) return;
+      const key = entry.hash || entry.pack?.hash || entry.pack?.header?.gridsSha256 || entry;
+      if (drawn.has(key)) return;
+      drawn.add(key);
+      packs.push(header);
       outline(square(east, north, half), { color: PACK, weight: 2, fillOpacity: 0.08 }).addTo(layers.packs);
       if (lidarHalf) outline(square(east, north, lidarHalf), { color: LIDAR, weight: 1, fillColor: LIDAR, fillOpacity: 0.2 }).addTo(layers.lidar);
-      label(name, onMap(east, north + half), 'map-tag-name').addTo(layers.packs);
+      label(String(name || 'Map pack').slice(0, 80), onMap(east, north + half), 'map-tag-name').addTo(layers.packs);
       L.circleMarker(onMap(east, north), { radius: 7, color: '#fff', weight: 2, fillColor: PACK, fillOpacity: 1, className: 'pack-dot', bubblingMouseEvents: false })
-        .bindTooltip(asText(name)).on('click', () => onPick({ e: east, n: north })).addTo(layers.packs);
-      for (const layer of opened) fill(layer, decoded);
+        .bindTooltip(asText(String(name || 'Map pack').slice(0, 80))).on('click', () => onPick({ e: east, n: north })).addTo(layers.packs);
+      if (entry.pack) setPictures(entry); // direct callers may supply a decoded pack
     },
     // Show what is already on this computer: 100 km squares of OS data, { squares: ['SU', ...] }, and Estonia's national files.
     showDownloads(downloads) {
@@ -171,6 +184,6 @@ export function createSiteMap(container, { onPick, onChange = () => {}, storage 
       refused = point && L.circleMarker([point.lat, point.lon], { radius: 6, color: '#8a94a6', fillOpacity: 0.6, interactive: false }).addTo(map);
       if (point) map.panTo([point.lat, point.lon]);
     },
-    remove() { map.remove(); },
+    remove() { pictureEpoch++; map.remove(); },
   };
 }

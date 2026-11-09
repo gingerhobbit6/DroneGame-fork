@@ -61,21 +61,24 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   sim.on('sandbox', bump);
 
   // ---------- real map packs ----------
-  const packs = createPackStore({ api });
+  const packs = createPackStore({ api, pinned: () => parseWorldId(state.terrainSeed)?.hash });
   const usePack = ({ pack }) => sim.registerPack({ hash: pack.hash, header: pack.header, grids: pack.grids, features: pack.features });
-  async function loadPack(entry) {
+  let latestPackLoad = 0;
+  async function loadPack(entry, required = false) {
+    const ticket = ++latestPackLoad;
     const decoded = await packs.load(entry);
-    usePack(decoded);
+    if (required || ticket === latestPackLoad) usePack(decoded);
     return decoded;
   }
   // Make sure a saved world's pack is loaded. Returns why not, or null.
   async function ensureWorld(world) {
     const id = parseWorldId(world);
-    if (!id || packs.get(id.hash)) return null;
+    if (!id) return null;
+    if (packs.get(id.hash)) { await loadPack({ hash: id.hash }, true); return null; }
     const { packs: all } = await packs.list();
     const entry = all.find((p) => p.hash.startsWith(id.hash));
     if (!entry) return 'The map pack for this laydown is not available here. Import or build it first.';
-    await loadPack(entry);
+    await loadPack(entry, true);
     return null;
   }
   const mapSource = (world) => {

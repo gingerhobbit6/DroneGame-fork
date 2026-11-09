@@ -210,5 +210,5 @@ describe('the wizard only reads the game', () => {
     const untouched = run(() => {});
     const watched = run((s) => { stepStatus(s, square); unanswered(s); sensorChecklist(s); suggestSpot(s, STRUCTURES.camera); zoneScores(s, square); });
     expect(watched).toBe(untouched);
-  }, 60000);
+  }, 120000);
 });

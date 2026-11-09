@@ -83,6 +83,14 @@ const KINDS = ['structures', 'drones', 'comms', 'people', 'patrol'];
 // a shared set too. A typed figure, an imported file and a set another account saved all pass through here.
 const SHARE = new Set(['0–1', 'fraction']);
 const bounded = (key, v) => Math.min(Math.max(v, 0), SHARE.has(FIGURE_FIELDS[key]?.unit) ? 1 : 1e12);
+export const MAX_RANGE_SCALE = 1e12;
+const validRangeScale = (value) => Number.isFinite(value) && value >= 0 && value <= MAX_RANGE_SCALE;
+
+export function setRangeScale(value) {
+  if (!validRangeScale(value)) throw new RangeError('Range scale must be between 0 and 1 trillion.');
+  WORLD.rangeScale = value;
+  applyRangeScale();
+}
 
 // Set one figure. kind is 'structures', 'drones', 'comms', 'people' or 'patrol'.
 export function setFigure(kind, id, key, value) {
@@ -114,10 +122,12 @@ export function exportFigures() {
   return out;
 }
 const isRecord = (x) => x != null && typeof x === 'object' && !Array.isArray(x);
-export function importFigures(json) {
+export function importFigures(json, reset = false) {
   // the whole file is checked before anything is applied, so one that cannot be read changes nothing
   const unreadable = (group) => group != null && (!isRecord(group) || !Object.values(group).every(isRecord));
   if (!isRecord(json) || KINDS.some((kind) => unreadable(json[kind]))) throw new Error('This is not a figures file.');
+  if (Number.isFinite(json.world?.rangeScale) && !validRangeScale(json.world.rangeScale)) throw new Error('This is not a figures file.');
+  if (reset) resetAllFigures();
   for (const kind of KINDS) {
     for (const [id, vals] of Object.entries(json[kind] || {})) {
       // own properties only: the JSON is untrusted, and "constructor" would otherwise reach the Object function

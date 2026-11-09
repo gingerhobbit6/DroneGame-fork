@@ -9,7 +9,7 @@ const LOADED = [['packs', 'Maps ready to play'], ['lidar', 'Lidar heights'], ['d
 const MARKS = [['world', `Your ${WORLD_KM} km world`], ['plan', 'Map a build would make']];
 const STYLE_HELP = { Satellite: 'From EOX, which then sees the area you view', Hybrid: 'From EOX, which then sees the area you view', [NO_LIVE_MAP]: 'Asks no outside server, and shows only the pictures in your map packs' };
 
-export function SiteMap({ packs, downloads, point, planned, elsewhere, moving, onPick }) {
+export function SiteMap({ packs, decoded, downloads, point, planned, elsewhere, moving, privateLocationRequest = 0, onPick }) {
   const box = useRef(null);
   const leaflet = useRef(null);
   const pick = useRef(onPick);
@@ -21,7 +21,9 @@ export function SiteMap({ packs, downloads, point, planned, elsewhere, moving, o
     return () => { leaflet.current.remove(); leaflet.current = null; };
   }, []);
   useEffect(() => { packs.forEach((pack) => leaflet.current.addPack(pack)); }, [packs]);
+  useEffect(() => { leaflet.current.setPictures(decoded); }, [decoded]);
   useEffect(() => { leaflet.current.showDownloads(downloads); }, [downloads]);
+  useEffect(() => { if (privateLocationRequest) leaflet.current.setStyle(NO_LIVE_MAP); }, [privateLocationRequest]);
   useEffect(() => { leaflet.current.show(point, { planned, move: moving.current }); }, [point, planned]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { leaflet.current.markElsewhere(elsewhere); }, [elsewhere]);
   return (

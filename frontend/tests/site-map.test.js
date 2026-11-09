@@ -49,6 +49,29 @@ describe('the start map', () => {
     expect(shapes(made.map)).toHaveLength(3);
     made.remove();
   });
+  it('draws lightweight pack summaries once when the listing refreshes', () => {
+    const made = createSiteMap(box(), { onPick: vi.fn(), storage: createFakeStorage() });
+    const summary = { hash: 'a'.repeat(32), east: 422000, north: 166000, half: 15000, lidarHalf: 0, name: 'Savernake' };
+    made.addPack(summary);
+    made.addPack({ ...summary });
+    expect(shapes(made.map)).toHaveLength(1);
+    expect(dots(made.map)).toBe(1);
+    const fit = vi.spyOn(made.map, 'fitBounds');
+    made.showLoaded();
+    expect(fit).toHaveBeenCalled();
+    made.remove();
+  });
+  it('ignores malformed pack summaries before drawing or zooming to them', () => {
+    const made = createSiteMap(box(), { onPick: vi.fn(), storage: createFakeStorage() });
+    const fit = vi.spyOn(made.map, 'fitBounds');
+    made.addPack({ hash: 'bad', east: 1e30, north: 166000, half: 15000, name: 'Bad' });
+    made.addPack({ hash: 'too-wide', east: 422000, north: 166000, half: 1e9, name: 'Bad' });
+    made.showLoaded();
+    expect(shapes(made.map)).toHaveLength(0);
+    expect(dots(made.map)).toBe(0);
+    expect(fit).not.toHaveBeenCalled();
+    made.remove();
+  });
   it('marks a start point, the map a build would make, and a spot off the grid', () => {
     const made = createSiteMap(box(), { onPick: vi.fn(), storage: createFakeStorage() });
     made.show({ e: 422000, n: 166000 });

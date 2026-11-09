@@ -10,6 +10,15 @@ import { contourLines, topoPixels } from './topo.js';
 
 const SIZE = 4096, SMALL = 1024, PREVIEW = 192, PREVIEW_SPAN = 6000, TILE_REFRESH_MS = 400;
 const OSM_URL = 'https://tile.openstreetmap.org', OSM_ZOOM = 14;
+const MAX_TILES = 4096, MAX_TILE_REQUESTS = 16, MAX_BITMAP_DIM = 8192, MAX_BITMAP_PIXELS = 8192 * 8192;
+let bitmapTurn = Promise.resolve(); // previews and a live repaint must not decode several large pictures at once
+async function withBitmapTurn(draw) {
+  const previous = bitmapTurn;
+  let release;
+  bitmapTurn = new Promise((resolve) => { release = resolve; });
+  await previous;
+  try { return await draw(); } finally { release(); }
+}
 const ROADS = [['Motorway', 34, '#4d9de0'], ['Primary', 27, '#3fbf6f'], ['A Road', 24, '#e15554'], ['B Road', 20, '#f0a33a'], ['Minor', 12, '#ffffff'], ['Local', 7, '#dddddd'], ['Restricted', 7, '#cccccc']]; // widths in metres on the ground
 
 const roadStyle = (cls) => ROADS.find(([start]) => cls.startsWith(start));
@@ -29,11 +38,21 @@ function restyle({ g, size }, steps) {
 
 // The OSM tiles over a world, and where three of each tile's corners land on the national grid.
 export function tilesOver({ north, south, east, west }, zoom = OSM_ZOOM, toGrid = wgs84ToBng) {
+  if (![north, south, east, west].every(Number.isFinite) || north < south || east < west ||
+      Math.abs(north) > 85 || Math.abs(south) > 85 || east > 180 || west < -180 ||
+      !Number.isInteger(zoom) || zoom < 0 || zoom > 20) throw new Error('This map has invalid tile bounds.');
   const scale = 2 ** zoom, col = (lon) => Math.floor(((lon + 180) / 360) * scale);
   const row = (lat) => { const r = (lat * Math.PI) / 180; return Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * scale); };
+  const x0 = col(west), x1 = Math.min(col(east), scale - 1), y0 = row(north), y1 = row(south);
+  const width = x1 - x0 + 1, height = y1 - y0 + 1;
+  if (![x0, x1, y0, y1, width, height].every(Number.isSafeInteger) ||
+      x0 < 0 || y0 < 0 || x1 >= scale || y1 >= scale || width <= 0 || height <= 0 || width * height > MAX_TILES) {
+    throw new Error('This map requests too many tiles.');
+  }
   const tiles = [];
-  for (let y = row(north); y <= row(south); y++) {
-    for (let x = col(west); x <= col(east); x++) {
+  for (let yi = 0; yi < height; yi++) {
+    for (let xi = 0; xi < width; xi++) {
+      const x = x0 + xi, y = y0 + yi;
       tiles.push({
         x, y, zoom,
         origin: toGrid(tileLat(y, zoom), tileLon(x, zoom)), right: toGrid(tileLat(y, zoom), tileLon(x + 1, zoom)), down: toGrid(tileLat(y + 1, zoom), tileLon(x, zoom)),
@@ -62,14 +81,23 @@ function frameOf(g, west, top, span, size) {
 export async function paintPictures(f, pictures, layer, still) {
   const { g, west, top, span, px } = f;
   for (const p of pictures) {
+    if (![p.west, p.top, p.width, p.height].every(Number.isFinite) || p.width <= 0 || p.height <= 0 ||
+        p.width > 80000 || p.height > 80000) throw new Error('This map has invalid picture dimensions.');
     if (p.layer !== layer || p.west >= west + span || p.west + p.width <= west || p.top <= top - span || p.top - p.height >= top) continue;
     // decoded at the size it is drawn: an OS piece is 4000 px across, and most of those pixels would be thrown away
     const w = Math.max(Math.ceil(px(p.width)), 1), h = Math.max(Math.ceil(px(p.height)), 1);
-    const bitmap = await createImageBitmap(p.blob, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' }).catch(() => null); // a picture the browser cannot read is left out, not the whole map
-    if (!bitmap) continue;
-    if (!still()) { bitmap.close(); return; } // a newer choice took over, and must not be drawn over
-    g.drawImage(bitmap, px(p.west - west), px(top - p.top), w, h);
-    bitmap.close();
+    if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h) || w > MAX_BITMAP_DIM || h > MAX_BITMAP_DIM || w * h > MAX_BITMAP_PIXELS) {
+      throw new Error('This map requests an oversized picture.');
+    }
+    await withBitmapTurn(async () => {
+      if (!still()) return;
+      const bitmap = await createImageBitmap(p.blob, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' }).catch(() => null); // a picture the browser cannot read is left out, not the whole map
+      if (!bitmap) return;
+      try {
+        if (still()) g.drawImage(bitmap, px(p.west - west), px(top - p.top), w, h); // a newer choice must not be drawn over
+      } finally { bitmap.close(); }
+    });
+    if (!still()) return;
   }
 }
 
@@ -80,15 +108,18 @@ async function paintLive({ g, west, top, px }, data, still, onTile) {
   const a = corner(-data.R, -data.R), b = corner(data.R, data.R), c = corner(data.R, -data.R), d = corner(-data.R, data.R);
   const tiles = tilesOver({ north: Math.max(a.lat, c.lat), south: Math.min(b.lat, d.lat), east: Math.max(b.lon, c.lon), west: Math.min(a.lon, d.lon) }, OSM_ZOOM, gridFor(data.geo.n0));
   let failed = 0;
-  await Promise.all(tiles.map(async (tile) => {
-    const image = await tileImage(tile);
-    if (!still()) return;
-    if (!image) { failed++; return; }
-    const { origin, right, down } = tile, k = px(1) / 256;
-    g.setTransform((right.e - origin.e) * k, (origin.n - right.n) * k, (down.e - origin.e) * k, (origin.n - down.n) * k, px(origin.e - west), px(top - origin.n));
-    g.drawImage(image, 0, 0);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    onTile();
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(MAX_TILE_REQUESTS, tiles.length) }, async () => {
+    while (still() && next < tiles.length) {
+      const tile = tiles[next++], image = await tileImage(tile);
+      if (!still()) return;
+      if (!image) { failed++; continue; }
+      const { origin, right, down } = tile, k = px(1) / 256;
+      g.setTransform((right.e - origin.e) * k, (origin.n - right.n) * k, (down.e - origin.e) * k, (origin.n - down.n) * k, px(origin.e - west), px(top - origin.n));
+      g.drawImage(image, 0, 0);
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      onTile();
+    }
   }));
   return { failed, total: tiles.length };
 }
@@ -197,6 +228,10 @@ function paintMgrs({ g, west, top, span, px }, data) {
   const corners = [[west, top], [west + span, top], [west, top - span], [west + span, top - span]].map(([e, n]) => { const c = toLatLon(e, n); return toUtm(c.lat, c.lon, zone); });
   const e0 = Math.floor(Math.min(...corners.map((c) => c.e)) / 1000) * 1000, e1 = Math.max(...corners.map((c) => c.e));
   const n0 = Math.floor(Math.min(...corners.map((c) => c.n)) / 1000) * 1000, n1 = Math.max(...corners.map((c) => c.n));
+  if (![e0, e1, n0, n1].every((v) => Number.isFinite(v) && Math.abs(v) < 10000000) ||
+      e1 < e0 || n1 < n0 || e1 - e0 > 150000 || n1 - n0 > 150000) {
+    throw new Error('This map has invalid MGRS bounds.');
+  }
   const along = (from, to) => { const list = []; for (let v = from; v < to; v += STEP) list.push(v); return [...list, to]; };
   const line = (points) => { g.beginPath(); points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
   g.strokeStyle = 'rgba(30,110,255,0.75)';

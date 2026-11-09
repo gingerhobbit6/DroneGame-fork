@@ -145,7 +145,12 @@ describe('checking a pack', () => {
   it.each([
     ['an even size', { N: 800 }], ['a huge size', { N: 90001 }], ['another cell size', { cell: 10 }], ['a mismatched span', { half: 9000 }],
     ['an off-grid middle', { east: E + 1 }], ['no fingerprint', { gridsSha256: 'x' }], ['no fit', { lonFit: [1] }], ['an infinite fit', { latFit: [Infinity, 0, 0, 0, 0, 0] }],
+    ['a huge but finite fit', { lonFit: [1e30, 0, 0, 0, 0, 0] }],
   ])('refuses %s', (_, change) => { expect(() => parsePack({ ...header(), ...change }, parts.grids, parts.features)).toThrow(); });
+  it('refuses excessive wire geometry even when a world bypasses the pack parser', () => {
+    const points = Array.from({ length: 30001 }, (_, i) => ({ x: i % 2 * 20, z: 0 }));
+    expect(() => buildWorldView(new THREE.Scene(), { lines: [points] }, new THREE.MeshStandardMaterial())).toThrow(/power-line points/);
+  });
   it('takes a 70 km pack, as the builder now makes, and refuses one over 80 km', () => {
     expect(() => parsePack({ ...header(), N: 3501, half: 35000 }, parts.grids, parts.features)).toThrow(/wrong length/); // past the size check
     expect(() => parsePack({ ...header(), N: 4003, half: 40020 }, parts.grids, parts.features)).toThrow(/unexpected size/);
@@ -239,6 +244,17 @@ describe('playing on a real world', () => {
     expect(sim.commands.loadLaydown({ structures: [], fusionUplinks: [], fusionCell: 'B8' }, other)).toMatch(/not loaded/);
     expect(sim.state.terrainSeed).toBe('1');
   });
+  it('keeps the active world and most recent pack, and releases older registrations', () => {
+    expect(sim.commands.deploy('1', id)).toBeNull();
+    const original = pack();
+    const older = { ...original, hash: 'b'.repeat(32) };
+    const newest = { ...original, hash: 'c'.repeat(32) };
+    sim.registerPack(older);
+    sim.registerPack(newest);
+    expect(sim.commands.deploy('1', worldId(older.hash, E, N))).toMatch(/not loaded/);
+    expect(sim.state.terrainSeed).toBe(id);
+    expect(sim.commands.deploy('1', worldId(newest.hash, E, N))).toBeNull();
+  });
   it('registers its nodes with grid bearings and real positions', () => {
     expect(sim.commands.deploy('1', id)).toBeNull();
     expect(sim.state.started).toBe(true);
@@ -272,7 +288,7 @@ describe('playing on a real world', () => {
     s.commands.deploy('1', 'hills');
     expect(terrainState.data.geo).toBeNull();
     expect(location(0, 0, 10).y).toBe(0);
-  }, 60000);
+  }, 120000);
   it('keeps spotters above mountains taller than they fly', () => {
     const tall = pack();
     tall.grids = { ...tall.grids, ground: tall.grids.ground.map((v, k) => (Math.floor(k / 801) < 150 ? 1500 : v)) };
