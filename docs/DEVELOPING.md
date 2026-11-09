@@ -122,7 +122,7 @@ These tests use small made-up inputs and download nothing.
 
 ### What they pin
 
-A digest is a 32-bit FNV-1a fingerprint of a run: every SAPIENT message still kept, plus kills, health, budget, leaks, game time, the message count and the ledger ([`simulation.js:241`](../frontend/src/sim/simulation.js#L241)). Any change to what a sensor reports, when a message arrives, what a weapon hits or how a drone flies changes it. How this fits with determinism is in [ARCHITECTURE.md](ARCHITECTURE.md#determinism).
+A digest is a 32-bit FNV-1a fingerprint of a run: every [SAPIENT](SAPIENT.md) message still kept, plus kills, health, budget, leaks, game time, the message count and the ledger ([`simulation.js:241`](../frontend/src/sim/simulation.js#L241)). Any change to what a sensor reports, when a message arrives, what a weapon hits or how a drone flies changes it. How this fits with determinism is in [ARCHITECTURE.md](ARCHITECTURE.md#determinism).
 
 Five scripted runs are pinned ([`scenarios.js:11`](../frontend/tests/support/scenarios.js#L11)). Each places its systems with no budget checks, auto-wires them and plays the waves:
 

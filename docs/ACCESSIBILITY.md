@@ -65,7 +65,7 @@ Conflicts:
 
 ### Escape
 
-Escape does the first of these that applies: leave the view from a mast, close the map panel, drop the picked tool, close the open list, clear the selection ([`useHotkeys.js:29`](../frontend/src/ui/useHotkeys.js#L29)). It does not close the SAPIENT dock, the wizard, the Attack panel, the Area to defend panel, the map note, the Sandbox panel or the Tuning panel. It does nothing while focus is in an input or select, because the text-field guard runs first ([`useHotkeys.js:16`](../frontend/src/ui/useHotkeys.js#L16)), so Escape in the map panel's grid reference field leaves the panel open. When Escape closes a panel that held focus, focus falls back to the page body.
+Escape does the first of these that applies: leave the view from a mast, close the map panel, drop the picked tool, close the open list, clear the selection ([`useHotkeys.js:29`](../frontend/src/ui/useHotkeys.js#L29)). It does not close the [SAPIENT](SAPIENT.md) dock, the wizard, the Attack panel, the Area to defend panel, the map note, the Sandbox panel or the Tuning panel. It does nothing while focus is in an input or select, because the text-field guard runs first ([`useHotkeys.js:16`](../frontend/src/ui/useHotkeys.js#L16)), so Escape in the map panel's grid reference field leaves the panel open. When Escape closes a panel that held focus, focus falls back to the page body.
 
 ### Doing drag and map actions another way
 

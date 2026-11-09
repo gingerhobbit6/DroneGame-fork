@@ -27,4 +27,4 @@ Python speed was not the deciding factor. A quick benchmark of line-of-sight che
 
 ## When to revisit
 
-Choose the server if the game needs multiplayer or a shared live picture, real SAPIENT nodes or hardware connected, or tamper-proof scores. `sim/` has no DOM or rendering and exposes commands, state and events, so that boundary is the part that would move.
+Choose the server if the game needs multiplayer or a shared live picture, real [SAPIENT](../SAPIENT.md) nodes or hardware connected, or tamper-proof scores. `sim/` has no DOM or rendering and exposes commands, state and events, so that boundary is the part that would move.

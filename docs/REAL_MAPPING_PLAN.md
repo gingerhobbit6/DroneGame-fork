@@ -9,7 +9,7 @@ The map switcher sits beside the minimap, with a preview of each map. The topogr
 | Part | State |
 |---|---|
 | Pack builder, `tools/mapbuild/` | Done, with lidar, satellite, roads and names. Downloads the OS files it needs, and checks their checksums. |
-| Loading packs into the rules | Done, with grid bearings and real positions in SAPIENT messages |
+| Loading packs into the rules | Done, with grid bearings and real positions in [SAPIENT](SAPIENT.md) messages |
 | Map on the ground | OS map, satellite, shaded relief and live OpenStreetMap. Roads and names (hybrid), national grid, plan view. |
 | Start screen | Generated ground or a real map. The start point can be clicked on a map, typed as a grid reference, or taken from the laptop's location. |
 | No map at that spot | The app offers to build one, as a background job with progress |

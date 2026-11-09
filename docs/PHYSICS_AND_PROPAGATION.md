@@ -246,7 +246,7 @@ The open-field ranges are assessed, not computed from a link budget. The config 
 
 ### Direction finding and what is reported
 
-RF detectors report a bearing only: no range and no elevation (their `sapient.noise` has only `az`). Angle-of-arrival detectors have 2° to 3° bearing error, sector detectors 30° ([`unit-config.js:22`](../frontend/src/sim/unit-config.js#L22)). A position comes only from crossing bearings in the fusion node ([FUSION_AND_TARGETING.md](FUSION_AND_TARGETING.md)). The signal amplitude in the SAPIENT report is a cosmetic formula, -45 dB - 20 log₁₀(r / 100 m) plus 2 dB noise, not the output of a link budget ([`network/sensors.js:171`](../frontend/src/sim/network/sensors.js#L171)).
+RF detectors report a bearing only: no range and no elevation (their `sapient.noise` has only `az`). Angle-of-arrival detectors have 2° to 3° bearing error, sector detectors 30° ([`unit-config.js:22`](../frontend/src/sim/unit-config.js#L22)). A position comes only from crossing bearings in the fusion node ([FUSION_AND_TARGETING.md](FUSION_AND_TARGETING.md)). The signal amplitude in the [SAPIENT](SAPIENT.md) report is a cosmetic formula, -45 dB - 20 log₁₀(r / 100 m) plus 2 dB noise, not the output of a link budget ([`network/sensors.js:171`](../frontend/src/sim/network/sensors.js#L171)).
 
 The classifier library affects only what the detector names, not whether it detects ([`rf-model.js:14`](../frontend/src/sim/rf-model.js#L14)); with no library its false alarms double. A narrow receiver visits one band per report interval, so its interval is multiplied by the number of bands it monitors ([`unit-config.js:168`](../frontend/src/sim/unit-config.js#L168)).
 

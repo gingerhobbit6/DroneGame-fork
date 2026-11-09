@@ -27,7 +27,7 @@ The game runs in the browser. The backend stores and serves, and takes no part i
 
 | Layer | Folder | What it does |
 |---|---|---|
-| Simulation | [`frontend/src/sim/`](../frontend/src/sim/) | The rules: terrain, sensors, drones, effectors, the SAPIENT network and the tracker. No DOM and no rendering, so a whole game runs in Node for tests and balance work |
+| Simulation | [`frontend/src/sim/`](../frontend/src/sim/) | The rules: terrain, sensors, drones, effectors, the [SAPIENT](SAPIENT.md) network and the tracker. No DOM and no rendering, so a whole game runs in Node for tests and balance work |
 | Game wiring | [`game.js`](../frontend/src/game.js), [`tools.js`](../frontend/src/tools.js), [`zone.js`](../frontend/src/zone.js), [`patrol-draw.js`](../frontend/src/patrol-draw.js), [`drag.js`](../frontend/src/drag.js) | Joins the simulation to the view and runs the frame loop. Holds view-only state: the picked tool, the next placement's settings, the area being drawn |
 | Rendering | [`frontend/src/render/`](../frontend/src/render/) | The three.js scene. Reads simulation state each frame and draws it |
 | Interface | [`frontend/src/ui/`](../frontend/src/ui/) | React panels, the login page and profile, the wizard and the dock. Canvas diagrams inside the dock |
