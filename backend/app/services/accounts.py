@@ -111,11 +111,22 @@ class AccountService:
             raise Locked(LOCKOUT_SECONDS)
         raise SignInFailed
 
+    def _rejected_after_check(self, user: dict[str, Any], *fields: str) -> None:
+        """Preserve the lockout response if only the lock changed during slow hashing."""
+        current = self.store.by_id(user["id"])
+        now = self._now()
+        if current and all(current[field] == user[field] for field in fields) and current["locked_until"] > now:
+            raise Locked(current["locked_until"] - now)
+        raise SignInFailed
+
     def sign_in(self, username: str, password: str, remember: bool) -> tuple[int, str, int]:
         """Returns the account id, a new session token and how long it lasts in seconds."""
         user = self._check(username, password, "password_hash")
-        self.store.update(user["id"], failed_attempts=0, locked_until=0, last_sign_in=self.stamp())
-        return (user["id"], *self.start_session(user["id"], remember))
+        now, lasts = self._now(), REMEMBERED_SECONDS if remember else SESSION_SECONDS
+        token = secrets.token_urlsafe(32)
+        if not self.store.add_session_if_password(token_hash(token), user["id"], user["password_hash"], now, now + lasts, self.stamp()):
+            self._rejected_after_check(user, "password_hash")
+        return user["id"], token, lasts
 
     def start_session(self, user_id: int, remember: bool = False) -> tuple[str, int]:
         now, lasts = self._now(), REMEMBERED_SECONDS if remember else SESSION_SECONDS
@@ -134,32 +145,39 @@ class AccountService:
         """Sets a new password with the recovery code, signs out everywhere, and returns the next recovery code."""
         user = self._check(username, _clean_code(code), "recovery_hash")
         fresh = new_recovery_code()
-        self.store.update(user["id"], password_hash=hash_secret(new_password), recovery_hash=hash_secret(_clean_code(fresh)), failed_attempts=0, locked_until=0)
-        self.store.drop_sessions(user["id"])
+        if not self.store.reset_if_recovery(user["id"], user["recovery_hash"], hash_secret(new_password), hash_secret(_clean_code(fresh)), self._now()):
+            self._rejected_after_check(user, "recovery_hash")
         return fresh
 
-    def _confirm(self, user_id: int, password: str) -> None:
-        username = self.store.profile(user_id)["username"]
-        self._check(username, password, "password_hash")
+    def _confirm(self, user_id: int, password: str) -> dict[str, Any]:
+        user = self.store.by_id(user_id)
+        if user is None:
+            raise SignInFailed
+        verified = self._check(user["username"], password, "password_hash")
+        if verified["id"] != user_id:
+            raise SignInFailed
+        return verified
 
     def change_password(self, user_id: int, current: str, new: str, token: str) -> None:
         """Every other session is signed out, so a stolen session cannot outlive the change."""
-        self._confirm(user_id, current)
-        if new.lower() == self.store.profile(user_id)["username"].lower():
+        user = self._confirm(user_id, current)
+        if new.lower() == user["username"].lower():
             raise SameAsUsername
-        self.store.update(user_id, password_hash=hash_secret(new), failed_attempts=0)
-        self.store.drop_sessions(user_id, keep=token_hash(token))
+        if not self.store.change_password_if_current(user_id, user["password_hash"], hash_secret(new), token_hash(token), self._now()):
+            self._rejected_after_check(user, "password_hash")
 
     def replace_recovery_code(self, user_id: int, password: str) -> str:
-        self._confirm(user_id, password)
+        user = self._confirm(user_id, password)
         code = new_recovery_code()
-        self.store.update(user_id, recovery_hash=hash_secret(_clean_code(code)), failed_attempts=0)
+        if not self.store.replace_recovery_if_current(user_id, user["password_hash"], user["recovery_hash"], hash_secret(_clean_code(code)), self._now()):
+            self._rejected_after_check(user, "password_hash", "recovery_hash")
         return code
 
     def delete_account(self, user_id: int, password: str) -> None:
         """Deletes the account with its sessions and packs, once the password is confirmed. Shared saves stay."""
-        self._confirm(user_id, password)
-        self.store.delete_user(user_id)
+        user = self._confirm(user_id, password)
+        if not self.store.delete_user_if_password(user_id, user["password_hash"], self._now()):
+            self._rejected_after_check(user, "password_hash")
 
     def profile(self, user_id: int) -> dict[str, Any]:
         return self.store.profile(user_id)

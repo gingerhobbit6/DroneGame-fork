@@ -7,7 +7,8 @@ from fastapi.responses import FileResponse
 from pydantic import Field, model_validator
 
 from app.schemas import Strict
-from app.services.packs import BuildBusy, PackBuilder, PackLibrary, on_a_grid
+from app.routes.auth import UserId
+from app.services.packs import BuildBusy, BuildRateLimited, BuildStorageLimited, PackBuilder, PackLibrary, on_a_grid
 
 router = APIRouter(prefix="/api/v1/packs")
 
@@ -52,11 +53,15 @@ def build_status(jobs: Builder) -> dict[str, Any]:
 
 
 @router.post("/build", status_code=status.HTTP_202_ACCEPTED)
-def build_pack(body: BuildRequest, jobs: Builder) -> dict[str, Any]:
+def build_pack(body: BuildRequest, jobs: Builder, user_id: UserId) -> dict[str, Any]:
     try:
-        return jobs.start(body.east, body.north, body.lidar)
+        return jobs.start(body.east, body.north, body.lidar, user_id)
     except BuildBusy:
         raise HTTPException(status.HTTP_409_CONFLICT, "A map is already being built.") from None
+    except BuildRateLimited as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "The map build daily limit has been reached.", headers={"Retry-After": str(exc.retry_after)}) from None
+    except BuildStorageLimited as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
 
 
 @router.get("/{name}")

@@ -1,6 +1,7 @@
 """Migrations, and the rule that a failed one leaves the data alone."""
 
 import sqlite3
+import shutil
 
 import pytest
 
@@ -24,16 +25,16 @@ def write(folder, name, sql):
 
 
 def test_from_empty_builds_every_table(conn):
-    assert migrate(conn) == 2
-    assert version(conn) == 2
-    assert {"laydowns", "runs", "figure_sets", "users", "sessions", "units"} <= tables(conn)
+    assert migrate(conn) == 3
+    assert version(conn) == 3
+    assert {"laydowns", "runs", "figure_sets", "users", "sessions", "units", "account_sequence"} <= tables(conn)
 
 
 def test_running_again_changes_nothing(conn):
     migrate(conn)
     conn.execute("INSERT INTO figure_sets (name, figures, game_version, created_at) VALUES ('a', '{}', '1', 'now')")
     conn.commit()
-    assert migrate(conn) == 2
+    assert migrate(conn) == 3
     assert conn.execute("SELECT COUNT(*) FROM figure_sets").fetchone()[0] == 1
 
 
@@ -84,8 +85,26 @@ def test_open_database_creates_the_folder(tmp_path):
     open_database(path)
     open_database(path)
     conn = connect(path)
-    assert version(conn) == 2
+    assert version(conn) == 3
     conn.close()
+
+
+def test_existing_account_ids_are_kept_and_never_reissued(conn, tmp_path):
+    for file in MIGRATIONS.glob("000[12]_*.sql"):
+        shutil.copyfile(file, tmp_path / file.name)
+    assert migrate(conn, tmp_path) == 2
+    conn.execute(
+        "INSERT INTO users (id, username, display_name, password_hash, recovery_hash, created_at) "
+        "VALUES (42, 'existing', 'Existing', 'hash', 'recovery', 'now')"
+    )
+    conn.commit()
+    file = next(MIGRATIONS.glob("0003_*.sql"))
+    shutil.copyfile(file, tmp_path / file.name)
+    assert migrate(conn, tmp_path) == 3
+    assert conn.execute("SELECT id FROM users WHERE username = 'existing'").fetchone()[0] == 42
+    conn.execute("DELETE FROM users WHERE id = 42")
+    conn.execute("UPDATE account_sequence SET last_id = last_id + 1 WHERE singleton = 1")
+    assert conn.execute("SELECT last_id FROM account_sequence").fetchone()[0] == 43
 
 
 def test_json_columns_refuse_invalid_json(conn):
