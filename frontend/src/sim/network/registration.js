@@ -16,30 +16,48 @@ export function createRegistration(core, raiseAlert) {
     if (def.range) caps.push({ category: 'performance', type: 'maximum range', value: String(def.range), units: 'm' });
     if (def.sapient.interval) caps.push({ category: 'performance', type: 'report interval', value: String(def.sapient.interval), units: 's' });
     if (def.ref && def.ref.analogues) caps.push({ category: 'reference', type: 'real-world analogue', value: def.ref.analogues.join(' / ') });
+    caps.push({ category: 'configuration', type: 'role', value: def.role }); // the standard needs at least one
     return caps;
   }
 
+  // The commands a node accepts, so a fusion node from another maker would know a camera can be pointed or an effector told to engage.
+  // `units` lists the values a command takes; completion_time is how long it takes at most (a camera's half-turn at its slew rate).
+  function commands(s, modes) {
+    const def = s.def, cmd = (type, units, secs = 0) => ({ units, completion_time: dur(secs), type });
+    if (def.fov) return [cmd('COMMAND_TYPE_LOOK_AT', 'location_list', def.slewRate ? S.round(180 / def.slewRate, 1) : 0), cmd('COMMAND_TYPE_MODE_CHANGE', modes.join(', '))];
+    if (def.kind === 'jammer') return [cmd('COMMAND_TYPE_MODE_CHANGE', modes.join(', '))];
+    if (def.role === 'effector') return [cmd('COMMAND_TYPE_REQUEST', 'Engage')]; // command_parameter carries the track's object_id
+    return [];
+  }
+
+  // shortcut: region tasks are declared because the standard requires a region definition, but no node acts on one; honour them if the
+  // fusion node ever sends regions.
+  const taskDefinition = (cmds) => ({
+    concurrent_tasks: cmds.length ? 1 : 0,
+    region_definition: { region_type: ['REGION_TYPE_AREA_OF_INTEREST'], region_area: [{ location_units: 'LOCATION_COORDINATE_SYSTEM_LAT_LNG_DEG_M', location_datum: 'LOCATION_DATUM_WGS84_E' }] },
+    ...(cmds.length ? { command: cmds } : {}),
+  });
+  const UAV_CLASS = [{ class_definition: [{ type: 'Air Vehicle', sub_class: [{ type: 'UAV', level: 1 }] }] }];
+  const ENU = { enu_velocity_units: { east_north_rate_units: 'SPEED_UNITS_MS', up_rate_units: 'SPEED_UNITS_MS' }, location_datum: 'LOCATION_DATUM_WGS84_E' };
+
   function modeDefinitions(s) {
     const def = s.def, sp = def.sapient;
-    if (def.role === 'sensor') {
-      return (sp.modes || ['Detect']).map((name, i) => ({
-        mode_name: name, mode_type: i === 0 ? 'MODE_TYPE_DEFAULT' : 'MODE_TYPE_TEMPORARY', mode_description: `${def.name} ${name.toLowerCase()}`,
-        settle_time: dur(0), maximum_latency: dur(sp.interval || 1),
-        scan_type: sp.scan, tracking_type: 'TRACKING_TYPE_TRACK',
-        detection_definition: [{
-          location_type: { range_bearing_units: RB_UNITS, range_bearing_datum: rbDatum() },
-          detection_class_definition: [{ class_definition: [{ type: 'Air Vehicle', sub_class: [{ type: 'UAV' }] }] }],
-        }],
-      }));
-    }
     if (def.role === 'fusion') {
-      return [{ mode_name: 'Fuse', mode_type: 'MODE_TYPE_DEFAULT', mode_description: 'Track fusion and effector tasking', tracking_type: 'TRACKING_TYPE_TRACK_WITH_RE_ID' }];
+      return [{
+        mode_name: 'Fuse', mode_type: 'MODE_TYPE_DEFAULT', mode_description: 'Track fusion and effector tasking', settle_time: dur(0),
+        tracking_type: 'TRACKING_TYPE_TRACK_WITH_RE_ID', task: taskDefinition([]),
+        detection_definition: [{ location_type: { location_units: 'LOCATION_COORDINATE_SYSTEM_LAT_LNG_DEG_M', location_datum: 'LOCATION_DATUM_WGS84_E' }, detection_class_definition: UAV_CLASS, velocity_type: ENU }],
+      }];
     }
-    const modes = sp.modes || ['Ready'];
+    const modes = sp.modes || [def.role === 'sensor' ? 'Detect' : 'Ready'];
+    const task = taskDefinition(commands(s, modes));
     return modes.map((name, i) => ({
-      mode_name: name, mode_type: i === 0 ? 'MODE_TYPE_DEFAULT' : 'MODE_TYPE_TEMPORARY',
-      mode_description: `${def.name} ${name.toLowerCase()}`, scan_type: sp.scan,
-      task: { concurrent_tasks: 1 },
+      mode_name: name, mode_type: i === 0 ? 'MODE_TYPE_DEFAULT' : 'MODE_TYPE_TEMPORARY', mode_description: `${def.name} ${name.toLowerCase()}`,
+      settle_time: dur(0), scan_type: sp.scan, task,
+      ...(def.role === 'sensor' ? {
+        maximum_latency: dur(sp.interval || 1), tracking_type: 'TRACKING_TYPE_TRACK',
+        detection_definition: [{ location_type: { range_bearing_units: RB_UNITS, range_bearing_datum: rbDatum() }, detection_class_definition: UAV_CLASS, ...(sp.velocity ? { velocity_type: ENU } : {}) }],
+      } : {}),
     }));
   }
 

@@ -246,7 +246,7 @@ describe('playing on a real world', () => {
     expect(status.msg.status_report.node_location.y).toBeCloseTo(51.41, 3);
     expect(status.msg.status_report.node_location.z).toBeCloseTo(100 + 48.5 + 80, 0);
     setUp(sim, { seed: '1', laydown: MIXED });
-    const reg = bus.entries.find((e) => e.msg.registration?.mode_definition[0].detection_definition);
+    const reg = bus.entries.find((e) => e.msg.registration?.mode_definition[0].detection_definition?.[0].location_type.range_bearing_units); // a sensor, not the fusion node
     expect(reg.msg.registration.mode_definition[0].detection_definition[0].location_type.range_bearing_datum).toBe('RANGE_BEARING_DATUM_GRID');
   });
   it('plays a game repeatably, and goes back to true north on generated ground', () => {
