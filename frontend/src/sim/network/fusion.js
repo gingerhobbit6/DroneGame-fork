@@ -68,7 +68,7 @@ export function createFusion(core, { raiseAlert }) {
     body.location = S.location(tr.est.east, tr.est.north, tr.est.up, Math.max(tr.estErr, 5));
     body.detection_confidence = round(Math.min(0.99, 0.4 + 0.12 * tr.hits), 2);
     if (tr.cls) body.classification = tr.cls;
-    body.behaviour = [{ type: isLoitering(tr) ? 'Loitering' : 'Approaching', confidence: 0.7 }];
+    body.behaviour = [{ type: isLoitering(tr) ? 'Loitering' : (tr.closing ?? 0) < -FUSION.minClosing ? 'Departing' : 'Approaching', confidence: 0.7 }];
     if (srcs.length) body.derived_detection = srcs.map(([id, v]) => ({ timestamp: v.ts, node_id: id, object_id: v.objectId }));
     const e = tracker.estimate(tr, T());
     body.enu_velocity = { east_rate: round(e.vel[0], 2), north_rate: round(e.vel[1], 2), up_rate: round(e.vel[2], 2) };

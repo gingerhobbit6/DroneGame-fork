@@ -29,7 +29,10 @@ describe('location', () => {
 
 describe('validation', () => {
   const valid = {
-    registration: { node_definition: [{}], icd_version: 'v', name: 'n', short_name: 's', status_definition: { status_interval: {} } },
+    registration: {
+      node_definition: [{}], icd_version: 'v', capabilities: [{}], status_definition: { status_interval: {} }, config_data: [{ manufacturer: 'm', model: 'm' }],
+      mode_definition: [{ mode_name: 'Detect', mode_type: 'MODE_TYPE_DEFAULT', settle_time: {}, task: { region_definition: {} } }],
+    },
     registration_ack: { acceptance: true },
     status_report: { report_id: ULID, system: 'SYSTEM_OK', info: 'INFO_NEW', mode: 'Detect' },
     detection_report: { report_id: ULID, object_id: ULID, location: {} },

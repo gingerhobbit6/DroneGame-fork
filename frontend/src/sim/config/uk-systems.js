@@ -203,7 +203,7 @@ export const UK_SYSTEMS = {
     health: 30, signature: 1.5, emits: [],
     dps: 56, magazine: 600, reloadTime: 300,
     desc: 'British radio frequency weapon that burns out a drone’s electronics, so even fibre-optic drones are at risk. Not yet in service. Listed here until the game has a row for it.',
-    sapient: { nodeType: 'NODE_TYPE_LDEW', subType: ['RF directed energy'], scan: 'SCAN_TYPE_STEERABLE' },
+    sapient: { nodeType: 'NODE_TYPE_RFDEW', subType: ['RF directed energy'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Radio frequency directed energy weapon',
       analogues: ['Thales RapidDestroyer (RFDEW)'],
