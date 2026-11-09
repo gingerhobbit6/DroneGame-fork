@@ -78,6 +78,7 @@ export function pickTarget(w, d) {
   let best = null, bs = 0.3;
   const reach = u(d.def.seekRange ?? 3000);
   for (const s of w.structures) {
+    if (Math.abs(s.pos.x - d.pos.x) > reach || Math.abs(s.pos.z - d.pos.z) > reach) continue; // hypot is never below either side, so no square root
     const dist = hdist(s.pos, d.pos);
     if (dist > reach) continue;
     const score = d.def.antiRadar ? emission(s) : emitterScore(s) / (1 + dist / u(1500));

@@ -25,7 +25,6 @@ export const view = {
   replayCasualties: null, // how many in each group were down at the moment being reviewed, or null when live
   selected: null, // the system the Unit panel is showing
   eye: null, // the system whose mast the camera is on, for the ground view, or null for the map view
-  osm: false, // demo: OpenStreetMap tiles as the picture on the ground
   zone: null, // the area to defend as it is drawn: { points: [[x, z]...], closed }. game.js gives the simulation a closed one
   route: null, // a patrol route while it is being drawn, in the same shape. Once closed it goes to the simulation, which draws it from there
   spot: null, // a spot the wizard is suggesting: { x, z }

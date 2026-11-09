@@ -9,14 +9,14 @@ import { drawScale } from './drone-models.js';
 import { droneTemplate } from './models.js';
 import { trackColour } from './belief-view.js';
 import { labelLift } from './structure-view.js';
-import { hexCss, setText } from './labels.js';
-import { SYMBOL_PX, asSymbol, droneSymbol, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
+import { hexCss, setStyle, setText } from './labels.js';
+import { asSymbol, droneTagHeight, styleDrone, styleTrack, symbolSprite, trackTagOpacity, trackTagShown } from './symbols.js';
 
 // deps: what lives in the game: { scene, rec, labels, getStructures, labelOf, hideLive, getLastSpeed, setPaused, resume }
 export function createReplay(deps) {
   const { scene, rec, labels } = deps;
   const review = { active: false, idx: 0, playing: false };
-  const u = (m) => m / WORLD.metresPerUnit;
+  const at = new THREE.Vector3();
 
   // ---------- the view ----------
   const group = new THREE.Group(); // in the scene only while reviewing: three walks even a hidden group's children every frame
@@ -51,12 +51,12 @@ export function createReplay(deps) {
       seen.add(d.u);
       const o = droneObj(d);
       o.group.visible = view.truth;
-      const def = DRONES[d.type], k = drawScale(def), symbol = asSymbol(k * WORLD.metresPerUnit);
+      const def = DRONES[d.type], dist = camera.position.distanceTo(at.set(d.x, d.y, d.z));
+      const k = drawScale(def, view.eye ? dist : view.zoom), symbol = asSymbol(k * WORLD.metresPerUnit); // as the live view draws it
       o.group.position.set(d.x, d.y, d.z); o.group.rotation.y = d.ry; o.group.scale.setScalar(k);
-      o.model.visible = d.tracked && !symbol; o.unseen.visible = !d.tracked && !symbol; o.symbol.visible = symbol;
-      if (symbol) { setSymbol(o.symbol, droneSymbol(def, d.tracked)); o.symbol.material.opacity = d.tracked ? 1 : 0.6; o.symbol.scale.setScalar(symbolScale(SYMBOL_PX, k)); }
-      labels.place(o.label, d.x, d.y + Math.max(DRONES[d.type].size * o.group.scale.y * 0.7, 0.004 * view.zoom), d.z, view.truth && view.labels);
-      o.label.style.opacity = d.tracked ? '1' : '0.5';
+      styleDrone(o, def, d.tracked, symbol, k);
+      labels.place(o.label, d.x, d.y + Math.max(droneTagHeight(def, symbol, k, dist), 0.004 * view.zoom), d.z, view.truth && view.labels);
+      setStyle(o.label, 'opacity', d.tracked ? '1' : '0.5');
     }
     for (const [uid, o] of droneObjs) if (!seen.has(uid)) { o.group.visible = false; o.label.style.display = 'none'; }
 
@@ -67,13 +67,12 @@ export function createReplay(deps) {
       }, i);
       o.mesh.visible = true;
       o.mesh.position.set(tr.x, tr.y, tr.z);
-      setSymbol(o.mesh, trackSymbol(tr)); // the same symbol the live track had
-      o.mesh.scale.setScalar(symbolScale(tr.status === 'tentative' ? SYMBOL_PX * 0.75 : SYMBOL_PX));
-      o.mesh.material.color.setScalar(tr.status === 'coasting' ? 0.55 : 1);
-      o.label.style.borderColor = hexCss(trackColour(tr));
+      styleTrack(o.mesh, tr, view.trackHi); // as the live track was drawn
+      setStyle(o.label, 'borderColor', hexCss(trackColour(tr)));
+      setStyle(o.label, 'opacity', trackTagOpacity(tr, view.trackHi));
       const cls = tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV';
       setText(o.label, tr.status === 'tentative' ? 'tentative' : `${tr.short} · ${cls}${tr.kill ? ' · kill reported' : ''}`);
-      labels.place(o.label, tr.x, tr.y, tr.z, view.labels);
+      labels.place(o.label, tr.x, tr.y, tr.z, view.labels && trackTagShown(tr, view.trackHi), 8);
     });
     for (let i = f.tracks.length; i < trackObjs.length; i++) { trackObjs[i].mesh.visible = false; trackObjs[i].label.style.display = 'none'; }
 
@@ -118,7 +117,7 @@ export function createReplay(deps) {
   // ---------- reviewing ----------
   function enter(idx) {
     if (!rec.frames.length) return;
-    if (!review.active) { review.active = true; deps.setPaused(true); }
+    if (!review.active) { review.active = true; deps.setPaused(); }
     review.idx = Math.max(0, Math.min(idx, rec.frames.length - 1));
   }
   function exit() {

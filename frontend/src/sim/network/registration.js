@@ -117,11 +117,11 @@ export function createRegistration(core, raiseAlert) {
       node_location: S.location(s.pos.x * mpu(), -s.pos.z * mpu(), antennaM(s)),
     };
     if (s.task) body.active_task_id = s.task.id;
-    const st = s.def.sapient.status, env = CONDITIONS[ENV.now];
+    const def = s.def, env = CONDITIONS[ENV.now];
     const status = (type, value) => ({ status_level: 'STATUS_LEVEL_INFORMATION_STATUS', status_type: type, status_value: value });
     body.status = [
-      ...(st ? [status(st.type, st.value)] : []),
-      ...(s.def.role === 'sensor' ? [status('STATUS_TYPE_ILLUMINATION', env.light), status('STATUS_TYPE_WEATHER', env.weather)] : []), // what it is working in
+      ...(def.lowAlt ? [status('STATUS_TYPE_CLUTTER', `Targets below ${def.lowAlt} m masked beyond ${Math.round(def.lowRange)} m`)] : []), // its clutter range as edited and set
+      ...(def.role === 'sensor' ? [status('STATUS_TYPE_ILLUMINATION', env.light), status('STATUS_TYPE_WEATHER', env.weather)] : []), // what it is working in
     ];
     if (!body.status.length) delete body.status;
     const res = send(S.envelope(s.nodeId, 'status_report', body), s.nodeId, routeTo(s));

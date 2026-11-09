@@ -2,14 +2,15 @@
 // Every field changes the simulation, and every gain has a cost: price, older data, a louder signature or more false alarms.
 // The limits, prices and threshold factors are assumptions: tune them here. Saved values are untrusted, so only keys in this table are read.
 
-import { STRUCTURES, TX_POWER } from './config/index.js';
+import { STRUCTURES, TOOLBAR, TX_POWER } from './config/index.js';
 import { BANDS, CLUTTER, arcsText, bandOf, bandRange, bandSharpness, beamGain, lowestEdge, parseArcs } from './sensor-model.js';
 import { CHANNELS, PIXELS } from './camera-model.js';
 import { weatherRange } from './conditions.js';
 import { JAM_BANDS, LIBRARIES, covers, parseBands } from './rf-model.js';
 
 const each = (ids, limits) => Object.fromEntries(ids.map((id) => [id, limits]));
-const RADARS = ['radar_s', 'radar_a400', 'radar', 'radar_a800', 'radar_giraffe', 'radar_l'], RFS = ['rf_s', 'rf', 'rf_elysion', 'rf_airfence', 'rf_l'], CAMERAS = ['camera_s', 'camera', 'camera_l'], JAMMERS = ['jammer_s', 'jammer', 'jammer_neo', 'jammer_jupiter', 'jammer_auds', 'jammer_l', 'jammer_sf', 'jammer_mk4', 'jammer_skywiper', 'jammer_kvertus', 'jammer_dgmk3', 'jammer_dgtac'], ACOUSTICS = ['acoustic_s', 'acoustic', 'acoustic_l'];
+const ofKind = (kind) => TOOLBAR.find((row) => row.kind === kind).classes; // every system of a kind, as the purchase bar lists them
+const RADARS = ofKind('radar'), RFS = ofKind('rf'), CAMERAS = ofKind('camera'), JAMMERS = ofKind('jammer'), ACOUSTICS = ofKind('acoustic');
 const PANELLED = { radar_s: [1, 3], radar_l: [1, 3], radar_a800: [1, 4], radar_a400: [1, 4] }; // fixed-panel radars: up to all round
 const MEDIUM_UP = RADARS.filter((id) => STRUCTURES[id].size !== 'S'); // 2D is offered on Medium and Large radars
 const TOP_EDGE = Object.fromEntries(RADARS.filter((id) => STRUCTURES[id].elevation + lowestEdge > 15).map((id) => [id, [15, STRUCTURES[id].elevation + lowestEdge]])); // a narrow beam keeps its top

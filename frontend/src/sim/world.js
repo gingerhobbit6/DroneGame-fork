@@ -36,6 +36,9 @@ export function pickMasts({ N, cell, R, ground }, rng, minGround) {
   return towers;
 }
 
+// Can a camera, laser, gun or eye see along a line of sight los() traced? Through a little canopy, but not much.
+export const clearSight = (r) => r.clear && r.canopy <= TERRAIN.opticalCanopyTol;
+
 export function makeWorld({ seed, N, cell, R, ground, canopy, bldg, cover, buildings, lines, towers, station, geo = null }) {
   const at = (i, j) => j * N + i;
 

@@ -15,7 +15,6 @@ export const SENSORS = {
     sapient: {
       nodeType: 'NODE_TYPE_RADAR', subType: ['Surveillance', 'C-UAS'], scan: 'SCAN_TYPE_SCANNING', interval: 1,
       noise: { az: 0.6, el: 1.2, range: 8 }, velocity: true,
-      status: { type: 'STATUS_TYPE_CLUTTER', value: 'Targets below 40 m masked beyond 500 m' },
     },
     ref: {
       class: 'Counter-UAS surveillance radar, medium range',
@@ -45,7 +44,6 @@ export const SENSORS = {
     sapient: {
       nodeType: 'NODE_TYPE_RADAR', subType: ['Compact', 'C-UAS'], scan: 'SCAN_TYPE_FIXED', interval: 1,
       noise: { az: 1.0, el: 2.0, range: 10 }, velocity: true,
-      status: { type: 'STATUS_TYPE_CLUTTER', value: 'Targets below 30 m masked beyond 300 m' },
     },
     ref: {
       class: 'Compact 3D drone-detection radar',
@@ -70,7 +68,6 @@ export const SENSORS = {
     sapient: {
       nodeType: 'NODE_TYPE_RADAR', subType: ['Multi-mode', 'C-UAS'], scan: 'SCAN_TYPE_SCANNING', interval: 1,
       noise: { az: 0.6, el: 1.2, range: 8 }, velocity: true,
-      status: { type: 'STATUS_TYPE_CLUTTER', value: 'Targets below 40 m masked beyond 500 m' },
     },
     ref: {
       class: 'Counter-UAS surveillance radar, medium range',
@@ -94,7 +91,6 @@ export const SENSORS = {
     sapient: {
       nodeType: 'NODE_TYPE_RADAR', subType: ['Air defence', 'C-UAS'], scan: 'SCAN_TYPE_SCANNING', interval: 1,
       noise: { az: 0.3, el: 0.6, range: 5 }, velocity: true,
-      status: { type: 'STATUS_TYPE_CLUTTER', value: 'Targets below 30 m masked beyond 800 m' },
     },
     ref: {
       class: 'Long-range air-defence and C-UAS radar',

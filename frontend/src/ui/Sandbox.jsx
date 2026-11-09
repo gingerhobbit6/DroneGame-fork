@@ -45,7 +45,7 @@ export function Sandbox() {
       <div id="sandbox" className={`panel${state.sandbox ? '' : ' hidden'}`} data-movable style={style}>
         <button id="sb-minimise" aria-expanded={!small} aria-label={small ? 'Expand the sandbox panel' : 'Minimise the sandbox panel'} title={small ? 'Expand' : 'Minimise'} onClick={() => setSmall(!small)}>{small ? '▢' : '–'}</button>
         <h3 title="Drag to move. Double-click to put it back." {...handle}>SANDBOX</h3>
-        {!small && <>
+        {state.sandbox && !small && <>{/* hidden outside the sandbox, so its rows need not re-render every refresh */}
         <div className="note">Attack your laydown without consequences: the site and your systems cannot be damaged and shots are free. Leaving resets the run and keeps your laydown, so you can still place and wire systems here.</div>
         <label>Enemy has adapted to wave{' '}
           <select id="sb-level" value={state.sbLevel} onChange={(e) => commands.setSandboxLevel(Number(e.target.value))}>

@@ -54,7 +54,23 @@ export function selectionFrom(tool, tagged, pick) {
 
 // getTool() is a structure id, 'sell', 'zone', 'people' or null. A left click first calls onSelect(screenX, screenY), which returns true if
 // it dealt with the click. Otherwise it calls onGroundClick(x, z).
-export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getTool, defFor = (tool) => STRUCTURES[tool], onGroundClick, onSelect, onDrop = () => {} }) {
+// Where a ray first meets the ground inside the world, or null: step out along it, each step a little longer, then halve the last one.
+// Testing the ground mesh's 580,000 triangles instead took about 16 ms, on every mouse move.
+export function groundHit(ray, far, out) {
+  const { origin: o, direction: d } = ray, edge = terrainState.data.R / WORLD.metresPerUnit;
+  const under = (t) => {
+    const x = o.x + d.x * t, z = o.z + d.z * t;
+    return Math.abs(x) <= edge && Math.abs(z) <= edge && o.y + d.y * t <= hereU(x, z);
+  };
+  for (let last = 0, step = u(5), t = step; t < far; last = t, step *= 1.02, t += step) {
+    if (!under(t)) continue;
+    for (let k = 0; k < 12; k++) { const mid = (last + t) / 2; if (under(mid)) t = mid; else last = mid; }
+    return out.set(o.x + d.x * t, o.y + d.y * t, o.z + d.z * t);
+  }
+  return null;
+}
+
+export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = (tool) => STRUCTURES[tool], onGroundClick, onSelect, onDrop = () => {} }) {
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -64,10 +80,7 @@ export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getT
   function updateMouse(e) {
     ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    const mesh = getWorldMesh();
-    const hit = mesh ? raycaster.intersectObject(mesh, false)[0] : null; // the terrain
-    if (hit) { mouseGround.copy(hit.point); mouseOnGround = true; }
-    else mouseOnGround = !!raycaster.ray.intersectPlane(groundPlane, mouseGround);
+    mouseOnGround = !!(groundHit(raycaster.ray, camera.far, mouseGround) || raycaster.ray.intersectPlane(groundPlane, mouseGround));
     if (mouseOnGround) mouseGround.y = hereU(mouseGround.x, mouseGround.z);
   }
   canvas.addEventListener('pointermove', updateMouse);
@@ -112,7 +125,7 @@ export function createPlacement({ scene, camera, canvas, getWorldMesh, sim, getT
     if (def) {
       const r = u(def.range);
       ghostRadii = usesPath(def) ? new Array(BEARINGS).fill(r) : null;
-      ghostRing = drapedRing(r, ringThickness(r) * 1.5, 0xffffff, 0.5, 160, 0.5, ghostRadii);
+      ghostRing = drapedRing(r, ringThickness(r) * 1.5, 0xffffff, 0.5, 160, ghostRadii);
       ghostRing.mesh.material.dispose();
       ghostRing.mesh.material = ghostMat; // shares the green/red placement colour
       ghost.add(ghostRing.mesh);

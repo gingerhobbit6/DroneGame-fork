@@ -73,13 +73,17 @@ def scenes_for(window: Window, years: list[int], crs: int = BRITISH_CRS) -> list
     return sorted(found.values(), key=lambda i: i["properties"]["eo:cloud_cover"])
 
 
-def composite(layers: list[np.ndarray]) -> np.ndarray:
-    """The median of each pixel across scenes, which removes leftover cloud. A value of 0 means no data."""
-    cube = np.stack(layers).astype("float32")
-    cube[cube == 0] = np.nan
+def composite(layers: list[np.ndarray], rows: int = 500) -> np.ndarray:
+    """The median of each pixel across scenes, which removes leftover cloud. A value of 0 means no data.
+    Taken a strip of `rows` at a time, as the median of a whole 70 km stack needs many times its size in memory."""
+    picture = np.empty(layers[0].shape, "uint8")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        return np.nan_to_num(np.nanmedian(cube, axis=0), nan=0).clip(0, 255).astype("uint8")
+        for top in range(0, picture.shape[1], rows):
+            cube = np.stack([layer[:, top:top + rows] for layer in layers]).astype("float32")
+            cube[cube == 0] = np.nan
+            picture[:, top:top + rows] = np.nan_to_num(np.nanmedian(cube, axis=0), nan=0).clip(0, 255).astype("uint8")
+    return picture
 
 
 def satellite(window: Window, years: list[int], say, crs: int = BRITISH_CRS) -> tuple[list[dict], int | None]:

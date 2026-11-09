@@ -36,7 +36,7 @@ export const SITE = {
   maxHealth: 100,
 };
 
-export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, lockAfterStart: true, maxSystems: 200 }; // maxSystems: what a save holds (MAX_SYSTEMS in backend/app/schemas.py)
+export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, maxSystems: 200 }; // maxSystems: what a save holds (MAX_SYSTEMS in backend/app/schemas.py)
 
 // Procedural terrain. The terrain seed is separate from the scenario seed, so you can change the attack
 // without changing the ground (or the other way round). Heights are metres above the station base.

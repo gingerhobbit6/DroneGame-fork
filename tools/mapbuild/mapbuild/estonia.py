@@ -33,6 +33,7 @@ SURFACE_PER_CELL = CELL // SURFACE_M
 HEIGHTS_M = 10
 HEIGHTS_PER_CELL = CELL // HEIGHTS_M
 MIN_BUILDING_PIXELS = 2  # of the 16 in a cell, before a footprint makes the cell solid
+BAND_CELLS = 500  # rows of cells reduced at a time
 
 FOREST = 10  # type "Mets" in ETAK: the other woody types are bushes and lone trees, too low to count as woodland
 MIN_LINE_KV = 35  # the local lines below this hang on poles, not the pylons OS maps show
@@ -57,10 +58,16 @@ def _need(data_root: str, name: str) -> str:
     return path
 
 
+def bands(rows: int, per_cell: int, band_cells: int = BAND_CELLS) -> list[slice]:
+    """Slices of fine rows, whole cells deep, so the copies a reduction makes exist for one band at a time rather than the whole window."""
+    step = band_cells * per_cell
+    return [slice(r, r + step) for r in range(0, rows, step)]
+
+
 def cells(fine: np.ndarray, per_cell: int) -> np.ndarray:
-    """A square of fine pixels to rows and columns of cells, with each cell's pixels on the last axis."""
-    side = fine.shape[0] // per_cell
-    return fine.reshape(side, per_cell, side, per_cell).transpose(0, 2, 1, 3).reshape(side, side, per_cell * per_cell)
+    """A block of fine pixels to rows and columns of cells, with each cell's pixels on the last axis."""
+    rows, columns = fine.shape[0] // per_cell, fine.shape[1] // per_cell
+    return fine.reshape(rows, per_cell, columns, per_cell).transpose(0, 2, 1, 3).reshape(rows, columns, per_cell * per_cell)
 
 
 def cell_mean(fine: np.ndarray, per_cell: int) -> np.ndarray:
@@ -86,7 +93,7 @@ def ground_posts(data_root: str, window: Window) -> np.ndarray:
             raise SystemExit(f"{HEIGHTS} is not on a {HEIGHTS_M} m grid, so it cannot be cut into the pack's cells")
         span = from_bounds(window.west - CELL / 2, window.south - CELL / 2, window.right + CELL / 2, window.top + CELL / 2, tif.transform).round_offsets().round_lengths()
         fine = tif.read(1, window=span, boundless=True, masked=True).astype("float32").filled(np.nan)
-    return cell_mean(fine, HEIGHTS_PER_CELL)
+    return np.concatenate([cell_mean(fine[b], HEIGHTS_PER_CELL) for b in bands(len(fine), HEIGHTS_PER_CELL)])
 
 
 def surface_pixels(data_root: str, window: Window) -> np.ndarray:
@@ -121,8 +128,9 @@ def lidar(data_root: str, window: Window, half: int, ground: np.ndarray, houses)
     solid = np.zeros(fine.shape, "uint8")
     if len(houses):
         rasterize(((mapping(s), 1) for s in houses), out=solid, transform=from_origin(west, top, SURFACE_M, SURFACE_M))
-    tall = cell_high(fine, SURFACE_PER_CELL)
-    tops = cell_high(np.where(solid == 1, fine, np.nan), SURFACE_PER_CELL, MIN_BUILDING_PIXELS)
+    parts = bands(len(fine), SURFACE_PER_CELL)
+    tall = np.concatenate([cell_high(fine[b], SURFACE_PER_CELL) for b in parts])
+    tops = np.concatenate([cell_high(np.where(solid[b] == 1, fine[b], np.nan), SURFACE_PER_CELL, MIN_BUILDING_PIXELS) for b in parts])
     reach = np.abs(np.arange(window.side) * CELL - window.half) <= half
     inside = reach[:, None] & reach[None, :]
     return {"ground": np.where(inside, ground, np.nan), "tall": np.where(inside, tall, np.nan), "houses": np.where(inside, tops, np.nan)}

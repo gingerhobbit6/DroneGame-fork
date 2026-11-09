@@ -16,8 +16,10 @@ export function createRecorder(now) {
   };
 }
 
-export function takeSnapshot({ state, drones, missiles, structures, net, people }) {
-  const m = WORLD.metresPerUnit;
+// A system doing what it was doing at the last snapshot shares that entry, so a long run keeps one object per change, not per frame.
+// Frames are only read, never changed.
+export function takeSnapshot({ state, drones, missiles, structures, net, people, rec }) {
+  const m = WORLD.metresPerUnit, last = rec?.frames.at(-1)?.structs;
   return {
     ...(people.length ? { casualties: people.map((g) => g.hits.length) } : {}),
     t: state.time, wave: state.wave, budget: state.budget, kills: state.kills, leaks: state.leaks, health: state.health,
@@ -26,9 +28,10 @@ export function takeSnapshot({ state, drones, missiles, structures, net, people 
       id: tr.id, short: tr.short, status: tr.status, airframe: tr.airframe, x: tr.est.east / m, y: tr.est.up / m, z: -tr.est.north / m, kill: !!tr.killWatch,
     })),
     missiles: missiles.map((mi) => ({ x: mi.pos.x, y: mi.pos.y, z: mi.pos.z })),
-    structs: structures.map((s) => {
-      const tr = s.task && net.tracks.get(s.task.trackId);
-      return { id: s.nodeId, mode: s.mode, target: s.task ? s.task.drone.uid : null, trackShort: tr ? tr.short : null, health: s.health, rounds: s.rounds, storage: s.storage, reload: s.reload, fired: s.fired };
+    structs: structures.map((s, i) => {
+      const tr = s.task && net.tracks.get(s.task.trackId), was = last?.[i];
+      const now = { id: s.nodeId, mode: s.mode, target: s.task ? s.task.drone.uid : null, trackShort: tr ? tr.short : null, health: s.health, rounds: s.rounds, storage: s.storage, reload: s.reload, fired: s.fired };
+      return was && Object.keys(now).every((k) => was[k] === now[k]) ? was : now;
     }),
   };
 }

@@ -4,9 +4,10 @@
 // link within 400 m: warned either way, the crew is ready by the time it comes into sight, and a jammer is pointed down its bearing
 // straight away. Nothing here draws a random number.
 
-import { CREW, TERRAIN, WORLD } from './config/index.js';
+import { CREW, WORLD } from './config/index.js';
 import { CONDITIONS, ENV } from './conditions.js';
 import { terrainState } from './terrain.js';
+import { clearSight } from './world.js';
 import { u } from './units.js';
 
 const SCAN = 0.5; // seconds between looks round for a new target
@@ -28,7 +29,7 @@ function crewSees(s, d) {
   const m = WORLD.metresPerUnit;
   if (s.pos.distanceTo(d.pos) * m > sightRange(d)) return false;
   const r = terrainState.data.los(s.pos.x * m, s.pos.y * m + (s.def.mount ?? EYE_HEIGHT), s.pos.z * m, d.pos.x * m, d.pos.y * m, d.pos.z * m);
-  return r.clear && r.canopy <= TERRAIN.opticalCanopyTol;
+  return clearSight(r);
 }
 
 // Keep the target while it can still be seen in reach, else look round for the nearest one that can; a jammer may also take one its
