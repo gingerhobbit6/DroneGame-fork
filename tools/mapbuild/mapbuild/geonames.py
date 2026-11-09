@@ -17,11 +17,22 @@ from .grid import Window
 URL = "https://download.geonames.org/export/dump/RU.zip"
 FOLDER = "geonames"
 MAX_BYTES = 60_000_000  # 15 MB in November 2026
+MAX_EXPANDED_BYTES = 500_000_000
+MAX_MEMBERS = 8
+MAX_RECORD_BYTES = 16_384
 CREDIT = "Place names past the border: GeoNames, geonames.org, CC BY 4.0"
 # Settlements only, leaving out ones GeoNames marks as historical, abandoned, destroyed or a part of another place.
 LEFT_OUT = {"PPLH", "PPLQ", "PPLW", "PPLX", "PPLCH"}
 TOWN_CODES = {"PPLC", "PPLA", "PPLA2", "PPLA3"}
 TOWN_PEOPLE = 2000  # a town is drawn as large as an Estonian town; anything smaller as a village
+
+
+def _checked_archive(archive: zipfile.ZipFile) -> None:
+    members = archive.infolist()
+    if (not 1 <= len(members) <= MAX_MEMBERS or len({m.filename.casefold() for m in members}) != len(members)
+            or "RU.txt" not in archive.namelist()
+            or sum(member.file_size for member in members) > MAX_EXPANDED_BYTES):
+        raise SystemExit("GeoNames archive expands beyond the expected size")
 
 
 def _fetch(target: str, say) -> None:
@@ -32,7 +43,8 @@ def _fetch(target: str, say) -> None:
         if len(data) > MAX_BYTES:
             raise SystemExit("The GeoNames file for Russia is far larger than expected")
         with zipfile.ZipFile(io.BytesIO(data)) as whole:
-            if "RU.txt" not in whole.namelist() or whole.testzip() is not None:
+            _checked_archive(whole)
+            if whole.testzip() is not None:
                 raise OSError("the GeoNames file did not arrive whole")
         return data
     say("downloading place names: GeoNames RU.zip")
@@ -56,9 +68,15 @@ def size_of(code: str, people: int) -> str:
 
 
 def _rows(path: str):
-    with zipfile.ZipFile(path) as whole, whole.open("RU.txt") as raw:
-        for line in io.TextIOWrapper(raw, encoding="utf-8"):
-            yield line.rstrip("\n").split("\t")
+    if os.path.getsize(path) > MAX_BYTES:
+        raise SystemExit("GeoNames archive is larger than expected")
+    with zipfile.ZipFile(path) as whole:
+        _checked_archive(whole)
+        with whole.open("RU.txt") as raw:
+            while line := raw.readline(MAX_RECORD_BYTES + 1):
+                if len(line) > MAX_RECORD_BYTES:
+                    raise SystemExit("GeoNames record is larger than expected")
+                yield line.decode("utf-8").rstrip("\n").split("\t")
 
 
 def place_names(data_root: str, window: Window, rows=None) -> tuple[np.ndarray, dict]:

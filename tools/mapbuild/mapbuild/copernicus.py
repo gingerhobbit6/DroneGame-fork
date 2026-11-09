@@ -16,6 +16,7 @@ from rasterio.warp import reproject
 
 from .estonia_files import AGENT, CRS, _retrying
 from .grid import CELL, Window
+from .source_limits import check_raster_blocks
 
 BUCKET = "https://copernicus-dem-30m.s3.amazonaws.com"
 FOLDER = "copernicus"
@@ -76,9 +77,11 @@ def ensure(data_root: str, window: Window, say) -> None:
 
 def _onto_posts(path: str, window: Window, resampling: Resampling) -> np.ndarray:
     out = np.full((window.side, window.side), np.nan, "float32")
-    with rasterio.open(path) as tif:
-        if tif.crs is None or tif.crs.to_epsg() != 4326:
+    with rasterio.open(path, driver="GTiff") as tif:
+        if (tif.crs is None or tif.crs.to_epsg() != 4326 or tif.count != 1
+                or tif.width > 6000 or tif.height > 6000 or tif.width * tif.height > 36_000_000):
             raise SystemExit(f"{os.path.basename(path)} is not in latitude and longitude")
+        check_raster_blocks(tif)
         reproject(rasterio.band(tif, 1), out, dst_transform=from_origin(window.west - CELL / 2, window.top + CELL / 2, CELL, CELL), dst_crs=CRS,
                   dst_nodata=np.nan, resampling=resampling)
     return out

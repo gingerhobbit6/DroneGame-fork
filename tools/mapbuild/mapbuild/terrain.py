@@ -20,6 +20,7 @@ from shapely import STRtree, box, intersects
 from shapely.geometry import mapping
 
 from .grid import CELL, Window, square_letters
+from .source_limits import check_raster_blocks, read_capped
 
 BASE = "https://environment.data.gov.uk/spatialdata"
 SERVICES = {
@@ -27,6 +28,7 @@ SERVICES = {
     "dsm": (f"{BASE}/lidar-composite-digital-surface-model-first-return-dsm-1m/wcs", "df4e3ec3-315e-48aa-aaaf-b5ae74d7b2bb__Lidar_Composite_Elevation_FZ_DSM_1m"),
 }
 SQUARE_M = 1000
+MAX_WCS_BYTES = 32_000_000
 POSTS_PER_SQUARE = SQUARE_M // CELL + 1
 TALL_M = 5  # cover at least this tall counts as trees
 MIN_BUILDING_SHARE = 0.1  # of a cell, before a footprint makes the cell solid
@@ -86,10 +88,12 @@ def terrain50(data_root: str, window: Window) -> tuple[np.ndarray, np.ndarray]:
 
 
 def read_square(data: bytes, east: int, north: int) -> np.ndarray:
-    with MemoryFile(data) as memory, memory.open() as tif:
+    with MemoryFile(data) as memory, memory.open(driver="GTiff") as tif:
         t = tif.transform
-        if tif.width != SQUARE_M or tif.height != SQUARE_M or abs(t.a - 1) > 1e-6 or abs(t.e + 1) > 1e-6 or abs(t.c - east) > 1e-3 or abs(t.f - (north + SQUARE_M)) > 1e-3:
+        if (tif.count != 1 or tif.width != SQUARE_M or tif.height != SQUARE_M or abs(t.a - 1) > 1e-6 or abs(t.e + 1) > 1e-6
+                or abs(t.b) > 1e-9 or abs(t.d) > 1e-9 or abs(t.c - east) > 1e-3 or abs(t.f - (north + SQUARE_M)) > 1e-3):
             raise ValueError(f"unexpected answer for {east},{north}")
+        check_raster_blocks(tif)
         values = tif.read(1).astype("float32")
     values[(values < -1000) | (values > 2000)] = np.nan  # the service's "missing" value, which it does not always declare
     return values
@@ -103,7 +107,7 @@ def fetch_square(service: tuple[str, str], east: int, north: int) -> np.ndarray:
     for attempt in range(6):
         try:
             with urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(query)}", timeout=120) as reply:
-                return read_square(reply.read(), east, north)  # a damaged answer fails here, and is fetched again
+                return read_square(read_capped(reply, MAX_WCS_BYTES, "lidar answer"), east, north)  # damaged answers are fetched again
         except (OSError, ValueError, urllib.error.URLError, Exception) as problem:  # noqa: B014 - rasterio raises its own errors
             if attempt >= 2 and getattr(problem, "code", None) == 500:
                 return np.full((SQUARE_M, SQUARE_M), np.nan, "float32")  # some all-sea squares always fail

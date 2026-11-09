@@ -21,7 +21,9 @@ def blank_posts(window: Window, pictures: list[dict]) -> np.ndarray:
     for p in pictures:
         if p["layer"] != "osmap":
             continue
-        with MemoryFile(p["data"]) as memory, memory.open() as jpeg:
+        with MemoryFile(p["data"]) as memory, memory.open(driver="JPEG") as jpeg:
+            if jpeg.count != 3 or jpeg.width * jpeg.height > 10_000_000:
+                raise SystemExit("basic map picture has unexpected pixels")
             pixels = jpeg.read()
         size = p["width"] / pixels.shape[2]
         cols, rows = np.floor((xs - p["west"]) / size).astype(int), np.floor((p["top"] - ys) / size).astype(int)
