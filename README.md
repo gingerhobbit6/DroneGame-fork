@@ -1,6 +1,6 @@
 # Site Guard
 
-A counter-drone defence game and command-and-control simulator. You place and network real sensors and weapons around a site you choose, then watch a fusion node detect, track and engage inbound drones using SAPIENT (BSI Flex 335 v2.0) messages.
+A counter-drone defence game and command-and-control simulator. You place and network real sensors and weapons around a site you choose, then watch a fusion node detect, track and engage inbound drones using [SAPIENT](docs/SAPIENT.md) (BSI Flex 335 v2.0) messages.
 
 ![Wave 5 in progress: drones approach the site while the fusion node tracks them and tasks interceptors](docs/screenshots/wave.jpg)
 

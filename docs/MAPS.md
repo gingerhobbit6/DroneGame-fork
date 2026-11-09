@@ -28,7 +28,7 @@ Both kinds give the rules the same thing: a square world 54 km across (`WORLD.ra
 |---|---|---|
 | Identity | Terrain seed, any string | `pack:<32 hex>:<easting>:<northing>:real` ([`world-pack.js:9`](../frontend/src/sim/world-pack.js#L9)) |
 | Posts | 2,701 x 2,701 | 2,701 x 2,701, cut from a larger pack |
-| Positions sent over SAPIENT | A fictional origin at latitude 0, longitude 0 ([`world.js:30`](../frontend/src/sim/config/world.js#L30)) | Real latitude and longitude from the pack's fit |
+| Positions sent over [SAPIENT](SAPIENT.md) | A fictional origin at latitude 0, longitude 0 ([`world.js:30`](../frontend/src/sim/config/world.js#L30)) | Real latitude and longitude from the pack's fit |
 | Bearing datum | True north | Grid north ([`core.js:12`](../frontend/src/sim/network/core.js#L12)) |
 | Base maps | Its own colouring only | Eight, plus overlays |
 | Needs a download | No | A pack, built once or imported |

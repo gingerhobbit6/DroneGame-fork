@@ -135,7 +135,7 @@ CREATE TABLE figure_sets (
 
 **Correction to the earlier outline:** a seed and laydown alone cannot regenerate a run. Engagement approvals, jam band changes and the moment each wave starts all affect the result, as do tuned figures. That is why `figures` and `commands` are stored too.
 
-SAPIENT messages are not stored, because one run produces thousands. The existing NDJSON export still covers saving a log.
+[SAPIENT](SAPIENT.md) messages are not stored, because one run produces thousands. The existing NDJSON export still covers saving a log.
 
 ## API
 

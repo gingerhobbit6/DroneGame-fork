@@ -4,7 +4,7 @@ How Site Guard moved from static files to a React, FastAPI and SQLite applicatio
 
 ## Where it started
 
-A browser game in plain JavaScript modules with no build step: about 5,500 lines, including a 1,469-line `main.js` that mixed rules, rendering and UI, and no tests. The simulation design was already strong: seeded random streams, a Kalman tracker, a comms model and real SAPIENT messages.
+A browser game in plain JavaScript modules with no build step: about 5,500 lines, including a 1,469-line `main.js` that mixed rules, rendering and UI, and no tests. The simulation design was already strong: seeded random streams, a Kalman tracker, a comms model and real [SAPIENT](SAPIENT.md) messages.
 
 A review found these bugs by running the game:
 
