@@ -33,7 +33,7 @@ Install the frontend's packages once, and again after they change:
 npm --prefix frontend ci
 ```
 
-uv installs the Python packages the first time `uv run` needs them. Both Python projects set `exclude-newer = "2026-10-21T00:00:00Z"` ([`backend/pyproject.toml:13`](../backend/pyproject.toml#L13)), so uv only resolves packages released before that date; the comment says the aim is that a compromised release has two weeks to be caught. Move the date forward on purpose when updating dependencies. The frontend's dependencies are pinned to exact versions in `package.json`.
+uv installs the Python packages the first time `uv run` needs them. Both Python projects set `exclude-newer = "2 weeks"` ([`backend/pyproject.toml:13`](../backend/pyproject.toml#L13)), so whenever uv locks it only resolves packages released at least two weeks before; the comment says the aim is that a compromised release has time to be caught. The window rolls, so it never needs moving by hand, and installs still come from the hashed `uv.lock`. The frontend's dependencies are pinned to exact versions in `package.json`.
 
 ## Running it
 

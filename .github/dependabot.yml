@@ -38,7 +38,7 @@ updates:
       time: '07:00'
       timezone: Europe/London
     cooldown:
-      default-days: 14
+      default-days: 15 # a day past the projects' two-week exclude-newer window, so a proposal always resolves
     open-pull-requests-limit: 5
     groups:
       python:

@@ -25,7 +25,7 @@ After pushing these files:
 2. Configure GitHub branch rules to require the successful checks before merging. Workflow files alone do not enforce branch protection.
 3. Enable eligible GitHub security features before opting into their conditional jobs.
 
-The Python projects retain their fixed `exclude-newer` cutoffs. Advance those deliberately when reviewing Python updates, or newer releases will remain unavailable to uv and dependency update proposals.
+The Python projects resolve only releases at least two weeks old (`exclude-newer = "2 weeks"`, a rolling window). Dependabot waits 15 days before proposing a Python release, so its proposals always fall inside that window. A fixed cutoff date, used until 10 November 2026, made every proposal newer than the date fail.
 
 ## Local verification
 
