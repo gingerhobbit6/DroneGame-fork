@@ -282,6 +282,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     placement = createPlacement({
       scene: gameView.scene, camera: gameView.camera, canvas, sim,
       getTool: tools.get, defFor: (id) => unitDef(id, onVehicle(id, loadoutFor(id), tools.vehicle())), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
+      onDoubleClick: gameView.zoomInOn,
     });
     replay = createReplay({
       scene: gameView.scene, rec: sim.rec, labels: gameView.labels,

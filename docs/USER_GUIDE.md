@@ -145,11 +145,15 @@ Instead of a site, protect soldiers on patrol. In the area to defend panel, pres
 
 ## Maps in the game
 
-The buttons beside the minimap open the map switcher, centre on your location, centre on the site, draw the area to defend, and switch between 3D and plan view. On a real map the switcher offers OS (or the Estonian basic map), light, dark, satellite, hybrid, topographic, shaded relief and live OpenStreetMap, with roads and names, contours and a national or MGRS grid on top. A typed grid reference moves the camera there, or places the system you have picked. **Change world** goes back to the start screen. See [MAPS.md](MAPS.md).
+The buttons beside the minimap open the map switcher, centre on your location, centre on the site, show the whole laydown, turn north up, draw the area to defend, and switch between 3D and plan view. The compass among them points to north on the screen.
+
+To move the camera, drag the ground, right-drag (or Shift-drag) to turn and tilt, and scroll or pinch to zoom. Double-click the ground, with no tool picked, to glide there and close in by half. From the keyboard, hold W, A, S and D to move, Q and E to turn, and + and - to zoom; the keys go by position, so they sit in the same place on any layout. H frames every system, group of people and the area you defend (with nothing placed, the area you may build in), N turns north up, and F flies to the selected system. Clicking the minimap jumps there.
+
+On a real map the switcher offers OS (or the Estonian basic map), light, dark, satellite, hybrid, topographic, shaded relief and live OpenStreetMap, with roads and names, contours and a national or MGRS grid on top. A typed grid reference moves the camera there, or places the system you have picked. **Change world** goes back to the start screen. See [MAPS.md](MAPS.md).
 
 ## Keys
 
-Keys are ignored while you type in a field, and Ctrl, Alt and Cmd combinations belong to the browser ([`useHotkeys.js:17`](../frontend/src/ui/useHotkeys.js#L17)).
+Keys are ignored while you type in a field, and Ctrl, Alt and Cmd combinations belong to the browser ([`useHotkeys.js:21`](../frontend/src/ui/useHotkeys.js#L21)).
 
 | Key | Does |
 |---|---|
@@ -160,6 +164,12 @@ Keys are ignored while you type in a field, and Ctrl, Alt and Cmd combinations b
 | Space | Pause and resume, or play and pause a replay |
 | Left, Right | Step back and forward through a replay |
 | R, T, L | Range rings, truth overlay, labels |
+| W, A, S, D (held) | Move the camera ahead, left, back and right |
+| Q, E (held) | Turn the view left and right (not in plan view) |
+| +, - (held) | Zoom in and out |
+| H | Frame the whole laydown |
+| N | Turn north up |
+| F | Fly to the selected drone, or the selected system |
 | P | Plan view (look straight down) |
 | M | Next map (real maps only) |
 | G, C | Next grid, contours (real maps only) |

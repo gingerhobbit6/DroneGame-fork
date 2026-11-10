@@ -13,6 +13,7 @@ import { view } from '../render/view.js';
 import { useArmed, useGame, useTick } from './hooks.js';
 import { accuracyText, locateMe } from './locate.js';
 import { ZonePanel } from './ZonePanel.jsx';
+import { Compass } from './Compass.jsx';
 import './map-panel.css';
 import { Movable } from './Movable.jsx';
 
@@ -91,6 +92,7 @@ const ICONS = {
   me: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10z',
   site: 'M4 20V10l8-6l8 6v10M9 20v-6h6v6',
   zone: 'M5 8l7-4l7 5l-2 10l-10 1z',
+  fit: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M9 12h6M12 9v6',
 };
 
 function Thumb({ id, pictures }) {
@@ -195,6 +197,8 @@ export function MapControls() {
         </button>
         <button id="map-me" className={`${locating ? 'loading ' : ''}${view.me ? 'on' : ''}`} aria-label="Centre on my location" title="Centre on my location. Live map tiles switch off first; choosing Live map again shares the viewed area with OpenStreetMap." disabled={locating} onClick={centreOnMe}><Icon path={ICONS.me} /></button>
         <button id="map-site" aria-label="Centre on the site" title="Centre on the site" onClick={() => gameView?.centreOn(0, 0)}><Icon path={ICONS.site} /></button>
+        <button id="map-fit" aria-label="Show the whole laydown (H)" title="Show the whole laydown (H)" onClick={() => gameView?.fitLaydown?.()}><Icon path={ICONS.fit} /></button>
+        <Compass />
         <button id="map-zone" className={zoneOpen ? 'on' : ''} aria-expanded={zoneOpen} aria-label="Draw the area to defend" title="Draw the area to defend" onClick={toggleZone}><Icon path={ICONS.zone} /></button>
         <button id="map-plan" className={view.planView ? 'on' : ''} aria-pressed={view.planView} title="Look straight down (P)" onClick={() => game.setViewOption('planView', !view.planView)}>{view.planView ? '3D' : '2D'}</button>
       </div>

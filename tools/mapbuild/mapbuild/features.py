@@ -22,8 +22,9 @@ MAX_LINE_POINTS = 30_000  # includes every line in the pack, before the game bui
 MAX_LINES = 3_000
 MAX_POWER_VERTICES = 100_000
 MAX_ROAD_VERTICES = 2_000_000
-MAX_ROAD_POINTS = 400_000
-MAX_ROADS = 150_000
+MAX_ROAD_POINTS = 400_000  # MAX_ROAD_POINTS in frontend/src/sim/world-pack.js
+MAX_ROADS = 150_000  # MAX_ROADS there too
+MAX_SOURCE_ROADS = 1_000_000  # the 70 km round London has 316,290
 MAX_NAMES = 25_000
 MAX_SOURCE_OFFSET = 2_000_000  # a source feature may cross the window, but not the entire planet
 
@@ -106,9 +107,22 @@ def building_box(window: Window, envelope) -> list[float] | None:
     return [*to_scene(window, *middle), round(float(np.hypot(*along)), 1), round(float(np.hypot(*across)), 1), 8, round(float(np.arctan2(along[1], along[0])), 3)]
 
 
+def roads_kept(window: Window, roads) -> np.ndarray:
+    """The roads the game can draw: all of them, or for a city the nearest the middle. Only simple lines are drawn."""
+    kept = shapely.get_type_id(roads) == 1  # LineString
+    points = shapely.get_num_coordinates(roads) * kept
+    if kept.sum() > MAX_ROADS or points.sum() > MAX_ROAD_POINTS:
+        order = np.argsort(shapely.distance(roads, shapely.Point(window.east, window.north)), kind="stable")
+        order = order[kept[order]]
+        fits = (np.cumsum(points[order]) <= MAX_ROAD_POINTS) & (np.arange(len(order)) < MAX_ROADS)
+        kept = np.zeros(len(roads), bool)
+        kept[order[fits]] = True
+    return kept
+
+
 def feature_lists(window: Window, houses, power, roads, road_fields, names, name_fields, bldg: np.ndarray) -> dict:
     _check_power(window, power)
-    _check_shapes(window, roads, max_shapes=MAX_ROADS, max_vertices=MAX_ROAD_VERTICES, description="roads")
+    _check_shapes(window, roads, max_shapes=MAX_SOURCE_ROADS, max_vertices=MAX_ROAD_VERTICES, description="roads")
     _check_shapes(window, names, max_shapes=MAX_NAMES, max_vertices=MAX_NAMES, description="place names")
     rows = []
     for row in map(lambda e: building_box(window, e), shapely.oriented_envelope(houses)):
@@ -134,10 +148,8 @@ def feature_lists(window: Window, houses, power, roads, road_fields, names, name
             lines.append([to_scene(window, p.x, p.y) for p in points])
     road_rows = []
     simple_roads = shapely.simplify(roads, 5)
-    if int(shapely.get_num_coordinates(simple_roads).sum()) > MAX_ROAD_POINTS:
-        raise ValueError("roads have more points than a map pack can hold")
-    for shape, cls in zip(simple_roads, road_fields.get("CLASSIFICA", [])):
-        if shape.geom_type == "LineString":
+    for shape, cls, kept in zip(simple_roads, road_fields.get("CLASSIFICA", []), roads_kept(window, simple_roads)):
+        if kept:
             road_rows.append([str(cls), [to_scene(window, x, y) for x, y in shape.coords]])
     name_rows = []
     for point, text, kind, height in zip(names, name_fields.get("DISTNAME", []), name_fields.get("CLASSIFICA", []), name_fields.get("FONTHEIGHT", [])):

@@ -42,7 +42,7 @@ People are placed in groups. Each group has a size, a role and a level of protec
 
 ## Placing people
 
-Use the **People** tool on the toolbar, or key **9** ([`useHotkeys.js:34`](../frontend/src/ui/useHotkeys.js#L34)). Its panel ([`PeoplePicker.jsx`](../frontend/src/ui/PeoplePicker.jsx), the `PeopleChoice` controls) sets the size, role and protection of the next group, which starts as 10 civilians in the open ([`view.js:24`](../frontend/src/render/view.js#L24)). Then click the map. The wizard's optional step 6, "Who is on site?", shows the same controls ([`PeopleStep.jsx`](../frontend/src/ui/assistant/PeopleStep.jsx)).
+Use the **People** tool on the toolbar, or key **9** ([`useHotkeys.js:43`](../frontend/src/ui/useHotkeys.js#L43)). Its panel ([`PeoplePicker.jsx`](../frontend/src/ui/PeoplePicker.jsx), the `PeopleChoice` controls) sets the size, role and protection of the next group, which starts as 10 civilians in the open ([`view.js:24`](../frontend/src/render/view.js#L24)). Then click the map. The wizard's optional step 6, "Who is on site?", shows the same controls ([`PeopleStep.jsx`](../frontend/src/ui/assistant/PeopleStep.jsx)).
 
 A group cannot be placed ([`people.js:59`](../frontend/src/sim/people.js#L59) to [`people.js:72`](../frontend/src/sim/people.js#L72)):
 

@@ -51,7 +51,7 @@ What it contains, from [`terrain.js`](../frontend/src/sim/terrain.js) and `TERRA
 | Power lines | Two lines from the switchyard, a pylon every 260 m, with a cleared corridor under them (cover class 3). |
 | Masts | Three cell masts on the highest of 60 candidates 3.5 to 7 km out, at least 3 km apart ([`world.js:25`](../frontend/src/sim/world.js#L25)). |
 
-Generated ground has one map: its own colouring by height, slope, cover and snow above 72% of the relief, with trees drawn within 4.5 km of the middle and models drawn twice their true size so they show ([`terrain-view.js:21`](../frontend/src/render/terrain-view.js#L21)). The map switcher offers only **Generated** ([`MapControls.jsx:30`](../frontend/src/ui/MapControls.jsx#L30)), with no overlays or grids, and the M, G and C keys do nothing there. An older demo that laid live OpenStreetMap tiles over generated ground was deleted on 8 November 2026 (commit `06236ff`), as the tiles matched nothing.
+Generated ground has one map: its own colouring by height, slope, cover and snow above 72% of the relief, with trees drawn within 4.5 km of the middle and models drawn twice their true size so they show ([`terrain-view.js:21`](../frontend/src/render/terrain-view.js#L21)). The map switcher offers only **Generated** ([`MapControls.jsx:31`](../frontend/src/ui/MapControls.jsx#L31)), with no overlays or grids, and the M, G and C keys do nothing there. An older demo that laid live OpenStreetMap tiles over generated ground was deleted on 8 November 2026 (commit `06236ff`), as the tiles matched nothing.
 
 ## Real maps
 
@@ -80,7 +80,7 @@ There is no power station on real ground: the real buildings are the site.
 
 ## Base maps and overlays in the game
 
-The map switcher sits beside the minimap. On a real map it offers eight base maps ([`MapControls.jsx:19`](../frontend/src/ui/MapControls.jsx#L19)), each with a small preview of 6 km around the site, except the live map. In Estonia, "OS map" reads **Basic map**. The default is the OS or basic map, with the national grid on ([`view.js:13`](../frontend/src/render/view.js#L13)).
+The map switcher sits beside the minimap. On a real map it offers eight base maps ([`MapControls.jsx:20`](../frontend/src/ui/MapControls.jsx#L20)), each with a small preview of 6 km around the site, except the live map. In Estonia, "OS map" reads **Basic map**. The default is the OS or basic map, with the national grid on ([`view.js:13`](../frontend/src/render/view.js#L13)).
 
 Everything is painted into one 4,096 pixel canvas laid over the 3D ground, about 13.2 m of ground per pixel, so grid lines and roads always follow the ground ([`map-texture.js:11`](../frontend/src/render/map-texture.js#L11)). A 1,024 pixel copy becomes the minimap and the Plan tab's picture.
 
@@ -95,7 +95,7 @@ Everything is painted into one 4,096 pixel canvas laid over the 3D ground, about
 | Shaded relief | The same picture generated ground uses for its minimap, about 44 m a pixel, shaded by slope ([`makeHillshade`](../frontend/src/render/terrain-view.js#L234)) | The world's grids | Yes |
 | Live map | OpenStreetMap's standard tiles at zoom 14, each stretched by its own corners onto the national grid ([`paintLive`](../frontend/src/render/map-texture.js#L78)). A 54 km world needs 1,369 tiles at Hereford and 2,162 at Narva (counted with `tilesOver` on those packs). Fetched again each time it is chosen. | `tile.openstreetmap.org` | No |
 
-Satellite and Hybrid say "Not in this map pack" when the pack has no satellite picture, and the live map says "Needs internet" when the browser reports it is offline ([`MapControls.jsx:45`](../frontend/src/ui/MapControls.jsx#L45)).
+Satellite and Hybrid say "Not in this map pack" when the pack has no satellite picture, and the live map says "Needs internet" when the browser reports it is offline ([`MapControls.jsx:46`](../frontend/src/ui/MapControls.jsx#L46)).
 
 | Overlay | What it adds | Where it comes from |
 |---|---|---|
@@ -105,7 +105,7 @@ Satellite and Hybrid say "Not in this map pack" when the pack has no satellite p
 | MGRS grid | 1 km squares of the Military Grid Reference System in the UTM zone of the world's middle, with each 100 km square named, for example `30U WC` ([`paintMgrs`](../frontend/src/render/map-texture.js#L194)) | Worked out in the browser |
 | Trees and buildings | The 3D tree and building models. Hiding them only changes the picture: they still block sight lines. | The world |
 
-Keys on a real map ([`useHotkeys.js:36`](../frontend/src/ui/useHotkeys.js#L36)): **M** moves to the next usable base map, **G** steps through national grid, MGRS and off, and **C** turns contours on and off. **P** looks straight down on any ground. The cursor's readout gives a grid reference on whichever grid is showing, and the height above sea level.
+Keys on a real map ([`useHotkeys.js:45`](../frontend/src/ui/useHotkeys.js#L45)): **M** moves to the next usable base map, **G** steps through national grid, MGRS and off, and **C** turns contours on and off. **P** looks straight down on any ground. The cursor's readout gives a grid reference on whichever grid is showing, and the height above sea level.
 
 A credit line is always on screen on a real map, and changes with the base map ([`Credits`](../frontend/src/ui/MapControls.jsx#L57)). The map panel also says when part of the world has no lidar, and that live tiles tell OpenStreetMap which area you are viewing.
 
@@ -358,7 +358,7 @@ Licence wording here is a summary of the sources' own terms, not legal advice.
 | "The site cannot be on water." | Move the start point onto land. |
 | "This pack is smaller than a 54 km world. Build it again at a larger size." | An older 30 or 44 km pack. Rebuild it at 56 km or more. |
 | Satellite and Hybrid say "Not in this map pack" | The build found fewer than two clear scenes, or used `--no-satellite`. Rebuild later, or use the OS map. |
-| Live map says "Needs internet", or "The live map could not load" | The browser is offline, or no tile arrived. The game goes back to the OS map ([`game.js:311`](../frontend/src/game.js#L311)). "N of M map tiles could not load" means some did. |
+| Live map says "Needs internet", or "The live map could not load" | The browser is offline, or no tile arrived. The game goes back to the OS map ([`game.js:312`](../frontend/src/game.js#L312)). "N of M map tiles could not load" means some did. |
 | The start map shows only pack pictures | A tile failed to load, so it switched to pictures from your packs. Check the connection, or keep **No live map**. |
 | "The map builder could not start. It needs uv installed." | Install `uv` and restart the backend. |
 | "A map is already being built." | One build at a time. Wait for it to finish. |

@@ -207,7 +207,7 @@ describe('run history panel', () => {
     fireEvent.click($('#runs-retry'));
     await waitFor(() => expect($('#runs-pending')).toBeNull());
     expect(api.runs.rows.size).toBe(1);
-    expect($('#runs-error')).toBeNull();
+    await waitFor(() => expect($('#runs-error')).toBeNull()); // cleared once the list has loaded again, a moment after the save
     expect(document.querySelectorAll('#runs-list tbody tr').length).toBe(1);
   });
   it('reports a failed delete', async () => {

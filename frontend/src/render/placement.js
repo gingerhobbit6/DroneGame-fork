@@ -84,7 +84,7 @@ export function groundHit(ray, far, out) {
   return null;
 }
 
-export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = (tool) => STRUCTURES[tool], onGroundClick, onSelect, onDrop = () => {} }) {
+export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = (tool) => STRUCTURES[tool], onGroundClick, onSelect, onDrop = () => {}, onDoubleClick = () => {} }) {
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -121,6 +121,12 @@ export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = 
     if (onSelect(e.clientX, e.clientY)) return;
     updateMouse(e);
     if (mouseOnGround) onGroundClick(mouseGround.x, mouseGround.z);
+  });
+  // With a tool picked each click is a placement, so only a double-click with nothing picked moves the camera
+  canvas.addEventListener('dblclick', (e) => {
+    if (getTool()) return;
+    updateMouse(e);
+    if (mouseOnGround) onDoubleClick(mouseGround.x, mouseGround.z);
   });
 
   const ghost = new THREE.Group();

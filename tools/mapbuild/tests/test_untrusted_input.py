@@ -215,8 +215,16 @@ def test_road_vertices_are_bounded_before_simplification_and_list_conversion(mon
         features.feature_lists(window, [], [], [road], {"CLASSIFICA": ["Local"]}, [], {}, empty)
     monkeypatch.setattr(features, "MAX_ROAD_VERTICES", 20)
     monkeypatch.setattr(features, "MAX_ROAD_POINTS", 10)
-    with pytest.raises(ValueError, match="roads"):
-        features.feature_lists(window, [], [], [road], {"CLASSIFICA": ["Local"]}, [], {}, empty)
+    assert features.feature_lists(window, [], [], [road], {"CLASSIFICA": ["Local"]}, [], {}, empty)["roads"] == []  # more points than the game draws
+
+
+def test_a_city_keeps_the_roads_nearest_the_middle(monkeypatch):
+    monkeypatch.setattr(features, "MAX_ROADS", 2)
+    window = Window(1000, 2000, 100)
+    roads = [shapely.LineString([(1000 + x, 2000), (1000 + x, 2010)]) for x in (60, -30, 10)]
+    empty = np.zeros((window.side, window.side), "uint8")
+    rows = features.feature_lists(window, [], [], roads, {"CLASSIFICA": ["A", "B", "C"]}, [], {}, empty)["roads"]
+    assert [row[0] for row in rows] == ["B", "C"]  # the nearest two, in their original order
 
 
 def test_a_large_compressed_raster_block_is_rejected_before_read(monkeypatch, tmp_path):

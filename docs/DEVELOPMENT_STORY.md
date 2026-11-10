@@ -427,6 +427,10 @@ The new figures show what the radio changes did to the picture. The mixed runs c
 
 The check had a cost. It switched `propagation.js`, `rf-model.js` and the reference digests back in the shared working tree, a minute at a time, and another session committed the tree in one of those minutes. Commit dece516 therefore carries 64 points a path and no band term under a message saying the reverse, and its own new tests fail there. The commit after it puts both back with their digests. A comparison of that kind belongs in a copy, not in the tree other sessions commit.
 
+## Finding your way round the map, 9 November 2026
+
+Alex asked for easier ways to get round the map. The camera already followed the mouse, touch, the minimap and a few fly-to buttons, but took no keys, gave no sense of north once turned, and could not frame what had been built. Held W, A, S and D now move it, Q and E turn it and + and - zoom it, by key position so any layout works. H frames every system, group of people and the area defended. N, or a new compass on the map rail, turns north up. F flies to the selected system, and a double-click with no tool picked glides there and closes in by half. The camera's glide now runs in spherical terms, so it can turn the short way round as well as move. The keys also fill the accessibility review's gap that a keyboard user could not move the camera at all.
+
 ## Numbers at the end of Phase 8
 
 | | Before | After |

@@ -2,10 +2,14 @@
 
 import { useEffect } from 'react';
 import { TOOLBAR } from '../sim/config/index.js';
+import { u } from '../sim/units.js';
+import { isCameraKey } from '../render/camera-moves.js';
 import { view } from '../render/view.js';
 import { useAccount } from './account/pack.js';
 import { mapName, nextBaseMap, nextGrid } from './MapControls.jsx';
 import { useGame } from './hooks.js';
+
+const FOCUS_DISTANCE = u(500); // F brings the camera this close to the selected system
 
 export function useHotkeys() {
   const game = useGame(), covered = useAccount()?.covered; // under the profile or login page
@@ -16,6 +20,15 @@ export function useHotkeys() {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag) || e.target.isContentEditable) return;
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return; // Ctrl+C, Ctrl+P and the like belong to the browser, and a card's Space to the card
       if (e.key === ' ' && (tag === 'BUTTON' || tag === 'SUMMARY')) return; // Space presses the focused button or opens the section, and nothing else
+      const camera = game.getView();
+      if (isCameraKey(e.code)) { camera?.keys?.press(e.code, true); e.preventDefault(); return; } // held, it moves the camera every frame
+      if (e.key === 'n' || e.key === 'N') { camera?.northUp(); return; }
+      if (e.key === 'h' || e.key === 'H') { camera?.fitLaydown(); return; }
+      if (e.key === 'f' || e.key === 'F') { // the selected drone, if its panel is open, else the selected system
+        const at = (view.drone && !view.drone.dead ? view.drone : view.selected)?.pos;
+        if (at) camera?.centreOn(at.x, at.z, FOCUS_DISTANCE);
+        return;
+      }
       const replay = game.getReplay();
       const reviewing = replay && replay.active();
       if (e.key === 'ArrowLeft' && replay) { replay.stepBack(); e.preventDefault(); return; }
@@ -46,7 +59,12 @@ export function useHotkeys() {
       const group = TOOLBAR.find((g) => g.key === e.key);
       if (group) game.cycleTool(group);
     };
+    // A key let go anywhere stops the camera, even in a text box; so does leaving the window, which sends no key-up.
+    const onUp = (e) => game.getView()?.keys?.press(e.code, false);
+    const stop = () => game.getView()?.keys?.release();
     addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
+    addEventListener('keyup', onUp);
+    addEventListener('blur', stop);
+    return () => { removeEventListener('keydown', onKey); removeEventListener('keyup', onUp); removeEventListener('blur', stop); stop(); };
   }, [game, covered]);
 }

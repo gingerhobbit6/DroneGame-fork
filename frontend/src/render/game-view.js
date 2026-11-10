@@ -18,9 +18,11 @@ import { createEyeView } from './eye-view.js';
 import { createMapTexture } from './map-texture.js';
 import { setModelEnv } from './paint.js';
 import { sizeWideLines } from './wide-lines.js';
+import { createCameraKeys, fitDistance, framing } from './camera-moves.js';
 import { FOV, view } from './view.js';
 
 const FLIGHT_SECONDS = 0.7;
+const FIT_LEAST = u(300); // framing a single system still shows the ground around it
 // How the scene looks in the run's conditions: sky and fog colour, fog distance (m) and light. The look only; the physics is in sim/conditions.js.
 const LOOKS = {
   day: { sky: 0x0b1220, fog: [12000, 30000], hemi: 0.9, sun: 1.1, sunColour: 0xffffff },
@@ -138,14 +140,18 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     }
     controls.enableRotate = !on;
   }
-  // Glide the camera over a point, keeping its angle, and coming in to `closest` if it is further out than that.
+  // Glide the camera to look at a point, from a new distance or compass angle (azimuth) if given, else its own. It turns the short way round.
   let flight = null;
-  function centreOn(x, z, closest = Infinity) {
-    const from = camera.position.clone().sub(controls.target), to = from.clone();
-    if (to.length() > closest) to.setLength(closest);
+  const _offset = new THREE.Vector3(), _at = new THREE.Spherical();
+  function glide(x, z, { distance, azimuth } = {}) {
+    const from = new THREE.Spherical().setFromVector3(_offset.subVectors(camera.position, controls.target)), to = from.clone();
+    if (distance != null) to.radius = THREE.MathUtils.clamp(distance, controls.minDistance, controls.maxDistance);
+    if (azimuth != null) to.theta = from.theta + THREE.MathUtils.euclideanModulo(azimuth - from.theta + Math.PI, Math.PI * 2) - Math.PI;
     flight = { t: 0, fromTarget: controls.target.clone(), toTarget: new THREE.Vector3(x, groundU(x, z), z), from, to };
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) flight.t = 1;
   }
+  // Glide over a point, keeping the camera's angle, and coming in to `closest` if it is further out than that.
+  const centreOn = (x, z, closest = Infinity) => glide(x, z, { distance: Math.min(camera.position.distanceTo(controls.target), closest) });
   controls.addEventListener('start', () => { flight = null; }); // the player has taken over
   // Keep the followed drone in the middle of the view: the camera keeps its angle and distance, and catches up smoothly.
   const _shift = new THREE.Vector3();
@@ -159,11 +165,29 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   function fly(real) {
     if (!flight) return;
     flight.t = Math.min(flight.t + real / FLIGHT_SECONDS, 1);
-    const ease = flight.t * flight.t * (3 - 2 * flight.t);
+    const ease = flight.t * flight.t * (3 - 2 * flight.t), { from, to } = flight;
     controls.target.lerpVectors(flight.fromTarget, flight.toTarget, ease);
-    camera.position.copy(controls.target).add(flight.from.clone().lerp(flight.to, ease));
+    _at.set(from.radius + (to.radius - from.radius) * ease, from.phi + (to.phi - from.phi) * ease, from.theta + (to.theta - from.theta) * ease);
+    camera.position.copy(controls.target).add(_offset.setFromSpherical(_at));
     if (flight.t === 1) flight = null;
   }
+  const keys = createCameraKeys(camera, controls);
+  // From a mast the camera is the mast's, so these leave it alone.
+  function northUp() { if (!view.eye) glide(controls.target.x, controls.target.z, { azimuth: 0 }); }
+  // Frame every system, group of people and the area defended, keeping the camera's angle. With nothing placed, the build ring.
+  function fitLaydown() {
+    if (view.eye) return;
+    const points = [
+      ...sim.structures.map((s) => ({ x: s.pos.x, z: s.pos.z, r: 0 })),
+      ...sim.people.map((g) => ({ x: g.x, z: g.z, r: 0 })),
+      ...(view.zone?.points ?? sim.state.zone ?? []).map(([x, z]) => ({ x, z, r: 0 })),
+    ];
+    if (!sim.siteIsFree()) points.push({ x: 0, z: 0, r: u(points.length ? SITE.radius : BUILD.maxDist) });
+    const f = framing(points);
+    if (f) glide(f.x, f.z, { distance: fitDistance(Math.max(f.radius, FIT_LEAST), camera) });
+  }
+  // A double-click glides to the spot and closes in by half.
+  const zoomInOn = (x, z) => { if (!view.eye) centreOn(x, z, camera.position.distanceTo(controls.target) / 2); };
   const mePin = new THREE.Mesh(new THREE.CylinderGeometry(3, 0.4, 14, 12).translate(0, 7, 0), new THREE.MeshBasicMaterial({ color: 0x2979ff, depthTest: false, transparent: true }));
   mePin.renderOrder = 15; mePin.visible = false;
   scene.add(mePin);
@@ -222,6 +246,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     zone.sync();
     showMe();
     for (const m of worldView.scenery) m.visible = view.scenery || !terrainState.data.geo; // the switch is only offered on a real map
+    if (!view.eye && keys.step(real)) flight = null; // a held key takes over from a glide, as a drag does
     fly(real);
     follow(real);
     flash = Math.max(0, flash - real);
@@ -240,7 +265,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   resize();
 
   return {
-    scene, camera, controls, labels, structures, update, refreshMap, mapPreviews, viewFromAbove, centreOn,
+    scene, camera, controls, labels, structures, update, refreshMap, mapPreviews, viewFromAbove, centreOn, keys, northUp, fitLaydown, zoomInOn,
     draw() {
       if (eyeView.update()) view.zoom = u(20); // from a mast, what is near is drawn true size
       else { controls.update(); view.zoom = camera.position.distanceTo(controls.target); }
