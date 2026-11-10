@@ -1,11 +1,12 @@
 // Effectors act only on tasks from the fusion node. Each one is looked up by how it fires: act(w, system, target, dt).
 
 import { Vector3 } from 'three';
-import { WORLD, TERRAIN, SYSTEM_UNIT_M } from './config/index.js';
+import { WORLD, muzzleHeight } from './config/index.js';
 import { beamFactor, evasionFactor, hitChance, layTime } from './hit-chance.js';
 import { rand } from './rng.js';
-import { antennaHeight, flies } from './site-range.js';
+import { antennaHeight, usesPath } from './site-range.js';
 import { terrainState } from './terrain.js';
+import { clearSight } from './world.js';
 import { u, hereU, hdist } from './units.js';
 import { affordable, spend, tally } from './economy.js';
 import { damageDrone } from './drones.js';
@@ -18,14 +19,14 @@ const MISS_COLOUR = 0x90a4ae;
 const SALVO_ASSURANCE = 0.8; // a salvo stops once it is this likely that one of the rounds in the air will work: an assumption
 
 // where a round leaves: muzzleY model units up, at true size (SYSTEM_UNIT_M metres each)
-export const muzzle = (s, out = _m) => out.set(s.pos.x, s.pos.y + u((s.def.muzzleY || 2) * SYSTEM_UNIT_M * (s.def.modelScale || 1)), s.pos.z);
+export const muzzle = (s, out = _m) => out.set(s.pos.x, s.pos.y + u(muzzleHeight(s.def)), s.pos.z);
 
-// The laser needs a clear optical path; guided weapons (interceptor drones, missiles) are cued over the terrain.
+// A laser, a gun and a beam-riding missile need a clear optical path; other guided weapons (interceptor drones, missiles) are cued over the terrain.
 export function opticalLos(s, d) {
-  if (flies(s.def)) return true;
+  if (!usesPath(s.def)) return true;
   const m = WORLD.metresPerUnit;
   const r = terrainState.data.los(s.pos.x * m, s.pos.y * m + antennaHeight(s.def), s.pos.z * m, d.pos.x * m, d.pos.y * m, d.pos.z * m);
-  return r.clear && r.canopy <= TERRAIN.opticalCanopyTol;
+  return clearSight(r);
 }
 
 const aimAt = (s, t) => { s.aim = Math.atan2(t.pos.x - s.pos.x, t.pos.z - s.pos.z); };
@@ -132,7 +133,7 @@ export function updateMissiles(w, dt) {
     // look along the path it just flew too, and burst where it came closest.
     if (m.target && !fuzed && closestOnPath(_from, m.pos, m.target.pos, _near) < r) { m.pos.copy(_near); fuzed = true; }
     if (fuzed || m.life <= 0 || m.pos.y < hereU(m.pos.x, m.pos.z) + 0.2) {
-      const hit = fuzed && rand() < hitChance(m.def, { speed: m.target.def.speed, evade: m.target.evade }, m.from, m.cueError);
+      const hit = fuzed && (!m.def.beamRider || opticalLos(m.src, m.target)) && rand() < hitChance(m.def, { speed: m.target.def.speed, evade: m.target.evade }, m.from, m.cueError); // a beam-rider is lost once its launcher cannot see the target
       if (hit) { // it reaches its target, and its blast anything else close by. A miss costs the round and does nothing.
         if (m.shot) m.shot.hits++;
         const r = u(m.def.splash);

@@ -6,6 +6,7 @@ import { WORLD, TERRAIN, COMMS } from '../sim/config/index.js';
 import { terrainState } from '../sim/terrain.js';
 import { clamp } from '../sim/world.js';
 import { mulberry32, hashSeed } from '../sim/rng.js';
+import { MAX_LINES, MAX_LINE_POINTS } from '../sim/world-pack.js';
 
 const MPU = () => WORLD.metresPerUnit;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -15,6 +16,9 @@ const u = (m) => m / MPU();
 export const groundU = (xu, zu) => terrainState.data.groundAt(xu * MPU(), zu * MPU()) / MPU();
 
 export function buildWorldView(scene, data, siteMat) {
+  if (data.lines.length > MAX_LINES || data.lines.reduce((count, line) => count + line.length, 0) > MAX_LINE_POINTS) {
+    throw new Error('This world has too many power-line points to draw.');
+  }
   const group = new THREE.Group();
   scene.add(group);
   const R = data.R;
@@ -203,7 +207,8 @@ export function buildWorldView(scene, data, siteMat) {
 // A ring that follows the ground: a flat ribbon whose vertices are raised to the terrain height. `update(cx, cz)` re-fits
 // it around a new centre (scene units); the ring is built relative to its centre, so position its parent at the ground there.
 // With radii, the ring follows one radius per bearing, clockwise from north, instead of a circle. It reads them on each update, so they can change.
-export function drapedRing(radiusU, thicknessU, color, opacity, segs = 160, lift = 0.5, radii = null) {
+const LIFT = 0.5; // scene units above the ground, so the ring is not lost in it
+export function drapedRing(radiusU, thicknessU, color, opacity, segs = 160, radii = null) {
   if (radii) segs = radii.length;
   const positions = new Float32Array((segs + 1) * 2 * 3);
   const index = [];
@@ -221,7 +226,7 @@ export function drapedRing(radiusU, thicknessU, color, opacity, segs = 160, lift
       for (let s = 0; s < 2; s++) {
         const r = s === 0 ? Math.max(outer - thicknessU, 0.01) : outer;
         const o = (i * 2 + s) * 3;
-        positions[o] = cs * r; positions[o + 1] = groundU(cx + cs * r, cz + sn * r) - y0 + lift; positions[o + 2] = sn * r;
+        positions[o] = cs * r; positions[o + 1] = groundU(cx + cs * r, cz + sn * r) - y0 + LIFT; positions[o + 2] = sn * r;
       }
     }
     geo.attributes.position.needsUpdate = true;

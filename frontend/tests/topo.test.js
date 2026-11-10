@@ -47,4 +47,9 @@ describe('topography', () => {
     const data = slope({ water: true }), { minor, index } = contourLines(data);
     for (const list of [minor, index]) for (let s = 0; s < list.length; s += 4) { expect(list[s]).toBeLessThan(data.cell * (data.N - 2) + 0.01); expect(list[s + 2]).toBeLessThan(data.cell * (data.N - 2) + 0.01); }
   });
+  it('stops hostile height oscillation before contour geometry exhausts memory', () => {
+    const data = slope({ N: 71, H0: 0, rise: 0 });
+    for (let j = 0; j < data.N; j++) for (let i = 0; i < data.N; i++) data.ground[j * data.N + i] = i % 2 ? 19998 : -19998;
+    expect(() => contourLines(data)).toThrow(/too many contour/);
+  });
 });

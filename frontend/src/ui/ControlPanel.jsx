@@ -41,6 +41,7 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox, menuOpen
       {toggle('rings', 'rings', 'Show ranges (R)')}
       {toggle('truth', 'truth', 'Truth overlay (T)', "On: every drone is drawn where it really is (grey if no sensor has it). Off: you only see what the fusion node believes.")}
       {toggle('labels-toggle', 'labels', 'Labels (L)', 'Name tags on every system and drone')}
+      {toggle('symbols-toggle', 'symbols', 'Map symbols', 'NATO symbols in place of the drone and system models when zoomed out')}
       {toggle('track-hi', 'trackHi', 'Highlight tracks', "Tracks are drawn faint grey so they don't crowd the view. Tick to colour them by classification.")}
       {toggle('trails', 'trails', 'Drone trails', 'A line behind every drone of where it has flown. With the truth overlay, where it really flew; without it, the path of its track.')}
       <label title="Who decides to engage. SAPIENT has no weapon-release message, so this is a C2 policy."> Engagement authority

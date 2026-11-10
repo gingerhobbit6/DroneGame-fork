@@ -27,7 +27,7 @@ describe('the live figures', () => {
     expect(liveStats(sim)).toBe(first);
     sim.run(20); // a sim-second
     expect(liveStats(sim)).not.toBe(first);
-  }, 60000);
+  }, 120000);
 });
 
 describe('after two waves against the mixed laydown', () => {

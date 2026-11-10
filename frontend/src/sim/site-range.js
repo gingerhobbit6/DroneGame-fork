@@ -1,10 +1,11 @@
 // How far a system reaches from where it actually stands. A catalogue range means an open field: flat, clear ground, on its standard mast.
 // reachOnPath takes that down for one real path, and is what detection and jamming use, so the prediction here cannot disagree with play.
 
-import { SENSING, TERRAIN } from './config/index.js';
+import { SENSING, TERRAIN, muzzleHeight } from './config/index.js';
 import { earthBulge, freeSpaceLoss, fresnelRadius, pathLoss, reachFactor } from './propagation.js';
 import { coverKey, inCover } from './sensor-model.js';
-import { bandGhz, heardBand } from './rf-model.js';
+import { bandGhz, bandReach, heardBand } from './rf-model.js';
+import { clearSight } from './world.js';
 
 // How much ground clutter hides low flyers from radar, by ground cover (open, forest, built, power-line corridor):
 // the radar's low-flyer range is multiplied by this.
@@ -22,21 +23,21 @@ export const BEARINGS = 90;      // directions a prediction looks in
 const STEPS = 32;                // points checked along each direction
 
 const isRadio = (def) => def.kind === 'radar' || def.kind === 'rf' || def.kind === 'jammer';
-// A weapon whose round or interceptor flies to the target. It is cued over the terrain, so it needs no sight line and reaches as far
-// anywhere, but its round must be able to catch what it is sent at. Every other system works along a clear path from where it stands.
+// A weapon whose round or interceptor flies to the target, so its round must be able to catch what it is sent at. Most are cued over the
+// terrain and reach as far anywhere. A gun, and a missile riding a beam its launcher holds on the target (beamRider), must also see it.
 export const flies = (def) => def.fire === 'guided';
-export const usesPath = (def) => !flies(def);
+export const usesPath = (def) => !flies(def) || def.kind === 'gun' || !!def.beamRider; // works along a clear path from where it stands
 // A drone's usual height: the middle of its height band, or the average of the middles of its bands if it flies more than one.
 export const typicalAltitude = (droneDef) => { const bands = droneDef.altModes ?? [droneDef.alt]; return bands.reduce((sum, [lo, hi]) => sum + (lo + hi) / 2, 0) / bands.length; };
-export const antennaHeight = (def) => def.mount ?? (def.fire === 'beam' ? 4 : 0);
+export const antennaHeight = (def) => def.mount ?? (def.fire === 'beam' ? 4 : flies(def) && usesPath(def) ? muzzleHeight(def) : 0); // a gun or beam-rider sights along its muzzle, where its round leaves
 
 // How far this sensor reaches for this type of drone in an open field, before terrain and clutter. 0 means it can never detect it.
-export function reachFor(def, droneDef) {
+export function reachFor(def, droneDef, band = def.senses === 'rf' ? heardBand(def, droneDef) : null) { // band: the one a detector hears it on, where the caller knows
   const kind = def.kind || def.id;
-  if (def.senses === 'rf' && !heardBand(def, droneDef)) return 0; // silent, or on no band it covers (rf-model.js)
+  if (def.senses === 'rf' && !band) return 0; // silent, on no band it covers, or drowned on every one by your own jamming (rf-model.js)
   if (kind === 'radar') return def.range * Math.pow((droneDef.rcs ?? SENSING.refRcs) / SENSING.refRcs, 0.25);
   if (kind === 'camera') return def.range * ((droneDef.size ?? SENSING.refSize) / SENSING.refSize);
-  if (kind === 'rf') return def.range * Math.sqrt(droneDef.rfPower ?? 1);
+  if (kind === 'rf') return def.range * Math.sqrt(droneDef.rfPower ?? 1) * bandReach(band, droneDef); // a louder link, or one on a band that carries further
   if (kind === 'acoustic') return def.range * (droneDef.sound ?? 1);
   return def.range;
 }
@@ -49,9 +50,9 @@ function pathGhz(def, droneDef, ghz) {
   return band ? bandGhz(band) : REFERENCE_RF_GHZ;
 }
 
-// How far this system reaches along the path from a to b ({ x, y, z } in metres). ghz: the band, where the caller knows it.
-export function reachOnPath(def, droneDef, world, a, b, ghz) {
-  const open = reachFor(def, droneDef);
+// How far this system reaches along the path from a to b ({ x, y, z } in metres). ghz: the band, where the caller knows it; open: its
+// open-field reach, where the caller has worked it out.
+export function reachOnPath(def, droneDef, world, a, b, ghz, open = reachFor(def, droneDef)) {
   if (!open || !usesPath(def)) return open;
   if (isRadio(def)) return open * reachFactor(pathLoss(world, a, b, pathGhz(def, droneDef, ghz)).loss);
   const sight = world.los(a.x, a.y, a.z, b.x, b.y, b.z);
@@ -59,7 +60,7 @@ export function reachOnPath(def, droneDef, world, a, b, ghz) {
     const noisy = world.coverAt(a.x, a.z) === BUILT_UP;
     return open * (sight.clear ? 1 : ACOUSTIC.hillLoss) * (noisy ? ACOUSTIC.noiseLoss : 1);
   }
-  return sight.clear && sight.canopy <= TERRAIN.opticalCanopyTol ? open : 0; // a camera or laser needs a clear line
+  return clearSight(sight) ? open : 0; // a camera or laser needs a clear line
 }
 
 // How many times the quoted error applies at this range, given the reach on this path, so hills and trees worsen it too. A radar's signal falls
@@ -126,8 +127,13 @@ function calculate(def, droneDef, world, x, z, alt, open) {
 export function pathReport(def, droneDef, world, x, z, bearing, alt = typicalAltitude(droneDef)) {
   const open = reachFor(def, droneDef), rad = (bearing * Math.PI) / 180;
   const east = Math.sin(rad), south = -Math.cos(rad);
-  let D = Math.max(open > alt ? Math.sqrt(open * open - alt * alt) : 0, world.cell * 2);
-  while (D > world.cell && (Math.abs(x + east * D) > world.R || Math.abs(z + south * D) > world.R)) D -= world.cell;
+  const full = Math.max(open > alt ? Math.sqrt(open * open - alt * alt) : 0, world.cell * 2);
+  // The ray exits the square at the nearer axis. Subtracting one cell at a time can never advance for very large figures.
+  const edge = Math.min(
+    east > 0 ? (world.R - x) / east : east < 0 ? (-world.R - x) / east : Infinity,
+    south > 0 ? (world.R - z) / south : south < 0 ? (-world.R - z) / south : Infinity,
+  );
+  const D = Math.max(world.cell, Math.min(full, Math.max(0, edge)));
   const n = Math.min(120, Math.ceil(D / world.cell));
   const ghz = isRadio(def) ? pathGhz(def, droneDef) : null;
   const a = { x, y: world.groundAt(x, z) + antennaHeight(def), z };

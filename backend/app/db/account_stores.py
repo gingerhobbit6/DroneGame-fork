@@ -5,7 +5,7 @@ import json
 import sqlite3
 from typing import Any
 
-_PROFILE = "username, display_name, rank, organisation, created_at, last_sign_in"
+_PROFILE = "id, username, display_name, rank, organisation, created_at, last_sign_in"
 
 
 class SqliteAccountStore:
@@ -19,6 +19,10 @@ class SqliteAccountStore:
         row = self.conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         return dict(row) if row else None
 
+    def by_id(self, user_id: int) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
     def profile(self, user_id: int) -> dict[str, Any]:
         return dict(self.conn.execute(f"SELECT {_PROFILE} FROM users WHERE id = ?", (user_id,)).fetchone())
 
@@ -26,24 +30,31 @@ class SqliteAccountStore:
         """Returns None if the username is taken, whatever its case."""
         try:
             with self.conn:
-                cur = self.conn.execute(
-                    "INSERT INTO users (username, display_name, password_hash, recovery_hash, created_at) VALUES (?, ?, ?, ?, ?)",
-                    (username, display_name, password_hash, recovery_hash, now),
+                user_id = self.conn.execute(
+                    "UPDATE account_sequence SET last_id = last_id + 1 WHERE singleton = 1 RETURNING last_id"
+                ).fetchone()[0]
+                self.conn.execute(
+                    "INSERT INTO users (id, username, display_name, password_hash, recovery_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (user_id, username, display_name, password_hash, recovery_hash, now),
                 )
         except sqlite3.IntegrityError:
             return None
-        return cur.lastrowid
+        return user_id
 
     def update(self, user_id: int, **fields: Any) -> None:
-        allowed = {"display_name", "rank", "organisation", "password_hash", "recovery_hash", "failed_attempts", "locked_until", "last_sign_in"}
+        allowed = {"display_name", "rank", "organisation", "failed_attempts", "locked_until", "last_sign_in"}
         if not fields or not fields.keys() <= allowed:  # column names are joined into the SQL, so only these ever are
             raise ValueError("unknown column")
         with self.conn:
             self.conn.execute(f"UPDATE users SET {', '.join(f'{k} = ?' for k in fields)} WHERE id = ?", (*fields.values(), user_id))
 
-    def delete_user(self, user_id: int) -> None:
-        with self.conn:  # its sessions and packs go with it (ON DELETE CASCADE)
-            self.conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    def delete_user_if_password(self, user_id: int, expected_hash: str, now: int) -> bool:
+        """Delete only the account whose password was just verified; cascades remove its sessions and packs."""
+        with self.conn:
+            changed = self.conn.execute(
+                "DELETE FROM users WHERE id = ? AND password_hash = ? AND locked_until <= ?", (user_id, expected_hash, now)
+            ).rowcount
+        return changed == 1
 
     def count_attempt(self, user_id: int, now: int) -> int | None:
         """Counts one more try in a single statement, so tries made at the same moment cannot overwrite each other's count.
@@ -57,6 +68,56 @@ class SqliteAccountStore:
     def add_session(self, token_hash: str, user_id: int, expires_at: int) -> None:
         with self.conn:
             self.conn.execute("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)", (token_hash, user_id, expires_at))
+
+    def add_session_if_password(self, token_hash: str, user_id: int, expected_hash: str, now: int, expires_at: int, signed_at: str) -> bool:
+        """Commit validation and the session together, so revocation cannot pass between them."""
+        with self.conn:
+            changed = self.conn.execute(
+                "UPDATE users SET failed_attempts = 0, locked_until = 0, last_sign_in = ? "
+                "WHERE id = ? AND password_hash = ? AND locked_until <= ?",
+                (signed_at, user_id, expected_hash, now),
+            ).rowcount
+            if changed != 1:
+                return False
+            self.conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
+            self.conn.execute(
+                "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)", (token_hash, user_id, expires_at)
+            )
+        return True
+
+    def reset_if_recovery(self, user_id: int, expected_hash: str, password_hash: str, recovery_hash: str, now: int) -> bool:
+        with self.conn:
+            changed = self.conn.execute(
+                "UPDATE users SET password_hash = ?, recovery_hash = ?, failed_attempts = 0, locked_until = 0 "
+                "WHERE id = ? AND recovery_hash = ? AND locked_until <= ?",
+                (password_hash, recovery_hash, user_id, expected_hash, now),
+            ).rowcount
+            if changed != 1:
+                return False
+            self.conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        return True
+
+    def change_password_if_current(self, user_id: int, expected_hash: str, password_hash: str, keep: str, now: int) -> bool:
+        with self.conn:
+            changed = self.conn.execute(
+                "UPDATE users SET password_hash = ?, failed_attempts = 0 "
+                "WHERE id = ? AND password_hash = ? AND locked_until <= ? "
+                "AND EXISTS (SELECT 1 FROM sessions WHERE user_id = users.id AND token_hash = ? AND expires_at > ?)",
+                (password_hash, user_id, expected_hash, now, keep, now),
+            ).rowcount
+            if changed != 1:
+                return False
+            self.conn.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash IS NOT ?", (user_id, keep))
+        return True
+
+    def replace_recovery_if_current(self, user_id: int, password_hash: str, expected_recovery: str, recovery_hash: str, now: int) -> bool:
+        with self.conn:
+            changed = self.conn.execute(
+                "UPDATE users SET recovery_hash = ?, failed_attempts = 0 "
+                "WHERE id = ? AND password_hash = ? AND recovery_hash = ? AND locked_until <= ?",
+                (recovery_hash, user_id, password_hash, expected_recovery, now),
+            ).rowcount
+        return changed == 1
 
     def session_user(self, token_hash: str, now: int) -> int | None:
         row = self.conn.execute("SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?", (token_hash, now)).fetchone()

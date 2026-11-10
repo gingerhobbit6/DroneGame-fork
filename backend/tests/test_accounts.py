@@ -38,6 +38,7 @@ class TestSigningUp:
         assert made.status_code == 201
         body = made.json()
         assert body["user"]["username"] == "operator" and body["user"]["display_name"] == "Test Operator"
+        assert body["user"]["id"] == anon.get(f"{API}/me").json()["id"]
         assert re.fullmatch(r"[A-Z2-7]{6}(-[A-Z2-7]{6}){3}", body["recovery_code"])
         header = cookie_header(made)
         assert "httponly" in header and "samesite=strict" in header and "path=/api" in header
@@ -270,3 +271,6 @@ def test_only_known_columns_can_be_updated(db_path, anon):
             SqliteAccountStore(conn).update(1, **{"username = 'x', display_name": "y"})
         with pytest.raises(ValueError):
             SqliteAccountStore(conn).update(1)
+        for field in ("password_hash", "recovery_hash"):
+            with pytest.raises(ValueError):
+                SqliteAccountStore(conn).update(1, **{field: "unsafe bypass"})

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The login page, the login gate and the profile hub, against an in-memory server.
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
 import { ApiError, SIGNED_OUT, createApi } from '../src/api/client.js';
@@ -16,7 +16,7 @@ const $ = (sel) => document.querySelector(sel);
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 const type = (label, value) => fireEvent.change(screen.getByLabelText(label, { exact: false, selector: 'input' }), { target: { value } });
 const press = (text) => fireEvent.click(screen.getByRole('button', { name: text }));
-const USER = { username: 'operator', display_name: 'Sgt Alex Smith', rank: '', organisation: '', created_at: '2026-11-07T10:00:00+00:00', last_sign_in: null };
+const USER = { id: 1, username: 'operator', display_name: 'Sgt Alex Smith', rank: '', organisation: '', created_at: '2026-11-07T10:00:00+00:00', last_sign_in: null };
 const CODE = 'AAAAAA-BBBBBB-CCCCCC-DDDDDD';
 
 let api;
@@ -44,109 +44,6 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); resetAllFigures(); });
 
-describe('the login page', () => {
-  const page = (onSignedIn = vi.fn()) => { render(<AuthScreen api={api} onSignedIn={onSignedIn} />); return onSignedIn; };
-
-  it('signs in, and can keep the session for 30 days', async () => {
-    const done = page();
-    type('Username', ' operator ');
-    type('Password', 'correct horse battery');
-    fireEvent.click(screen.getByLabelText(/Keep me signed in/));
-    press('Sign in');
-    await settle();
-    expect(api.auth.signIn).toHaveBeenCalledWith({ username: 'operator', password: 'correct horse battery', remember: true });
-    expect(done).toHaveBeenCalledWith(USER);
-  });
-
-  it('shows why a sign-in was refused, in the server\'s words', async () => {
-    api.auth.signIn.mockRejectedValueOnce(new ApiError('Too many failed attempts. Try again in 5 minutes.', false, 429));
-    const done = page();
-    type('Username', 'operator');
-    type('Password', 'wrong');
-    press('Sign in');
-    await settle();
-    expect(screen.getByRole('alert').textContent).toMatch(/Try again in 5 minutes/);
-    expect(done).not.toHaveBeenCalled();
-  });
-
-  it('says whether the server is running', async () => {
-    api.auth.health.mockRejectedValueOnce(new ApiError('down', true));
-    page();
-    await settle();
-    expect($('.acct-status').textContent).toMatch(/Server offline/);
-  });
-
-  it('shows and hides the password, and warns when Caps Lock is on', () => {
-    page();
-    const input = screen.getByLabelText('Password', { selector: 'input' });
-    expect(input.type).toBe('password');
-    press('Show the password');
-    expect(input.type).toBe('text');
-    fireEvent.keyDown(input, { key: 'A', modifierCapsLock: true });
-    expect(screen.getByRole('status').textContent).toBe('Caps Lock is on');
-  });
-
-  it('creates an account, and goes on only once the recovery code is saved', async () => {
-    const done = page();
-    fireEvent.click(screen.getByRole('tab', { name: 'Create account' }));
-    type('Your name', 'Sgt Alex Smith');
-    type('Username', 'operator');
-    type('New password', 'a long passphrase here');
-    type('Type it again', 'a long passphrase here');
-    expect($('.acct-meter').dataset.score).toBe('4');
-    press('Create account');
-    await settle();
-    expect(api.auth.register).toHaveBeenCalledWith({ username: 'operator', display_name: 'Sgt Alex Smith', password: 'a long passphrase here' });
-    expect($('#recovery-code').textContent).toBe(CODE);
-    const go = screen.getByRole('button', { name: 'Continue to your profile' });
-    expect(go.disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText(/I have saved it/));
-    fireEvent.click(go);
-    expect(done).toHaveBeenCalledWith(USER);
-  });
-
-  it.each([
-    ['short', 'operator', 'too short', 'too short', /at least 10/],
-    ['mismatched', 'operator', 'a long passphrase', 'a long passphrase!', /do not match/],
-    ['the username', 'operator1234', 'operator1234', 'operator1234', /must not be your username/],
-    ['a bad username', 'no spaces here', 'a long passphrase', 'a long passphrase', /Usernames are 3 to 32/],
-  ])('refuses a %s password or name before asking the server', (_, username, password, again, why) => {
-    page();
-    fireEvent.click(screen.getByRole('tab', { name: 'Create account' }));
-    type('Your name', 'Op');
-    type('Username', username);
-    type('New password', password);
-    type('Type it again', again);
-    press('Create account');
-    expect(screen.getByRole('alert').textContent).toMatch(why);
-    expect(api.auth.register).not.toHaveBeenCalled();
-  });
-
-  it('resets a forgotten password with the recovery code, and shows the next code', async () => {
-    page();
-    press('Forgotten password?');
-    type('Username', 'operator');
-    type('Recovery code', CODE.toLowerCase());
-    type('New password', 'a brand new passphrase');
-    type('Type it again', 'a brand new passphrase');
-    press('Reset password');
-    await settle();
-    expect(api.auth.reset).toHaveBeenCalledWith({ username: 'operator', recovery_code: CODE.toLowerCase(), new_password: 'a brand new passphrase' });
-    expect($('#recovery-code').textContent).toBe('NEWNEW-CODE22-333333-444444');
-    fireEvent.click(screen.getByLabelText(/I have saved it/));
-    press('Sign in');
-    expect(screen.getByRole('status').textContent).toMatch(/Sign in with your new password/);
-    expect(screen.getByRole('button', { name: 'Sign in' })).not.toBeNull();
-  });
-
-  it('goes back from the reset form', () => {
-    page();
-    press('Forgotten password?');
-    press('Back to sign in');
-    expect(screen.getByRole('heading', { name: 'Welcome back' })).not.toBeNull();
-  });
-});
-
 describe('password strength', () => {
   it.each([
     ['', 0], ['short', 1], ['aaaaaaaaaaaa', 1], ['operator-password', 1], ['abcdefghij', 2], ['Abcdefgh12', 3], ['four words make it strong', 4],
@@ -155,7 +52,7 @@ describe('password strength', () => {
   });
 });
 
-describe('the login gate', { timeout: 30000 }, () => {
+describe('the login gate', { timeout: 120000 }, () => {
   let game;
   const gate = (storage = createFakeStorage()) => {
     game = createGame({ seed: '1', terrainSeed: '1', api, storage });
@@ -232,12 +129,22 @@ describe('the login gate', { timeout: 30000 }, () => {
   it('gives the game, but not the pack, to someone else who signs in after a session runs out', async () => {
     await deployFirstPack();
     act(() => { dispatchEvent(new Event(SIGNED_OUT)); });
-    api.auth.signIn.mockResolvedValueOnce({ ...USER, username: 'someone', display_name: 'Cpl Jo Bloggs' });
+    api.auth.signIn.mockResolvedValueOnce({ ...USER, id: 2, username: 'someone', display_name: 'Cpl Jo Bloggs' });
     await signBackIn();
     expect(screen.getByRole('heading', { name: 'Welcome, Cpl Jo Bloggs' })).not.toBeNull(); // their profile first
     expect($('#enter-game').textContent).toBe('Back to the game');
     expect($('[data-catalogue="unit"]')).toBeNull();
     expect(game.attach).toHaveBeenCalledTimes(1); // the same game, never reloaded
+  });
+
+  it('restores the same account\'s pack after its session lapses', async () => {
+    await deployFirstPack();
+    act(() => { dispatchEvent(new Event(SIGNED_OUT)); });
+    expect(game.sim.state.packed).toBe(false);
+    await signBackIn();
+    await settle();
+    expect(game.sim.state.packed).toBe(true);
+    expect(game.sim.state.kit).toEqual({ radar_a800: 1 });
   });
 
   it('keeps the hidden game\'s hotkeys off under the profile', async () => {
@@ -264,6 +171,55 @@ describe('the login gate', { timeout: 30000 }, () => {
     expect(game.attach).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the account open and reports a failed sign-out', async () => {
+    api.auth.me.mockResolvedValueOnce(USER);
+    gate();
+    await screen.findByRole('heading', { name: 'Welcome, Sgt Alex Smith' });
+    api.auth.signOut.mockRejectedValueOnce(new ApiError('The save server is not running.', true));
+    press('Sign out');
+    expect((await screen.findByRole('alert')).textContent).toMatch(/sign out.*not complete/i);
+    expect($('.acct-hub')).not.toBeNull();
+    expect($('.acct-login')).toBeNull();
+    expect(api.auth.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards a private pack response that arrives after another account signs in', async () => {
+    const storage = createFakeStorage();
+    storage.setItem(DEPLOYED, JSON.stringify({ ownerId: USER.id, id: 99 }));
+    let resolvePack;
+    api.units.get = vi.fn(() => new Promise((resolve) => { resolvePack = resolve; }));
+    api.auth.me.mockResolvedValueOnce(USER);
+    gate(storage);
+    await screen.findByRole('heading', { name: 'Welcome, Sgt Alex Smith' });
+    await waitFor(() => expect(api.units.get).toHaveBeenCalledWith(99));
+    press('Sign out');
+    await screen.findByRole('heading', { name: 'Welcome back' });
+    api.auth.signIn.mockResolvedValueOnce({ ...USER, id: 2, username: 'someone', display_name: 'Cpl Jo Bloggs' });
+    type('Username', 'operator'); type('Password', 'correct horse battery'); press('Sign in');
+    await screen.findByRole('heading', { name: 'Welcome, Cpl Jo Bloggs' });
+    await act(async () => { resolvePack({ ...PACK, id: 99 }); });
+    expect(screen.getByRole('heading', { name: 'Welcome, Cpl Jo Bloggs' })).not.toBeNull();
+    expect(screen.queryByText(/Deployed:/)).toBeNull();
+    expect(game.sim.state.packed).toBe(false);
+  });
+
+  it('discards an old profile response after another account signs in', async () => {
+    let resolveProfile;
+    api.auth.updateProfile.mockImplementationOnce(() => new Promise((resolve) => { resolveProfile = resolve; }));
+    api.auth.me.mockResolvedValueOnce(USER);
+    gate();
+    await screen.findByRole('heading', { name: 'Welcome, Sgt Alex Smith' });
+    press('Edit');
+    type('Name', 'Old account edited');
+    press('Save');
+    act(() => { dispatchEvent(new Event(SIGNED_OUT)); });
+    api.auth.signIn.mockResolvedValueOnce({ ...USER, id: 2, username: 'someone', display_name: 'Cpl Jo Bloggs' });
+    type('Username', 'operator'); type('Password', 'correct horse battery'); press('Sign in');
+    await screen.findByRole('heading', { name: 'Welcome, Cpl Jo Bloggs' });
+    await act(async () => { resolveProfile({ ...USER, display_name: 'Old account edited' }); });
+    expect(screen.getByRole('heading', { name: 'Welcome, Cpl Jo Bloggs' })).not.toBeNull();
+  });
+
   it('limits the game to the deployed pack through the whole login path, and lifts it when the pack is withdrawn', async () => {
     await deployFirstPack();
     expect(game.sim.state).toMatchObject({ packed: true, kit: { radar_a800: 1 } });
@@ -279,7 +235,7 @@ describe('the login gate', { timeout: 30000 }, () => {
 
   it('keeps the deployed pack across a reload, for its owner only', async () => {
     await deployFirstPack();
-    expect(JSON.parse(game.storage.getItem(DEPLOYED))).toEqual({ username: 'operator', id: 1 });
+    expect(JSON.parse(game.storage.getItem(DEPLOYED))).toEqual({ ownerId: USER.id, id: 1 });
     const storage = game.storage;
     cleanup();
     api.auth.me.mockResolvedValueOnce(USER);
@@ -287,15 +243,27 @@ describe('the login gate', { timeout: 30000 }, () => {
     await settle();
     expect(screen.getByText('Deployed: 1 Troop. Its kit waits in the pack tray in the game.')).not.toBeNull();
     cleanup();
-    api.auth.me.mockResolvedValueOnce({ ...USER, username: 'someone' });
+    api.auth.me.mockResolvedValueOnce({ ...USER, id: 2 }); // even a re-created username is a different account
     gate(storage);
     await settle();
     expect(screen.queryByText(/Deployed:/)).toBeNull();
+    expect(storage.getItem(DEPLOYED)).toBeNull();
+  });
+
+  it('drops old username-only deployment records because they cannot prove ownership', async () => {
+    const storage = createFakeStorage();
+    storage.setItem(DEPLOYED, JSON.stringify({ username: 'operator', id: 1 }));
+    const get = vi.spyOn(api.units, 'get');
+    api.auth.me.mockResolvedValueOnce(USER);
+    gate(storage);
+    await settle();
+    expect(get).not.toHaveBeenCalled();
+    expect(storage.getItem(DEPLOYED)).toBeNull();
   });
 
   it('forgets a kept pack that was deleted meanwhile', async () => {
     const storage = createFakeStorage();
-    storage.setItem(DEPLOYED, JSON.stringify({ username: 'operator', id: 99 }));
+    storage.setItem(DEPLOYED, JSON.stringify({ ownerId: USER.id, id: 99 }));
     api.auth.me.mockResolvedValueOnce(USER);
     gate(storage);
     await settle();

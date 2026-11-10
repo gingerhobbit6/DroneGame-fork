@@ -153,8 +153,13 @@ function moveSpotter(w, d, spd, dt) {
 function holdOff(w, d, tgt, hrem, spd, dt) {
   d.holdT = (d.holdT || 0) + dt;
   if (d.holdT > PATROL.enemy.holdTime) return escape(w, d, 'gave up waiting for a fix');
-  let dx = (tgt.x - d.pos.x) / hrem, dz = (tgt.z - d.pos.z) / hrem;
-  if (hrem < u(PATROL.enemy.holdRadius)) [dx, dz] = [-dz, dx]; // round, not in
+  let dx, dz;
+  if (hrem === 0) { // no radial direction at the centre: keep its heading without drawing a random number
+    dx = Math.sin(d.heading); dz = Math.cos(d.heading);
+  } else {
+    dx = (tgt.x - d.pos.x) / hrem; dz = (tgt.z - d.pos.z) / hrem;
+    if (hrem < u(PATROL.enemy.holdRadius)) [dx, dz] = [-dz, dx]; // round, not in
+  }
   d.pos.x += dx * spd; d.pos.z += dz * spd;
   d.pos.y = Math.max(d.pos.y, hereU(d.pos.x, d.pos.z) + u(d.def.minAgl || 30));
   return true;
@@ -193,12 +198,12 @@ function moveStrike(w, d, spd, dt) {
 //    navigation jammed too it cannot find home and drifts down
 // A jammed video link brings down a drone flown by hand, more slowly, as it is flying blind; one that flies itself is only blinded.
 // Within `terminal` metres of its target a drone with a homing module flies on by itself, so jamming no longer touches it.
-// A reactive jammer breaks a link sooner. Returns the speed multiplier, or null if the drone came down.
-function applyJamming(w, d, dt) {
+// A reactive jammer breaks a link sooner. Returns the speed multiplier, or null if the drone came down. jammers: those switched on.
+function applyJamming(w, d, dt, jammers) {
   if (d.toGo <= (d.def.terminal ?? 0)) { d.videoJammed = false; return 1; }
   let ctrl = false, vid = false, gnss = false, spoof = false, takeover = false, killTime = Infinity, ctrlSlow = 1, rate = 1, src = null;
-  for (const s of w.structures) {
-    if (s.def.kind !== 'jammer' || s.mode !== 'Jam') continue;
+  for (const s of jammers) {
+    if (s.health <= 0) continue; // struck down earlier in this step, and gone from the laydown
     const j = jamming(s, d, w.structures);
     if (!j) continue;
     if (j.control) { ctrl = true; ctrlSlow = Math.min(ctrlSlow, s.def.slow); }
@@ -240,10 +245,11 @@ function applyJamming(w, d, dt) {
 }
 
 export function updateDrones(w, dt) {
+  const jammers = w.structures.filter((s) => s.def.kind === 'jammer' && s.mode === 'Jam'); // nothing here switches one on or off
   for (let i = w.drones.length - 1; i >= 0; i--) {
     const d = w.drones[i];
     d.detected = w.net.isTracked(d);
-    const slow = applyJamming(w, d, dt);
+    const slow = applyJamming(w, d, dt, jammers);
     if (slow === null) continue;
 
     const px = d.pos.x, py = d.pos.y, pz = d.pos.z;

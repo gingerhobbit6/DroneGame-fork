@@ -23,7 +23,7 @@ import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-const USER = { username: 'operator', display_name: 'Sgt Alex Smith', rank: '', organisation: '', created_at: '2026-11-07T10:00:00+00:00', last_sign_in: null };
+const USER = { id: 1, username: 'operator', display_name: 'Sgt Alex Smith', rank: '', organisation: '', created_at: '2026-11-07T10:00:00+00:00', last_sign_in: null };
 const PACK = { id: 1, name: '1 Troop', echelon: 'troop', callsign: '', assets: { systems: [{ id: 'radar_a800', count: 1 }, { id: 'jammer', count: 2 }], vehicles: [], people: [] } };
 const KIT = { radar_a800: 1, jammer: 2 };
 
@@ -172,6 +172,24 @@ describe('choosing a pack on the start screen', { timeout: 30000 }, () => {
     rerender(page({ ...value, covered: false }));
     await settle();
     expect([...$('#start-pack-select').options].map((o) => o.textContent)).toContain('1 Troop (1 sensor · 2 effectors)');
+  });
+
+  it('never shows the previous account\'s cached packs after a username is reused', async () => {
+    const made = await api.units.create(PACK);
+    let currentUserId = USER.id;
+    api.units.list = vi.fn(async () => currentUserId === USER.id ? [{ id: made.id }] : []);
+    game.sim.commands.leave();
+    const base = { user: USER, activeUnit: null, deploy: vi.fn(), openProfile: vi.fn(), covered: false };
+    const page = (account) => <GameContext.Provider value={game}><AccountContext.Provider value={account}><Overlay /></AccountContext.Provider></GameContext.Provider>;
+    const { rerender } = render(page(base));
+    await settle();
+    expect($('#start-pack-select').options.length).toBe(2);
+    currentUserId = 2;
+    rerender(page({ ...base, user: { ...USER, id: 2 } }));
+    await settle();
+    expect(api.units.list).toHaveBeenCalledTimes(2);
+    expect([...$('#start-pack-select').options].map((o) => o.textContent)).toEqual(['None: buy any system, on a budget']);
+    expect(base.deploy).not.toHaveBeenCalled();
   });
 });
 

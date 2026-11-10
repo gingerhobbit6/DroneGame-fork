@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/London
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/London
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    groups:
+      frontend:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: uv
+    directories: [/backend, /tools/mapbuild]
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/London
+    cooldown:
+      default-days: 15 # a day past the projects' two-week exclude-newer window, so a proposal always resolves
+    open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ['*']
+        update-types: [minor, patch]

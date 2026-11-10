@@ -12,7 +12,6 @@ from dataclasses import dataclass
 import numpy as np
 import rasterio
 import shapely
-from pyogrio.raw import read as ogr_read
 from rasterio.features import rasterize
 from rasterio.io import MemoryFile
 from rasterio.transform import from_origin
@@ -22,6 +21,7 @@ from shapely.geometry import mapping
 from . import copernicus, geonames
 from .estonia_files import AGENT, BUILDINGS, CRS, HEIGHTS, LAND, PLACES, SURFACE, TRANSPORT, UTILITIES, WATER, _retrying, ensure  # noqa: F401 - ensure is part of this module's face
 from .grid import CELL, Window
+from .source_limits import check_raster_blocks, read_capped, read_shapefile, safe_archive_members
 
 FIRST_NORTH = 6_000_000  # Great Britain's northings stop at 1,300 km, so a position says which grid it is on
 LICENCE = "https://geoportaal.maaruum.ee/opendata-licence"
@@ -33,6 +33,7 @@ SURFACE_PER_CELL = CELL // SURFACE_M
 HEIGHTS_M = 10
 HEIGHTS_PER_CELL = CELL // HEIGHTS_M
 MIN_BUILDING_PIXELS = 2  # of the 16 in a cell, before a footprint makes the cell solid
+BAND_CELLS = 500  # rows of cells reduced at a time
 
 FOREST = 10  # type "Mets" in ETAK: the other woody types are bushes and lone trees, too low to count as woodland
 MIN_LINE_KV = 35  # the local lines below this hang on poles, not the pylons OS maps show
@@ -48,6 +49,7 @@ TILE_M, TILE_PX = 1000, 256
 PIECE_TILES = 10
 TILE_PAUSE_S = 0.25
 MAX_SHEET_BYTES = 8_000_000  # a square km of 5 m pixels is about 0.2 MB, so anything far bigger is not what it claims to be
+MAX_TILE_BYTES = 2_000_000
 
 
 def _need(data_root: str, name: str) -> str:
@@ -57,10 +59,16 @@ def _need(data_root: str, name: str) -> str:
     return path
 
 
+def bands(rows: int, per_cell: int, band_cells: int = BAND_CELLS) -> list[slice]:
+    """Slices of fine rows, whole cells deep, so the copies a reduction makes exist for one band at a time rather than the whole window."""
+    step = band_cells * per_cell
+    return [slice(r, r + step) for r in range(0, rows, step)]
+
+
 def cells(fine: np.ndarray, per_cell: int) -> np.ndarray:
-    """A square of fine pixels to rows and columns of cells, with each cell's pixels on the last axis."""
-    side = fine.shape[0] // per_cell
-    return fine.reshape(side, per_cell, side, per_cell).transpose(0, 2, 1, 3).reshape(side, side, per_cell * per_cell)
+    """A block of fine pixels to rows and columns of cells, with each cell's pixels on the last axis."""
+    rows, columns = fine.shape[0] // per_cell, fine.shape[1] // per_cell
+    return fine.reshape(rows, per_cell, columns, per_cell).transpose(0, 2, 1, 3).reshape(rows, columns, per_cell * per_cell)
 
 
 def cell_mean(fine: np.ndarray, per_cell: int) -> np.ndarray:
@@ -81,12 +89,21 @@ def cell_high(fine: np.ndarray, per_cell: int, minimum: int = 1) -> np.ndarray:
 
 def ground_posts(data_root: str, window: Window) -> np.ndarray:
     """Metres at the window's posts: the mean of the 10 m pixels in each 20 m cell. NaN beyond the data, which stops at the national border."""
-    with rasterio.open(_need(data_root, HEIGHTS)) as tif:
-        if tif.transform.c % HEIGHTS_M or tif.transform.f % HEIGHTS_M:
+    with rasterio.open(_need(data_root, HEIGHTS), driver="GTiff") as tif:
+        t = tif.transform
+        if (tif.crs is None or tif.crs.to_epsg() != CRS or tif.count != 1 or abs(t.a - HEIGHTS_M) > 1e-6
+                or abs(t.e + HEIGHTS_M) > 1e-6 or abs(t.b) > 1e-9 or abs(t.d) > 1e-9
+                or t.c % HEIGHTS_M or t.f % HEIGHTS_M):
             raise SystemExit(f"{HEIGHTS} is not on a {HEIGHTS_M} m grid, so it cannot be cut into the pack's cells")
-        span = from_bounds(window.west - CELL / 2, window.south - CELL / 2, window.right + CELL / 2, window.top + CELL / 2, tif.transform).round_offsets().round_lengths()
+        span = from_bounds(window.west - CELL / 2, window.south - CELL / 2, window.right + CELL / 2, window.top + CELL / 2, t).round_offsets().round_lengths()
+        expected = window.side * HEIGHTS_PER_CELL
+        if span.width != expected or span.height != expected:
+            raise SystemExit(f"{HEIGHTS} has an unexpected pixel window")
+        if tif.width > 100_000 or tif.height > 100_000:
+            raise SystemExit(f"{HEIGHTS} has an unexpected source size")
+        check_raster_blocks(tif)
         fine = tif.read(1, window=span, boundless=True, masked=True).astype("float32").filled(np.nan)
-    return cell_mean(fine, HEIGHTS_PER_CELL)
+    return np.concatenate([cell_mean(fine[b], HEIGHTS_PER_CELL) for b in bands(len(fine), HEIGHTS_PER_CELL)])
 
 
 def surface_pixels(data_root: str, window: Window) -> np.ndarray:
@@ -96,7 +113,7 @@ def surface_pixels(data_root: str, window: Window) -> np.ndarray:
     fine = np.full((size, size), np.nan, "float32")
     path = _need(data_root, SURFACE)
     with zipfile.ZipFile(path) as z:
-        sizes = {member.filename: member.file_size for member in z.infolist()}
+        sizes = {member.filename: member.file_size for member in safe_archive_members(z)}
     for north_km in range((top - size * SURFACE_M) // 1000, top // 1000 + 1):
         for east_km in range(west // 1000, (west + size * SURFACE_M) // 1000 + 1):
             name = f"{north_km - FIRST_NORTH // 1000:03d}{east_km:03d}_ndsm_5m.tif"
@@ -104,7 +121,14 @@ def surface_pixels(data_root: str, window: Window) -> np.ndarray:
                 continue
             if sizes[name] > MAX_SHEET_BYTES:
                 raise SystemExit(f"{name} is far larger than a square km of heights should be")
-            with rasterio.open(f"/vsizip/{{{path}}}/{name}") as tif:  # GDAL, as these are in Deflate64, which Python cannot read
+            with rasterio.open(f"/vsizip/{{{path}}}/{name}", driver="GTiff") as tif:  # GDAL reads the agency's Deflate64 ZIPs
+                t = tif.transform
+                if (tif.crs is None or tif.crs.to_epsg() != CRS or tif.count != 1 or tif.width != 1000 // SURFACE_M
+                        or tif.height != 1000 // SURFACE_M or abs(t.a - SURFACE_M) > 1e-6 or abs(t.e + SURFACE_M) > 1e-6
+                        or abs(t.b) > 1e-9 or abs(t.d) > 1e-9 or abs(t.c - east_km * 1000) > 0.01
+                        or abs(t.f - (north_km + 1) * 1000) > 0.01):
+                    raise SystemExit(f"{name} does not match its 5 m square")
+                check_raster_blocks(tif)
                 values = tif.read(1, masked=True).astype("float32").filled(np.nan)
                 row, col = round((top - tif.bounds.top) / SURFACE_M), round((tif.bounds.left - west) / SURFACE_M)
             r0, c0 = max(row, 0), max(col, 0)
@@ -121,8 +145,9 @@ def lidar(data_root: str, window: Window, half: int, ground: np.ndarray, houses)
     solid = np.zeros(fine.shape, "uint8")
     if len(houses):
         rasterize(((mapping(s), 1) for s in houses), out=solid, transform=from_origin(west, top, SURFACE_M, SURFACE_M))
-    tall = cell_high(fine, SURFACE_PER_CELL)
-    tops = cell_high(np.where(solid == 1, fine, np.nan), SURFACE_PER_CELL, MIN_BUILDING_PIXELS)
+    parts = bands(len(fine), SURFACE_PER_CELL)
+    tall = np.concatenate([cell_high(fine[b], SURFACE_PER_CELL) for b in parts])
+    tops = np.concatenate([cell_high(np.where(solid[b] == 1, fine[b], np.nan), SURFACE_PER_CELL, MIN_BUILDING_PIXELS) for b in parts])
     reach = np.abs(np.arange(window.side) * CELL - window.half) <= half
     inside = reach[:, None] & reach[None, :]
     return {"ground": np.where(inside, ground, np.nan), "tall": np.where(inside, tall, np.nan), "houses": np.where(inside, tops, np.nan)}
@@ -137,14 +162,14 @@ class Etak:
     def read(self, theme: str, layer: str, fields: list[str] | None = None, where: str | None = None) -> tuple[np.ndarray, dict]:
         """A where clause needs its field among the columns read, or it quietly matches nothing."""
         w = self.window
-        meta, _, geometry, data = ogr_read(f"/vsizip/{_need(self.root, theme)}/{layer}.shp", bbox=(w.west, w.south, w.right, w.top), columns=fields or [], where=where, force_2d=True)
+        meta, _, geometry, data = read_shapefile(_need(self.root, theme), f"{layer}.shp", bbox=(w.west, w.south, w.right, w.top), columns=fields or [], where=where, force_2d=True)
         return shapely.from_wkb(geometry), dict(zip(meta["fields"], data))
 
 
 def place_names(data_root: str, window: Window) -> tuple[np.ndarray, dict]:
     """A point and a name for each settlement in the window, in the fields OS names come in. A settlement in several pieces is named once, on its largest."""
     w = window
-    meta, _, geometry, data = ogr_read(f"/vsizip/{_need(data_root, PLACES)}/asustusyksus.shp", bbox=(w.west, w.south, w.right, w.top), columns=["ANIMI", "AKOOD", "TYYP"], force_2d=True)
+    meta, _, geometry, data = read_shapefile(_need(data_root, PLACES), "asustusyksus.shp", bbox=(w.west, w.south, w.right, w.top), columns=["ANIMI", "AKOOD", "TYYP"], force_2d=True)
     shapes, fields = shapely.from_wkb(geometry), dict(zip(meta["fields"], data))
     largest = {}
     for i, code in enumerate(fields["AKOOD"]):
@@ -179,12 +204,14 @@ def _tile(x: int, y: int) -> np.ndarray | None:
     def attempt() -> bytes:
         request = urllib.request.Request(TILE.format(x=x, y=y), headers=AGENT)
         with urllib.request.urlopen(request, timeout=60) as reply:
-            return reply.read()
+            return read_capped(reply, MAX_TILE_BYTES, "basic map tile")
     try:
         data = _retrying(attempt, f"map tile {x}, {y}")
     except urllib.error.HTTPError:
         return None
-    with MemoryFile(data) as memory, memory.open() as png:
+    with MemoryFile(data) as memory, memory.open(driver="PNG") as png:
+        if png.width != TILE_PX or png.height != TILE_PX or png.count not in (1, 3, 4) or any(dtype != "uint8" for dtype in png.dtypes):
+            raise SystemExit("basic map tile has unexpected pixels")
         if png.count >= 3:
             return png.read([1, 2, 3])
         colours = np.zeros((256, 3), "uint8")

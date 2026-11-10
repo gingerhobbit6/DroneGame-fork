@@ -8,7 +8,7 @@ import { hereU } from '../sim/units.js';
 import { droneTemplate } from './models.js';
 import { drawScale } from './drone-models.js';
 import { hexCss } from './labels.js';
-import { SYMBOL_PX, asSymbol, droneSymbol, setSymbol, symbolScale, symbolSprite } from './symbols.js';
+import { SYMBOL_PX, asSymbol, droneTagHeight, haloSprite, styleDrone, symbolScale, symbolSprite } from './symbols.js';
 import { view } from './view.js';
 import { createTrail } from './trail.js';
 
@@ -24,8 +24,8 @@ export function createDroneViews(scene, sim, labels, camera) {
     const model = droneTemplate(d.type, false).clone();
     const unseen = droneTemplate(d.type, true).clone();
     unseen.visible = false;
-    const symbol = symbolSprite('hostile:uav', 16);
-    group.add(model, unseen, symbol);
+    const symbol = symbolSprite('hostile:uav', 16), halo = haloSprite();
+    group.add(halo, model, unseen, symbol);
     const rotors = [...model.children, ...unseen.children].filter((c) => c.name === 'rotor');
 
     const bar = new THREE.Group(); // the models are in metres, so the bar sits and sizes by the drone's span
@@ -51,7 +51,7 @@ export function createDroneViews(scene, sim, labels, camera) {
       fibre.frustumCulled = false;
       scene.add(fibre);
     }
-    const v = { group, model, unseen, symbol, top: 0, rotors, bar, fill, fillMat, drop, dropMat, fibre, trail: createTrail(scene, def.color), hp: d.hp, phase: (d.uid * 1.7) % 6, label: labels.make(def.label, hexCss(def.color), 'dlabel') };
+    const v = { group, model, unseen, symbol, halo, top: 0, rotors, bar, fill, fillMat, drop, dropMat, fibre, trail: createTrail(scene, def.color), hp: d.hp, phase: (d.uid * 1.7) % 6, label: labels.make(def.label, hexCss(def.color), 'dlabel') };
     views.set(d, v);
     return v;
   }
@@ -60,7 +60,7 @@ export function createDroneViews(scene, sim, labels, camera) {
     v.label.remove();
     scene.remove(v.group);
     if (v.fibre) { scene.remove(v.fibre); v.fibre.geometry.dispose(); v.fibre.material.dispose(); }
-    v.fillMat.dispose(); v.dropMat.dispose(); v.trail.dispose(); v.symbol.material.dispose(); v.symbol.geometry.dispose();
+    v.fillMat.dispose(); v.dropMat.dispose(); v.trail.dispose(); v.symbol.material.dispose(); v.symbol.geometry.dispose(); v.halo.material.dispose(); v.halo.geometry.dispose();
     views.delete(d);
   }
 
@@ -76,18 +76,11 @@ export function createDroneViews(scene, sim, labels, camera) {
       v.group.visible = view.truth;
       v.trail.push(d.pos); // kept while hidden, so switching it on shows the whole flight
       v.trail.line.visible = view.trails && view.truth;
-      v.model.visible = tracked && !symbol;
-      v.unseen.visible = !tracked && !symbol;
-      v.symbol.visible = symbol;
+      styleDrone(v, d.def, tracked, symbol, k);
       v.bar.visible = tracked;
-      if (symbol) {
-        setSymbol(v.symbol, droneSymbol(d.def, tracked));
-        v.symbol.material.opacity = tracked ? 1 : 0.6;
-        v.symbol.scale.setScalar(symbolScale(SYMBOL_PX, k));
-      }
       // the bar and the name tag clear the top of whatever is drawn
       v.bar.position.y = symbol ? symbolScale(SYMBOL_PX * 0.55, k) * dist : d.def.size * 0.5;
-      v.top = symbol ? symbolScale(SYMBOL_PX * 0.75) * dist : d.def.size * k * 0.7;
+      v.top = droneTagHeight(d.def, symbol, k, dist);
       if (v.hp !== d.hp) { // health bar
         v.hp = d.hp;
         const k = Math.max(d.hp / d.def.hp, 0);
@@ -115,7 +108,8 @@ export function createDroneViews(scene, sim, labels, camera) {
     sync,
     updateLabels() {
       for (const [d, v] of views) {
-        v.label.style.opacity = d.detected ? '1' : '0.5';
+        v.label.style.opacity = d.detected || d === view.drone ? '1' : '0.7';
+        v.label.classList.toggle('selected', d === view.drone);
         labels.place(v.label, d.pos.x, d.pos.y + Math.max(v.top, 0.004 * view.zoom), d.pos.z, view.labels && view.truth && view.replayT == null);
       }
     },

@@ -14,6 +14,8 @@ import { view } from '../render/view.js';
 import { accuracyText, locateMe } from './locate.js';
 
 const OUTSIDE = 'outside Great Britain and Estonia, which these maps cover so far.';
+// Said after a location is found, as the map has just gone blank but for any map pack there.
+const PRIVATE = 'No live map is on, so no map server has seen where you are. To see the area, choose Street or Satellite above the map, which shares it with that provider.';
 const covers = (entry, e, n) => Math.abs(e - entry.east) <= entry.half - WORLD.radius && Math.abs(n - entry.north) <= entry.half - WORLD.radius;
 const inside = (entry, e, n) => Math.abs(e - entry.east) <= entry.half && Math.abs(n - entry.north) <= entry.half;
 const clamp = (v, middle, room) => Math.min(Math.max(v, middle - room), middle + room);
@@ -29,7 +31,7 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
   const [wanted, setWanted] = useState(null); // a point with no pack yet
   const [elsewhere, setElsewhere] = useState(null); // a point off the grid, shown but not usable
   const [downloads, setDownloads] = useState(null); // which OS data this computer has
-  const [ready, setReady] = useState([]); // every pack loaded so far, shown on the map
+  const [privateLocationRequest, setPrivateLocationRequest] = useState(0);
   const file = useRef(null);
   const latest = useRef(0); // only the newest choice may finish, as a pack can take a moment to load
   const touched = useRef(false); // the player has made a choice of their own
@@ -40,27 +42,23 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
     setListing(found);
     return found;
   };
-  useEffect(() => { if (wantReal && !listing) refresh(); }, [wantReal]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let live = true;
     const sentHere = view.startAt; // from a game, to open a map of a place outside that world
     view.startAt = null;
     (async () => {
-      if (sentHere) await goTo(sentHere, sentHere.note);
+      if (sentHere) await goTo(sentHere, sentHere.note, null, !!sentHere.privateLocation);
       const { packs } = await refresh();
       // A real map is ready to go, unless the address says this player was just on generated ground.
       if (live && packs.length && !sentHere && !touched.current && !new URLSearchParams(location.search).has('terrain')) {
         onWantReal(true);
         await choosePack(packs[0], null, false);
       }
-      for (const pack of packs) { // the rest load behind the scenes, so moving between them is instant
-        try { const loaded = await game.loadPack(pack); if (live) setReady((was) => (was.includes(loaded) ? was : [...was, loaded])); } catch { /* it says why when chosen */ }
-      }
     })();
     return () => { live = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const choosePack = async (chosen, point, byPlayer = true) => {
+  const choosePack = async (chosen, point, byPlayer = true, privateLocation = false) => {
     if (byPlayer) touched.current = true;
     const ticket = ++latest.current;
     setEntry(chosen); setDecoded(null); setSite(null); onWorld(null); setNote('Loading the map...');
@@ -68,31 +66,32 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
       const loaded = await game.loadPack(chosen);
       if (ticket !== latest.current) return false;
       setDecoded(loaded);
-      setReady((was) => (was.includes(loaded) ? was : [...was, loaded]));
       setNote('');
-      setStart(loaded, point || { e: chosen.east, n: chosen.north });
+      setStart(loaded, point || { e: chosen.east, n: chosen.north }, privateLocation);
       return true;
     } catch (e) { if (ticket === latest.current) { setNote(e.message); setEntry(null); } return false; }
   };
-  function setStart(loaded, { e, n }) {
+  function setStart(loaded, { e, n }, privateLocation = false) {
     const e0 = snap(e), n0 = snap(n), problem = siteProblem(loaded.pack, e0, n0);
     if (problem) { setNote(problem); return; }
+    if (privateLocation) setPrivateLocationRequest((count) => count + 1); // a pending load may have allowed live tiles to be reselected
     setSite({ e: e0, n: n0 });
     setNote('');
     onWorld(worldId(loaded.pack.hash, e0, n0));
   }
   // Go to a point: into the pack already open if it fits, then any other pack, otherwise offer to build one.
-  const goTo = async (point, prefix = '', packs = null) => { // packs: a list newer than this render's, such as after a build
+  const goTo = async (point, prefix = '', packs = null, privateLocation = false) => { // packs: a list newer than this render's, such as after a build
     touched.current = true;
     const ticket = ++latest.current;
     setWanted(null); setElsewhere(null);
-    if (decoded && covers(decoded.pack.header, point.e, point.n)) { setStart(decoded, point); if (prefix) setNote(prefix); return; }
+    if (decoded && covers(decoded.pack.header, point.e, point.n)) { setStart(decoded, point, privateLocation); if (prefix) setNote(prefix); return; }
     const all = packs ?? (listing || await refresh()).packs;
     const match = all.find((p) => covers(p, point.e, point.n));
     if (ticket !== latest.current) return;
-    if (match) { if (await choosePack(match, point) && prefix) setNote(prefix); return; }
+    if (match) { if (await choosePack(match, point, true, privateLocation) && prefix) setNote(prefix); return; }
     setEntry(null); setDecoded(null); setSite(null); onWorld(null);
-    setWanted(point);
+    if (privateLocation) setPrivateLocationRequest((count) => count + 1);
+    setWanted(privateLocation ? { ...point, privateLocation: true } : point);
     setNote(prefix);
   };
   const showElsewhere = (point, message) => {
@@ -110,8 +109,9 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
     setNote('Finding your location...');
     try {
       const fix = await locateMe();
+      setPrivateLocationRequest((n) => n + 1); // remove live tiles before moving the map to this position
       if (!onGrid(fix.e, fix.n)) { showElsewhere(fix, `You appear to be ${OUTSIDE}`); return; }
-      await goTo(fix, `Your location, ${accuracyText(fix.accuracy)}.`);
+      await goTo(fix, `Your location, ${accuracyText(fix.accuracy)}. ${PRIVATE}`, null, true);
     } catch (e) { setNote(e.message); }
   };
   const goTyped = (e) => {
@@ -159,7 +159,7 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
             <ol id="site-ways">
               <li>
                 <button id="use-my-location" onClick={useMyLocation}>Use my location</button>
-                <span className="muted">Asks this laptop, only when you press it. It stays in this browser unless you deploy there.</span>
+                <span className="muted">Uses your location only when pressed and switches to No live map before showing it. Choosing live tiles later shares the viewed area with the map provider.</span>
               </li>
               <li>
                 <b>Move the map, then click the spot</b>
@@ -174,10 +174,10 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
               </li>
             </ol>
             {note && <div id="world-note" className="map-note">{note}</div>}
-            <SiteStatus site={site} decoded={decoded} wanted={wanted} downloads={downloads} onBuilt={async () => { const point = wanted; setWanted(null); await goTo(point, '', (await refresh()).packs); }} />
+            <SiteStatus site={site} decoded={decoded} wanted={wanted} downloads={downloads} onBuilt={async () => { const point = wanted; setWanted(null); await goTo(point, '', (await refresh()).packs, !!point?.privateLocation); }} />
           </div>
           <div className="site-view">
-            <SiteMap packs={ready} downloads={downloads} point={site || wanted} planned={!site && !!wanted} elsewhere={elsewhere} moving={touched} onPick={pickOnMap} />
+            <SiteMap packs={listing?.packs || []} decoded={decoded} downloads={downloads} point={site || wanted} planned={!site && !!wanted} elsewhere={elsewhere} moving={touched} privateLocationRequest={privateLocationRequest} onPick={pickOnMap} />
             <div className="row">
               <select id="pack-list" aria-label="Maps on this computer" value={entry?.hash || ''} onChange={(e) => { const c = listing.packs.find((p) => p.hash === e.target.value); setWanted(null); if (c) choosePack(c); }}>
                 <option value="">{listing ? (listing.packs.length ? 'Jump to a map' : 'No maps yet') : 'Looking for maps...'}</option>

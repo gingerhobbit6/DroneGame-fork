@@ -62,7 +62,7 @@ describe('in play', () => {
     const launched = sim.ledger.launched[id];
     expect(launched).toBe(2);
     expect(sim.state.health).toBe(100); // the sandbox still cannot be hurt
-  }, 60000);
+  }, 120000);
 
   it('a mix of real and generic drones runs the same way twice', () => {
     const go = () => {

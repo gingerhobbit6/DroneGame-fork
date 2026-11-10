@@ -4,8 +4,9 @@
 // enough sees the patrol for itself. With no fix yet, strikes circle the middle of the corridor and wait for one. All the figures are
 // ASSUMPTIONS (PATROL.enemy). Nothing here draws a random number.
 
-import { PATROL, TERRAIN, WORLD } from './config/index.js';
+import { PATROL, WORLD } from './config/index.js';
 import { terrainState } from './terrain.js';
+import { clearSight } from './world.js';
 import { hdist, u } from './units.js';
 import { nearest, pointAt } from './route.js';
 
@@ -18,7 +19,7 @@ function sees(w, d, range) {
   const g = w.patrol.group, m = WORLD.metresPerUnit;
   if (d.videoJammed || Math.hypot(d.pos.x - g.x, d.pos.y - g.y, d.pos.z - g.z) > u(range)) return false;
   const r = terrainState.data.los(d.pos.x * m, d.pos.y * m, d.pos.z * m, g.x * m, g.y * m + EYE, g.z * m);
-  return r.clear && r.canopy <= TERRAIN.opticalCanopyTol;
+  return clearSight(r);
 }
 
 // Look once a second, keeping the answer between looks.

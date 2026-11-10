@@ -137,6 +137,9 @@ describe('sources tab', () => {
     fireEvent.change($('#src-rangescale'), { target: { value: '2' } });
     expect(WORLD.rangeScale).toBe(2);
     expect(STRUCTURES.radar.range).toBe(STRUCTURES.radar.published * 2);
+    fireEvent.change($('#src-rangescale'), { target: { value: '1e308' } });
+    expect(WORLD.rangeScale).toBe(2);
+    expect($('#src-rangescale').value).toBe('2');
     fireEvent.change($('#src-fpvgap'), { target: { value: '7' } });
     expect(WAVES.fpvGap).toBe(7);
     fireEvent.click($('#src-reset'));

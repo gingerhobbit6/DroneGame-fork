@@ -1,12 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
-import { MIXED, GNSS_RING, runReferences, setUp, play } from './support/scenarios.js';
+import { MIXED, GNSS_RING, SCENARIOS, runReferences, setUp, play } from './support/scenarios.js';
 import want from './support/reference-digests.json';
 
 describe('reference runs', () => {
-  it('reproduce the recorded digests exactly', () => {
-    expect(runReferences(createSimulation())).toEqual(want);
-  }, 120000);
+  let sim;
+  beforeAll(() => { sim = createSimulation(); });
+  it.each(SCENARIOS)('reproduces the recorded digest for $name exactly', (scenario) => {
+    expect(runReferences(sim, [scenario])).toEqual({ [scenario.name]: want[scenario.name] });
+  }, 240000);
 });
 
 describe('regressions', () => {

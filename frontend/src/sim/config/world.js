@@ -6,7 +6,7 @@
 // independent test results. Edit freely, or use the in-game Tuning panel.
 
 // Stored with saved laydowns and runs. Raise it when a change means old saves no longer replay the same.
-export const GAME_VERSION = '0.19.2';
+export const GAME_VERSION = '0.19.3';
 
 export const WORLD = {
   metresPerUnit: 20,     // 3D scene scale: 1 scene unit = this many metres
@@ -20,7 +20,7 @@ export const WORLD = {
   droneVisualScale: 4,   // zoomed right out, drones are drawn at most this much larger than the models' units (render/drone-models.js)
   // Closer in, a drone or system keeps at least this share of the screen's height (a Shahed's span, a system's height),
   // until the camera is close enough to show it at true size.
-  droneOnScreen: 0.06, systemOnScreen: 0.05,
+  droneOnScreen: 0.12, systemOnScreen: 0.05, // drones were 0.06, doubled so they are easier to see
   rangeScale: 1,         // game range = published range x this. 1 = published figures.
 };
 export const WORLD_KM = (2 * WORLD.radius) / 1000; // the world's width, for wording
@@ -36,7 +36,7 @@ export const SITE = {
   maxHealth: 100,
 };
 
-export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, lockAfterStart: true, maxSystems: 200 }; // maxSystems: what a save holds (MAX_SYSTEMS in backend/app/schemas.py)
+export const BUILD = { minDist: 250, maxDist: 2500, spacing: 60, sellRefund: 1, maxSystems: 200 }; // maxSystems: what a save holds (MAX_SYSTEMS in backend/app/schemas.py)
 
 // Procedural terrain. The terrain seed is separate from the scenario seed, so you can change the attack
 // without changing the ground (or the other way round). Heights are metres above the station base.
@@ -130,3 +130,4 @@ export const STRUCT_SCALE = 1.8;
 // Metres per system model unit at true size: the models are built so that a truck is about 7.5 m long. A launcher's muzzle is
 // muzzleY model units up, so this many metres each.
 export const SYSTEM_UNIT_M = 2.2;
+export const muzzleHeight = (def) => (def.muzzleY || 2) * SYSTEM_UNIT_M * (def.modelScale || 1); // metres above where the system stands

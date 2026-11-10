@@ -1,11 +1,13 @@
-// Limits real weapons have: a missile's minimum range, a plain gun's spread growing with distance, and armour that keeps out what
-// would wreck a truck.
+// Limits real weapons have: a missile's minimum range, a plain gun's spread growing with distance, armour that keeps out what
+// would wreck a truck, and the sight line a gun or a beam-riding missile needs.
 
-import { beforeEach, describe, expect, it } from 'vitest';
-import { DRONES, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DRONES, STRUCTURES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
 import { hitChance, meetTime } from '../src/sim/hit-chance.js';
 import { createSimulation } from '../src/sim/simulation.js';
+import { antennaHeight, reachOnPath, usesPath } from '../src/sim/site-range.js';
 import { armourOf } from '../src/sim/targeting.js';
+import { terrainState } from '../src/sim/terrain.js';
 import { reachText } from '../src/ui/SystemCard.jsx';
 import { hereU, u } from '../src/sim/units.js';
 import { setUp } from './support/scenarios.js';
@@ -84,6 +86,62 @@ describe('armour', () => {
     }
     expect(stormer.health).toBe(STRUCTURES.missile_hvm.health - DRONES.fw.damage / 2);
     expect(sim.structures.includes(radar)).toBe(false);
+  }, 60000);
+});
+
+describe('a sight line', () => {
+  // Make this weapon's own sight line clear, or blocked, whatever the ground: the world's answer is swapped, and put back after the test.
+  let swapped = null;
+  function sight(s, clear) {
+    const m = WORLD.metresPerUnit, world = terrainState.data;
+    swapped ??= { world, los: world.los };
+    const { los } = swapped, x = s.pos.x * m, y = s.pos.y * m + antennaHeight(s.def), z = s.pos.z * m;
+    world.los = (ax, ay, az, ...to) => (ax === x && ay === y && az === z ? { clear, blocker: clear ? null : 'terrain', canopy: 0 } : los(ax, ay, az, ...to));
+  }
+  afterEach(() => { if (swapped) swapped.world.los = swapped.los; swapped = null; });
+  const placed = (id) => {
+    setUp(sim, { seed: '1', laydown: [['radar', 600, 0], [id, -400, 300]] }); // where the mixed laydown wires its missile
+    sim.state.sandbox = true; sim.state.budget = 1e9;
+    return sim.structures.find((s) => s.def.id === id);
+  };
+
+  it('is needed by every gun and beam-riding missile, and by no other round that flies', () => {
+    for (const def of Object.values(STRUCTURES)) if (def.kind === 'gun') expect(usesPath(def), def.id).toBe(true);
+    for (const id of ['missile_rr', 'missile_hvm']) expect(usesPath(STRUCTURES[id])).toBe(true);
+    for (const id of ['interceptor', 'interceptor_s', 'missile', 'missile_s', 'missile_l', 'missile_skysabre']) expect(usesPath(STRUCTURES[id])).toBe(false);
+    expect(antennaHeight(STRUCTURES.gun_hmg)).toBeCloseTo(2.64, 2); // it sights along its muzzle, 1.2 model units up
+    const hidden = { los: () => ({ clear: false, blocker: 'terrain', canopy: 0 }) }, a = { x: 0, y: 3, z: 0 }, b = { x: 500, y: 100, z: 0 };
+    expect(reachOnPath(STRUCTURES.gun_hmg, DRONES.fpv, hidden, a, b)).toBe(0); // so its drawn range stops at a hill, as its fire does
+    expect(reachOnPath(STRUCTURES.missile, DRONES.fpv, hidden, a, b)).toBe(STRUCTURES.missile.range);
+  });
+
+  it('holds a gun’s fire on a drone it cannot see, and fires once it can', () => {
+    const gun = placed('gun_hmg');
+    expect(sim.unwired()).not.toContain(gun);
+    hover('fpv', gun, 600);
+    sight(gun, false);
+    sim.run(600);
+    expect(sim.ledger.shots.gun_hmg).toBeUndefined();
+    expect(sim.bus.entries.some((e) => e.msg.task_ack?.reason?.includes('no line of sight to target'))).toBe(true); // offered it, and said why not
+    sight(gun, true);
+    sim.run(600);
+    expect(sim.ledger.shots.gun_hmg?.n).toBeGreaterThan(0);
+  }, 60000);
+
+  it('loses a beam-riding missile once its launcher can no longer see the target', () => {
+    const flight = (lose) => {
+      const launcher = placed('missile_rr'), d = hover('fw', launcher, 1500, 300);
+      sight(launcher, true);
+      for (let n = 0; n < 1200 && !sim.missiles.length; n++) sim.step();
+      expect(sim.missiles.length).toBeGreaterThan(0);
+      if (lose) sight(launcher, false); // the missile is on its way
+      sim.run(1200);
+      return d;
+    };
+    expect(flight(false).dead).toBe(true);
+    const d = flight(true);
+    expect(d.dead).toBe(false);
+    expect(d.hp).toBe(DRONES.fw.hp);
   }, 60000);
 });
 

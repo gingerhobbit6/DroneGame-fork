@@ -35,7 +35,11 @@ def create_app(db_path: Path | None = None, game: Path = DEFAULT_GAME) -> FastAP
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         open_database(path)
-        yield
+        running_builder = app.state.pack_builder
+        try:
+            yield
+        finally:
+            running_builder.stop()
 
     # Interactive docs are off because they load scripts from a CDN, and this works offline. The schema is at /api/v1/openapi.json.
     app = FastAPI(title="Site Guard", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url="/api/v1/openapi.json")

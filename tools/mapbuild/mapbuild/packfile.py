@@ -3,7 +3,9 @@
 import gzip
 import hashlib
 import json
+import os
 import struct
+import tempfile
 from dataclasses import dataclass
 
 import numpy as np
@@ -11,6 +13,9 @@ import numpy as np
 MAGIC = b"SGMAP"
 VERSION = 1
 MAX_FEATURES = 32 * 1024 * 1024  # MAX_FEATURES in frontend/src/api/pack-store.js: the game refuses a pack with more
+MAX_PICTURES = 100
+MAX_PICTURE_BYTES = 256 * 1024 * 1024
+MAX_PACK_BYTES = 448 * 1024 * 1024
 
 
 @dataclass
@@ -76,6 +81,8 @@ def thin_buildings(features: dict, limit: int) -> dict:
 def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: list[dict], say=None) -> dict:
     """pictures: { layer, west, top, width, height (metres), type, data }. Returns the header written. `say` is told of any thinning."""
     check(grids)
+    if len(pictures) > MAX_PICTURES or sum(len(picture["data"]) for picture in pictures) > MAX_PICTURE_BYTES:
+        raise ValueError("the map pictures are larger than the game reads: build a smaller pack")
     sections, blobs, offset = [], [], 0
 
     def add(name: str, blob: bytes, raw_length: int, **extra) -> None:
@@ -102,8 +109,17 @@ def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: 
 
     final = {**header, "gridsSha256": grids_hash(grids), "sections": sections}
     head = json.dumps(final, separators=(",", ":")).encode()
-    with open(path, "wb") as out:
-        out.write(MAGIC + bytes([VERSION]) + struct.pack("<I", len(head)) + head)
-        for blob in blobs:
-            out.write(blob)
+    if 10 + len(head) + offset > MAX_PACK_BYTES:
+        raise ValueError("the map pack is larger than the game reads: build a smaller pack")
+    part = None
+    try:
+        with tempfile.NamedTemporaryFile("wb", dir=os.path.dirname(os.path.abspath(path)), prefix=f".{os.path.basename(path)}.", suffix=".part", delete=False) as out:
+            part = out.name
+            out.write(MAGIC + bytes([VERSION]) + struct.pack("<I", len(head)) + head)
+            for blob in blobs:
+                out.write(blob)
+        os.replace(part, path)
+    finally:
+        if part and os.path.exists(part):
+            os.remove(part)
     return final

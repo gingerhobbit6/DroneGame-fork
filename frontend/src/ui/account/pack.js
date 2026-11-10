@@ -11,6 +11,9 @@ export const useAccount = () => useContext(AccountContext);
 const emptyAssets = () => ({ systems: [], vehicles: [], people: [] });
 export const blankPack = () => ({ name: '', echelon: 'section', callsign: '', assets: emptyAssets() });
 
+// Every pack of the signed-in account, contents and all. The list holds summaries, so each pack is fetched too; an account has at most 50.
+export const fetchPacks = (api) => api.units.list().then((rows) => Promise.all(rows.map((p) => api.units.get(p.id))));
+
 export function packTotals({ systems = [], vehicles = [], people = [] }) {
   const of = (role) => systems.filter((l) => STRUCTURES[l.id]?.role === role).reduce((n, l) => n + l.count, 0);
   return {

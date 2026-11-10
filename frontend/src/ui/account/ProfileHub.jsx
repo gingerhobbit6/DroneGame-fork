@@ -6,7 +6,7 @@ import { money } from '../../sim/economy.js';
 import { useArmed } from '../hooks.js';
 import { Logo, MIN_PASSWORD, PasswordField, RecoveryCode, TextField, ZuluClock, initials, useRequest } from './parts.jsx';
 import { PackEditor } from './PackEditor.jsx';
-import { blankPack, describeTotals, packTotals } from './pack.js';
+import { blankPack, describeTotals, fetchPacks, packTotals } from './pack.js';
 
 const when = (iso) => (iso ? new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'Never');
 
@@ -44,7 +44,7 @@ function ProfileCard({ api, user, onChange }) {
   );
 }
 
-function SecurityCard({ api, onSignOut, onDeleted }) {
+function SecurityCard({ api, onSignOut, onDeleted, signOutError }) {
   const [open, setOpen] = useState(null); // password | code | delete
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -65,6 +65,7 @@ function SecurityCard({ api, onSignOut, onDeleted }) {
     <section className="acct-box" aria-label="Security">
       <h3>Security</h3>
       {done && <p className="acct-note" role="status">{done}</p>}
+      {signOutError && <p className="acct-error" role="alert">{signOutError}</p>}
       {open ? (
         <form className="acct-form" onSubmit={submit[0]}>
           {open === 'delete' && <p className="acct-error">This deletes your account, your profile and all your deployment packs, and cannot be undone. Shared laydowns and runs stay.</p>}
@@ -109,8 +110,7 @@ function Packs({ api, account, onEnter }) {
   const [packs, setPacks] = useState(null);
   const [editing, setEditing] = useState(() => (account.editActive ? account.activeUnit : null)); // opened from the game's pack tray
   const { error, run } = useRequest();
-  // the list holds summaries, so each card's contents are fetched too; a profile has at most 50 packs
-  const load = () => run(async () => setPacks(await Promise.all((await api.units.list()).map((p) => api.units.get(p.id)))));
+  const load = () => run(async () => setPacks(await fetchPacks(api)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
   const remove = (id) => run(async () => { await api.units.remove(id); if (account.activeUnit?.id === id) account.deploy(null); await load(); });
@@ -148,7 +148,7 @@ export function ProfileHub({ api, account, inGame, onEnter }) {
         <div className="acct-grid">
           <div className="acct-side">
             <ProfileCard api={api} user={user} onChange={account.setUser} />
-            <SecurityCard api={api} onSignOut={account.signOut} onDeleted={() => account.leave('Your account and its deployment packs were deleted.')} />
+            <SecurityCard api={api} onSignOut={account.signOut} onDeleted={() => account.leave('Your account and its deployment packs were deleted.')} signOutError={account.signOutError} />
           </div>
           <Packs api={api} account={account} onEnter={onEnter} />
         </div>

@@ -7,15 +7,36 @@ import re
 import urllib.parse
 import urllib.request
 
+from .source_limits import enough_disk_room, read_capped
+
 API = "https://api.os.uk/downloads/v1/products/{}/downloads"
 HOST = "api.os.uk"  # the listing is untrusted input too: a file is only fetched from OS itself, over https
+MAX_LISTING_BYTES = 5_000_000
+MAX_OS_BYTES = 4_000_000_000
 
 
 def _pick(product: str, area: str, fmt: str, sub: str | None) -> dict | None:
     with urllib.request.urlopen(API.format(product), timeout=60) as reply:
-        listing = json.load(reply)
+        listing = json.loads(read_capped(reply, MAX_LISTING_BYTES, "OS download listing"))
     found = [x for x in listing if x.get("area") == area and x.get("format") == fmt and x.get("subformat") == sub]
     return found[0] if found else None
+
+
+def _cached_matches(path: str, size: int, checksum: str) -> bool:
+    if not os.path.isfile(path) or os.path.getsize(path) != size:
+        return False
+    # Equal length does not rule out a damaged cache. Read at most the advertised size plus one byte,
+    # so even a file changed while it is checked cannot cause an unbounded read.
+    digest = hashlib.md5(usedforsecurity=False)
+    remaining = size
+    with open(path, "rb") as cached:
+        while remaining:
+            chunk = cached.read(min(1 << 20, remaining))
+            if not chunk:
+                return False
+            digest.update(chunk)
+            remaining -= len(chunk)
+        return not cached.read(1) and digest.hexdigest() == checksum.lower()
 
 
 def _fetch(item: dict, folder: str, say) -> None:
@@ -24,22 +45,30 @@ def _fetch(item: dict, folder: str, say) -> None:
         raise SystemExit(f"refusing an odd file name from OS: {name!r}")
     url = urllib.parse.urlsplit(str(item.get("url", "")))
     md5 = item.get("md5")
-    if url.scheme != "https" or url.hostname != HOST or not isinstance(item.get("size"), int) or item["size"] <= 0 or not (isinstance(md5, str) and re.fullmatch(r"[0-9a-fA-F]{32}", md5)):
+    if (url.scheme != "https" or url.hostname != HOST or not isinstance(item.get("size"), int)
+            or not 0 < item["size"] <= MAX_OS_BYTES or not (isinstance(md5, str) and re.fullmatch(r"[0-9a-fA-F]{32}", md5))):
         raise SystemExit(f"refusing a download OS did not describe properly: {name}")
     os.makedirs(folder, exist_ok=True)
     target = os.path.join(folder, name)
-    if os.path.exists(target) and os.path.getsize(target) == item["size"]:
+    if _cached_matches(target, item["size"], md5):
         return
     say(f"downloading {name}, {item['size'] / 1e6:.0f} MB")
     digest, done = hashlib.md5(usedforsecurity=False), 0
     part = target + ".part"
+    no_room = False
     with urllib.request.urlopen(item["url"], timeout=120) as reply, open(part, "wb") as out:
         while chunk := reply.read(1 << 20):
             done += len(chunk)
             if done > item["size"]:  # never more than OS said, so a bad reply cannot fill the disc
                 break
+            if not enough_disk_room(folder, len(chunk)):
+                no_room = True
+                break
             out.write(chunk)
             digest.update(chunk)
+    if no_room:
+        os.remove(part)
+        raise SystemExit(f"not enough free space to download {name}")
     if done != item["size"] or digest.hexdigest() != md5.lower():
         os.remove(part)
         raise SystemExit(f"{name} did not download correctly")

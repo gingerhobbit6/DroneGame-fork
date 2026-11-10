@@ -9,8 +9,8 @@ dependencies = [
 ]
 
 [tool.uv]
-# only packages at least two weeks old, so a compromised release has time to be caught
-exclude-newer = "2026-10-21T00:00:00Z"
+# only packages at least two weeks old, so a compromised release has time to be caught; a rolling window, so Dependabot's updates resolve
+exclude-newer = "2 weeks"
 package = false
 
 [tool.pytest.ini_options]

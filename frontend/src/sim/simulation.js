@@ -3,7 +3,7 @@
 //  - state and collections: read by the rendering and the UI, which never change them
 //  - on(event, fn): moments the rendering and UI need to hear about (explosion, toast, siteHit, gameOver, reset, terrain, sandbox...)
 
-import { ADAPT, ECONOMY, FUSION, RESEARCHED, SITE, WAVES, WORLD, applyRangeScale, exportFigures, importFigures, resetAllFigures, resetFigure, setFigure } from './config/index.js';
+import { ADAPT, ECONOMY, FUSION, RESEARCHED, SITE, WAVES, exportFigures, importFigures, resetAllFigures, resetFigure, setFigure, setRangeScale } from './config/index.js';
 import { hashSeed, seedAll } from './rng.js';
 import { generateTerrain, terrainState } from './terrain.js';
 import { cutWorld, parseWorldId, siteProblem } from './world-pack.js';
@@ -230,9 +230,9 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     setFigure: (kind, id, key, value) => setFigure(kind, id, key, value),
     resetFigure: (kind, id, key) => resetFigure(kind, id, key),
     resetAllFigures: () => resetAllFigures(),
-    applyFigures: (figures) => { resetAllFigures(); importFigures(figures); },
+    applyFigures: (figures) => importFigures(figures, true),
     importFigures: (figures) => importFigures(figures),
-    setRangeScale: (v) => { WORLD.rangeScale = v; applyRangeScale(); },
+    setRangeScale: (v) => setRangeScale(v),
     setFpvGap: (v) => { WAVES.fpvGap = v; },
     setAdapt: (key, v) => { if (Object.hasOwn(RESEARCHED.adapt, key)) ADAPT[key] = v; },
   });
@@ -247,7 +247,11 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
   }
 
   return {
-    registerPack(pack) { packs.set(pack.hash, pack); },
+    registerPack(pack) {
+      packs.set(pack.hash, pack);
+      const active = parseWorldId(state.terrainSeed)?.hash;
+      for (const hash of packs.keys()) if (hash !== active && hash !== pack.hash) packs.delete(hash);
+    },
     getPatrol: () => w.patrol,
     siteIsFree: () => siteIsFree(w), // a drawn area or a patrol: the station's rings no longer apply
     state, drones: w.drones, structures: w.structures, missiles: w.missiles, people: w.people, peopleRev: () => w.peopleRev, ledger: w.ledger, net: w.net, rec: w.rec, bus,

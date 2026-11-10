@@ -44,7 +44,7 @@ export function createStructureViews(scene, sim, labels) {
     const r = u(s.def.range), m = WORLD.metresPerUnit;
     // What this spot really gets against a small drone, with line of sight over the ground, as the placing preview shows.
     const radii = usesPath(s.def) ? Array.from(predictRange(s.def, DRONES.fpv, terrainState.data, s.pos.x * m, s.pos.z * m).first, (metres) => u(metres)) : null;
-    v.ringObj = drapedRing(r, ringThickness(r), ringColour(s.def), ringOpacity(), 160, 0.5, radii);
+    v.ringObj = drapedRing(r, ringThickness(r), ringColour(s.def), ringOpacity(), 160, radii);
     v.ringObj.update(s.pos.x, s.pos.z); v.holder.add(v.ringObj.mesh);
     v.ringObj.mesh.visible = view.rings;
     v.ringKey = ringKey(s);

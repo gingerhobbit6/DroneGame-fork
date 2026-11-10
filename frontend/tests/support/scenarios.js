@@ -36,9 +36,9 @@ export function play(sim, waves) {
   for (let w = 0; w < waves && !sim.state.over; w++) playWave(sim);
 }
 
-export function runReferences(sim) {
+export function runReferences(sim, scenarios = SCENARIOS) {
   const out = {};
-  for (const sc of SCENARIOS) {
+  for (const sc of scenarios) {
     setUp(sim, sc);
     play(sim, sc.waves);
     out[sc.name] = { digest: sim.digest(), wave: sim.state.wave, kills: sim.state.kills, leaks: sim.state.leaks, health: sim.state.health, budget: Math.round(sim.state.budget) };

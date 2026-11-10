@@ -3,6 +3,7 @@
 import { clamp } from '../sim/world.js';
 
 const WATER = 4, WOOD = 1, BUILDING = 2;
+const MAX_CONTOUR_LEVELS = 2_000_000, MAX_CONTOUR_SEGMENTS = 1_000_000, MAX_CONTOUR_LABELS = 50_000;
 // The same colours as .topo-legend in map-panel.css.
 const RAMP = [[0, 120, 170, 110], [0.3, 190, 210, 130], [0.55, 235, 220, 150], [0.8, 205, 160, 105], [1, 165, 120, 90]];
 
@@ -27,6 +28,10 @@ export function rampColour(t) {
   return [1, 2, 3].map((c) => a[c] + (b[c] - a[c]) * mix);
 }
 
+// The ramp at 1,024 steps, worked out once: working it out for each of a real world's 7 million posts took most of a second.
+const STEPS = 1024, TABLE = new Float32Array(STEPS * 3);
+for (let k = 0; k < STEPS; k++) TABLE.set(rampColour(k / (STEPS - 1)), 3 * k);
+
 // One RGBA pixel per grid post, north at the top.
 export function topoPixels(data) {
   const { N, cell, ground, cover, geo } = data, range = heightRange(data), span = Math.max(range.high - range.low, 1);
@@ -39,7 +44,8 @@ export function topoPixels(data) {
       const gx = (ground[j * N + Math.min(i + 1, N - 1)] - ground[j * N + Math.max(i - 1, 0)]) / cell;
       const gz = (ground[Math.min(j + 1, N - 1) * N + i] - ground[Math.max(j - 1, 0) * N + i]) / cell;
       const shade = clamp((1 + gx + gz) / Math.hypot(gx, gz, 1), 0.55, 1.25);
-      let [r, g, b] = rampColour((ground[k] + geo.H0 - range.low) / span);
+      const c = 3 * Math.round(clamp((ground[k] + geo.H0 - range.low) / span, 0, 1) * (STEPS - 1));
+      let r = TABLE[c], g = TABLE[c + 1], b = TABLE[c + 2];
       if (cover[k] === WOOD) { r *= 0.72; g *= 0.86; b *= 0.68; }
       if (cover[k] === BUILDING) { r = 95; g = 90; b = 88; }
       out[o] = r * shade; out[o + 1] = g * shade; out[o + 2] = b * shade; out[o + 3] = 255;
@@ -67,24 +73,31 @@ export function contourLines(data) {
   const { N, cell, cover, geo } = data, ground = smoothed(data.ground, N), step = contourStep(heightRange(data));
   const minor = [], index = [], labels = [], labelled = new Set();
   const LABEL_SPACING = 1500;
+  let levels = 0, segments = 0;
   for (let j = 0; j < N - 1; j++) {
     for (let i = 0; i < N - 1; i++) {
       const k = j * N + i;
       if (cover[k] === WATER || cover[k + 1] === WATER || cover[k + N] === WATER || cover[k + N + 1] === WATER) continue;
       const a = ground[k] + geo.H0, b = ground[k + 1] + geo.H0, c = ground[k + N + 1] + geo.H0, d = ground[k + N] + geo.H0;
+      if (a === b && b === c && c === d) continue;
       const top = Math.max(a, b, c, d);
       for (let level = Math.ceil(Math.min(a, b, c, d) / step) * step; level <= top; level += step) {
+        if (++levels > MAX_CONTOUR_LEVELS) throw new Error('This map has too many contour levels to draw.');
         const points = [];
         if (a < level !== b < level) points.push(i + (level - a) / (b - a), j);
         if (b < level !== c < level) points.push(i + 1, j + (level - b) / (c - b));
         if (c < level !== d < level) points.push(i + 1 - (level - c) / (d - c), j + 1);
         if (d < level !== a < level) points.push(i, j + 1 - (level - d) / (a - d));
         const major = level % (step * 5) === 0, list = major ? index : minor;
-        for (let p = 0; p + 3 < points.length; p += 4) list.push(points[p] * cell, points[p + 1] * cell, points[p + 2] * cell, points[p + 3] * cell);
+        for (let p = 0; p + 3 < points.length; p += 4) {
+          if (++segments > MAX_CONTOUR_SEGMENTS) throw new Error('This map has too many contour lines to draw.');
+          list.push(points[p] * cell, points[p + 1] * cell, points[p + 2] * cell, points[p + 3] * cell);
+        }
         if (!major || points.length < 4) continue;
         const x = points[0] * cell, z = points[1] * cell, slot = `${level}:${Math.floor(x / LABEL_SPACING)}:${Math.floor(z / LABEL_SPACING)}`;
         if (labelled.has(slot)) continue;
         labelled.add(slot);
+        if (labels.length >= MAX_CONTOUR_LABELS) throw new Error('This map has too many contour labels to draw.');
         const angle = Math.atan2(points[3] - points[1], points[2] - points[0]);
         labels.push({ level, x, z, angle: angle > Math.PI / 2 ? angle - Math.PI : angle < -Math.PI / 2 ? angle + Math.PI : angle }); // never upside down
       }

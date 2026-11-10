@@ -10,6 +10,15 @@ import { contourLines, topoPixels } from './topo.js';
 
 const SIZE = 4096, SMALL = 1024, PREVIEW = 192, PREVIEW_SPAN = 6000, TILE_REFRESH_MS = 400;
 const OSM_URL = 'https://tile.openstreetmap.org', OSM_ZOOM = 14;
+const MAX_TILES = 4096, MAX_TILE_REQUESTS = 16, MAX_BITMAP_DIM = 8192, MAX_BITMAP_PIXELS = 8192 * 8192;
+let bitmapTurn = Promise.resolve(); // previews and a live repaint must not decode several large pictures at once
+async function withBitmapTurn(draw) {
+  const previous = bitmapTurn;
+  let release;
+  bitmapTurn = new Promise((resolve) => { release = resolve; });
+  await previous;
+  try { return await draw(); } finally { release(); }
+}
 const ROADS = [['Motorway', 34, '#4d9de0'], ['Primary', 27, '#3fbf6f'], ['A Road', 24, '#e15554'], ['B Road', 20, '#f0a33a'], ['Minor', 12, '#ffffff'], ['Local', 7, '#dddddd'], ['Restricted', 7, '#cccccc']]; // widths in metres on the ground
 
 const roadStyle = (cls) => ROADS.find(([start]) => cls.startsWith(start));
@@ -29,11 +38,21 @@ function restyle({ g, size }, steps) {
 
 // The OSM tiles over a world, and where three of each tile's corners land on the national grid.
 export function tilesOver({ north, south, east, west }, zoom = OSM_ZOOM, toGrid = wgs84ToBng) {
+  if (![north, south, east, west].every(Number.isFinite) || north < south || east < west ||
+      Math.abs(north) > 85 || Math.abs(south) > 85 || east > 180 || west < -180 ||
+      !Number.isInteger(zoom) || zoom < 0 || zoom > 20) throw new Error('This map has invalid tile bounds.');
   const scale = 2 ** zoom, col = (lon) => Math.floor(((lon + 180) / 360) * scale);
   const row = (lat) => { const r = (lat * Math.PI) / 180; return Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * scale); };
+  const x0 = col(west), x1 = Math.min(col(east), scale - 1), y0 = row(north), y1 = row(south);
+  const width = x1 - x0 + 1, height = y1 - y0 + 1;
+  if (![x0, x1, y0, y1, width, height].every(Number.isSafeInteger) ||
+      x0 < 0 || y0 < 0 || x1 >= scale || y1 >= scale || width <= 0 || height <= 0 || width * height > MAX_TILES) {
+    throw new Error('This map requests too many tiles.');
+  }
   const tiles = [];
-  for (let y = row(north); y <= row(south); y++) {
-    for (let x = col(west); x <= col(east); x++) {
+  for (let yi = 0; yi < height; yi++) {
+    for (let xi = 0; xi < width; xi++) {
+      const x = x0 + xi, y = y0 + yi;
       tiles.push({
         x, y, zoom,
         origin: toGrid(tileLat(y, zoom), tileLon(x, zoom)), right: toGrid(tileLat(y, zoom), tileLon(x + 1, zoom)), down: toGrid(tileLat(y + 1, zoom), tileLon(x, zoom)),
@@ -62,12 +81,23 @@ function frameOf(g, west, top, span, size) {
 export async function paintPictures(f, pictures, layer, still) {
   const { g, west, top, span, px } = f;
   for (const p of pictures) {
+    if (![p.west, p.top, p.width, p.height].every(Number.isFinite) || p.width <= 0 || p.height <= 0 ||
+        p.width > 80000 || p.height > 80000) throw new Error('This map has invalid picture dimensions.');
     if (p.layer !== layer || p.west >= west + span || p.west + p.width <= west || p.top <= top - span || p.top - p.height >= top) continue;
-    const bitmap = await createImageBitmap(p.blob).catch(() => null); // a picture the browser cannot read is left out, not the whole map
-    if (!bitmap) continue;
-    if (!still()) { bitmap.close(); return; } // a newer choice took over, and must not be drawn over
-    g.drawImage(bitmap, px(p.west - west), px(top - p.top), px(p.width), px(p.height));
-    bitmap.close();
+    // decoded at the size it is drawn: an OS piece is 4000 px across, and most of those pixels would be thrown away
+    const w = Math.max(Math.ceil(px(p.width)), 1), h = Math.max(Math.ceil(px(p.height)), 1);
+    if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h) || w > MAX_BITMAP_DIM || h > MAX_BITMAP_DIM || w * h > MAX_BITMAP_PIXELS) {
+      throw new Error('This map requests an oversized picture.');
+    }
+    await withBitmapTurn(async () => {
+      if (!still()) return;
+      const bitmap = await createImageBitmap(p.blob, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' }).catch(() => null); // a picture the browser cannot read is left out, not the whole map
+      if (!bitmap) return;
+      try {
+        if (still()) g.drawImage(bitmap, px(p.west - west), px(top - p.top), w, h); // a newer choice must not be drawn over
+      } finally { bitmap.close(); }
+    });
+    if (!still()) return;
   }
 }
 
@@ -78,15 +108,18 @@ async function paintLive({ g, west, top, px }, data, still, onTile) {
   const a = corner(-data.R, -data.R), b = corner(data.R, data.R), c = corner(data.R, -data.R), d = corner(-data.R, data.R);
   const tiles = tilesOver({ north: Math.max(a.lat, c.lat), south: Math.min(b.lat, d.lat), east: Math.max(b.lon, c.lon), west: Math.min(a.lon, d.lon) }, OSM_ZOOM, gridFor(data.geo.n0));
   let failed = 0;
-  await Promise.all(tiles.map(async (tile) => {
-    const image = await tileImage(tile);
-    if (!still()) return;
-    if (!image) { failed++; return; }
-    const { origin, right, down } = tile, k = px(1) / 256;
-    g.setTransform((right.e - origin.e) * k, (origin.n - right.n) * k, (down.e - origin.e) * k, (origin.n - down.n) * k, px(origin.e - west), px(top - origin.n));
-    g.drawImage(image, 0, 0);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    onTile();
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(MAX_TILE_REQUESTS, tiles.length) }, async () => {
+    while (still() && next < tiles.length) {
+      const tile = tiles[next++], image = await tileImage(tile);
+      if (!still()) return;
+      if (!image) { failed++; continue; }
+      const { origin, right, down } = tile, k = px(1) / 256;
+      g.setTransform((right.e - origin.e) * k, (origin.n - right.n) * k, (down.e - origin.e) * k, (origin.n - down.n) * k, px(origin.e - west), px(top - origin.n));
+      g.drawImage(image, 0, 0);
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      onTile();
+    }
   }));
   return { failed, total: tiles.length };
 }
@@ -112,14 +145,18 @@ function paintRoads(f, features, data) {
   g.globalAlpha = 1;
 }
 
-function paintNames(f, features, data) {
-  const { g } = f, { atX, atZ } = packToFrame(f, data);
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 7; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.fillStyle = '#fff';
-  for (const [text, kind, height, x, z] of features.names || []) {
-    const big = height === 'Large' ? 54 : height === 'Medium' ? 38 : 0;
-    if (!big || kind === 'Landform') continue;
-    g.font = `600 ${big}px system-ui`; // canvas text, never HTML: names come from the pack file
-    g.strokeText(String(text), atX(x), atZ(z)); g.fillText(String(text), atX(x), atZ(z));
+// Place names, larger places first, skipping any that would overlap one drawn. At about 13 m a canvas pixel, 24 px is letters 300 m tall.
+const NAME_PX = { Large: 24, Medium: 17 };
+export function paintNames(f, features, data) {
+  const { g } = f, { atX, atZ } = packToFrame(f, data), kept = [];
+  const names = (features.names || []).filter(([, kind, height]) => NAME_PX[height] && kind !== 'Landform').sort((a, b) => NAME_PX[b[2]] - NAME_PX[a[2]]);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.lineJoin = 'round'; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.fillStyle = '#fff';
+  for (const [text, , height, x, z] of names) {
+    const size = NAME_PX[height], name = String(text), cx = atX(x), cy = atZ(z);
+    g.font = `600 ${size}px system-ui`; // canvas text, never HTML: names come from the pack file
+    const w = g.measureText(name).width / 2 + 4, h = size / 2 + 2, box = [cx - w, cy - h, cx + w, cy + h];
+    if (kept.some((k) => box[0] < k[2] && box[2] > k[0] && box[1] < k[3] && box[3] > k[1])) continue;
+    kept.push(box); g.strokeText(name, cx, cy); g.fillText(name, cx, cy);
   }
   g.textAlign = 'start'; g.textBaseline = 'alphabetic';
 }
@@ -138,7 +175,7 @@ function paintContours(f, lines, data, baseMap, withLabels) {
   stroke(lines.minor, 5, onPhoto ? 'rgba(255,240,190,0.5)' : 'rgba(120,75,35,0.55)');
   stroke(lines.index, 11, onPhoto ? 'rgba(255,240,190,0.9)' : 'rgba(105,60,25,0.9)');
   if (!withLabels) return;
-  g.font = '600 30px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.font = '600 18px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
   for (const { level, x, z, angle } of lines.labels) {
     g.save();
     g.translate(ax(x), az(z)); g.rotate(angle);
@@ -164,22 +201,22 @@ export function paintBeyond(f, data, rings, topo) {
 }
 
 function gridLabel(g, text, x, y) {
-  g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.fillStyle = '#0b3ea8';
+  g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.fillStyle = '#0b3ea8';
   g.strokeText(text, x, y); g.fillText(text, x, y);
 }
 const kmDigits = (v) => String(Math.floor(v / 1000) % 100).padStart(2, '0');
 
 function paintGrid({ g, west, top, span, size, px }) {
   const label = (text, x, y) => gridLabel(g, text, x, y);
-  g.font = '600 26px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
+  g.font = '600 16px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
   for (let e = Math.ceil(west / 1000) * 1000; e <= west + span; e += 1000) {
-    g.strokeStyle = 'rgba(30,110,255,0.75)'; g.lineWidth = e % 10000 ? 2 : 4;
+    g.strokeStyle = 'rgba(30,110,255,0.45)'; g.lineWidth = e % 10000 ? 1.5 : 3;
     g.beginPath(); g.moveTo(px(e - west), 0); g.lineTo(px(e - west), size); g.stroke();
     const n = Math.ceil((top - span) / 1000) * 1000 + 1000;
     for (let v = n; v < top; v += 5000) label(kmDigits(e), px(e - west) + 6, px(top - v));
   }
   for (let n = Math.ceil((top - span) / 1000) * 1000; n <= top; n += 1000) {
-    g.strokeStyle = 'rgba(30,110,255,0.75)'; g.lineWidth = n % 10000 ? 2 : 4;
+    g.strokeStyle = 'rgba(30,110,255,0.45)'; g.lineWidth = n % 10000 ? 1.5 : 3;
     g.beginPath(); g.moveTo(0, px(top - n)); g.lineTo(size, px(top - n)); g.stroke();
     for (let v = Math.ceil(west / 1000) * 1000 + 1000; v < west + span; v += 5000) label(kmDigits(n), px(v - west) + 6, px(top - n) - 2);
   }
@@ -195,15 +232,19 @@ function paintMgrs({ g, west, top, span, px }, data) {
   const corners = [[west, top], [west + span, top], [west, top - span], [west + span, top - span]].map(([e, n]) => { const c = toLatLon(e, n); return toUtm(c.lat, c.lon, zone); });
   const e0 = Math.floor(Math.min(...corners.map((c) => c.e)) / 1000) * 1000, e1 = Math.max(...corners.map((c) => c.e));
   const n0 = Math.floor(Math.min(...corners.map((c) => c.n)) / 1000) * 1000, n1 = Math.max(...corners.map((c) => c.n));
+  if (![e0, e1, n0, n1].every((v) => Number.isFinite(v) && Math.abs(v) < 10000000) ||
+      e1 < e0 || n1 < n0 || e1 - e0 > 150000 || n1 - n0 > 150000) {
+    throw new Error('This map has invalid MGRS bounds.');
+  }
   const along = (from, to) => { const list = []; for (let v = from; v < to; v += STEP) list.push(v); return [...list, to]; };
   const line = (points) => { g.beginPath(); points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
-  g.strokeStyle = 'rgba(30,110,255,0.75)';
-  for (let e = e0; e <= e1; e += 1000) { g.lineWidth = e % 10000 ? 2 : 4; line(along(n0, n1).map((n) => at(e, n))); }
-  for (let n = n0; n <= n1; n += 1000) { g.lineWidth = n % 10000 ? 2 : 4; line(along(e0, e1).map((e) => at(e, n))); }
-  g.font = '600 26px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
+  g.strokeStyle = 'rgba(30,110,255,0.45)'; // faint enough to read the map through, as on a printed one
+  for (let e = e0; e <= e1; e += 1000) { g.lineWidth = e % 10000 ? 1.5 : 3; line(along(n0, n1).map((n) => at(e, n))); }
+  for (let n = n0; n <= n1; n += 1000) { g.lineWidth = n % 10000 ? 1.5 : 3; line(along(e0, e1).map((e) => at(e, n))); }
+  g.font = '600 16px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
   for (let e = e0; e <= e1; e += 1000) for (let v = Math.ceil(n0 / 5000) * 5000; v < n1; v += 5000) { const [x, y] = at(e, v); gridLabel(g, kmDigits(e), x + 6, y); }
   for (let n = n0; n <= n1; n += 1000) for (let v = Math.ceil(e0 / 5000) * 5000 + 2000; v < e1; v += 5000) { const [x, y] = at(v, n); gridLabel(g, kmDigits(n), x + 6, y - 2); }
-  g.font = '700 44px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '700 28px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let sx = Math.floor(e0 / 100000) * 100000; sx < e1; sx += 100000) {
     for (let sy = Math.floor(n0 / 100000) * 100000; sy < n1; sy += 100000) {
       const e = (Math.max(sx, e0) + Math.min(sx + 100000, e1)) / 2, n = (Math.max(sy, n0) + Math.min(sy + 100000, n1)) / 2, [x, y] = at(e, n);
@@ -236,6 +277,16 @@ export function createMapTexture(renderer, relief) {
     return topo;
   }
 
+  // The last base map, before lines and names: switching those on or off starts again from it rather than decoding every picture again.
+  // Kept by the pack's own pictures and features, as the source object around them is made afresh for each paint.
+  const base = { canvas: null, data: null, pictures: null, features: null, baseMap: null };
+  const isBase = (data, source, baseMap) => base.data === data && base.pictures === source.pictures && base.features === source.features && base.baseMap === baseMap;
+  function keepBase(data, source, baseMap) {
+    base.canvas ??= Object.assign(document.createElement('canvas'), { width: SIZE, height: SIZE });
+    base.canvas.getContext('2d').drawImage(canvas, 0, 0);
+    Object.assign(base, { data, pictures: source.pictures, features: source.features, baseMap });
+  }
+
   async function paintBase(f, data, source, baseMap, still, onTile) {
     const { g, west, top, px, size } = f, worldX = px(data.geo.e0 - data.R - west), worldZ = px(top - data.geo.n0 - data.R), world = px(2 * data.R);
     if (baseMap === 'live') return paintLive(f, data, still, onTile);
@@ -243,7 +294,8 @@ export function createMapTexture(renderer, relief) {
     if (baseMap === 'relief') { g.drawImage(relief(data), worldX, worldZ, world, world); return {}; }
     if (baseMap === 'topo') { g.drawImage(topoOf(data).picture, worldX, worldZ, world, world); return {}; }
     await paintPictures(f, source.pictures, usesSatellite(baseMap) ? 'satellite' : 'osmap', still);
-    if (!usesSatellite(baseMap) && still()) paintBeyond(f, data, source.features?.beyond, topoOf(data));
+    // only a pack with ground past a border has outlines, and the topography takes about a second to work out
+    if (!usesSatellite(baseMap) && still() && source.features?.beyond?.length) paintBeyond(f, data, source.features.beyond, topoOf(data));
     if (RESTYLE[baseMap] && still()) restyle(f, RESTYLE[baseMap]);
     return {};
   }
@@ -260,8 +312,13 @@ export function createMapTexture(renderer, relief) {
       shown = performance.now();
       texture.needsUpdate = true;
     };
-    const layer = await paintBase(f, data, source, options.baseMap, still, onTile);
-    if (!still()) return { stale: true };
+    let layer = {};
+    if (isBase(data, source, options.baseMap)) f.g.drawImage(base.canvas, 0, 0);
+    else {
+      layer = await paintBase(f, data, source, options.baseMap, still, onTile);
+      if (!still()) return { stale: true };
+      if (options.baseMap !== 'live') keepBase(data, source, options.baseMap); // a live map is fetched again, so missing tiles get another try
+    }
     if (options.contours || options.baseMap === 'topo') paintContours(f, topoOf(data).lines, data, options.baseMap, true);
     if (roads) paintRoads(f, source.features, data);
     if (options.grid === 'mgrs') paintMgrs(f, data);

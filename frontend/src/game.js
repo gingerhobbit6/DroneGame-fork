@@ -9,7 +9,7 @@ import { createSimulation, SIM_STEP } from './sim/simulation.js';
 import { onVehicle } from './sim/laydown.js';
 import { createGameView } from './render/game-view.js';
 import { hereU } from './sim/units.js';
-import { PLACING_PICK_PX, createPlacement, pickStructure, selectionFrom, slideToShow } from './render/placement.js';
+import { PLACING_PICK_PX, createPlacement, pickDrone, pickStructure, selectionFrom, slideToShow } from './render/placement.js';
 import { createReplay } from './render/replay-view.js';
 import { view } from './render/view.js';
 import { createApi } from './api/client.js';
@@ -61,21 +61,24 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   sim.on('sandbox', bump);
 
   // ---------- real map packs ----------
-  const packs = createPackStore({ api });
+  const packs = createPackStore({ api, pinned: () => parseWorldId(state.terrainSeed)?.hash });
   const usePack = ({ pack }) => sim.registerPack({ hash: pack.hash, header: pack.header, grids: pack.grids, features: pack.features });
-  async function loadPack(entry) {
+  let latestPackLoad = 0;
+  async function loadPack(entry, required = false) {
+    const ticket = ++latestPackLoad;
     const decoded = await packs.load(entry);
-    usePack(decoded);
+    if (required || ticket === latestPackLoad) usePack(decoded);
     return decoded;
   }
   // Make sure a saved world's pack is loaded. Returns why not, or null.
   async function ensureWorld(world) {
     const id = parseWorldId(world);
-    if (!id || packs.get(id.hash)) return null;
+    if (!id) return null;
+    if (packs.get(id.hash)) { await loadPack({ hash: id.hash }, true); return null; }
     const { packs: all } = await packs.list();
     const entry = all.find((p) => p.hash.startsWith(id.hash));
     if (!entry) return 'The map pack for this laydown is not available here. Import or build it first.';
-    await loadPack(entry);
+    await loadPack(entry, true);
     return null;
   }
   const mapSource = (world) => {
@@ -174,6 +177,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   // The system the Unit panel shows. It is view state, not a command, so it is not logged and cannot change a run.
   function select(s) { view.selected = s; bump(); }
   function lookFrom(s) { view.eye = s ?? null; bump(); } // the ground view from this system's mast, or back to the map
+  function selectDrone(d) { view.drone = d; if (!d) view.follow = false; bump(); } // view state too
   function getSelected() { // sold or destroyed systems drop out of the list
     if (view.selected && !sim.structures.includes(view.selected)) view.selected = null;
     return view.selected;
@@ -188,10 +192,13 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (s) commands.sell(s.pos.x, s.pos.z);
       return !!s;
     }
+    const drone = !tool && view.truth && view.replayT == null && pickDrone(sim.drones, gameView.camera, x, y); // drones are drawn only with the truth overlay
+    if (drone) { selectDrone(drone); return true; }
     const chosen = selectionFrom(tool, tagged, tool ? () => pickStructure(sim.structures, gameView.camera, x, y, innerWidth, innerHeight, PLACING_PICK_PX) : pick);
     if (chosen === undefined) return false;
     selectHinted = true;
     select(chosen);
+    if (!chosen) selectDrone(null); // a click on empty ground closes both panels
     return true;
   }
   // If this ground point is hidden behind a panel or off the screen, slide the camera so it appears at (px, py) instead.
@@ -233,6 +240,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   // is left (which can set the speed) before the speed is set for the new run.
   sim.on('reset', ({ kept, begin, loading }) => {
     view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); // the ground view stays on its system too
+    view.drone = null; view.follow = false;
     if (replay) replay.reset();
     if (gameView) gameView.clear();
     simAcc = 0; pausedForApproval = false;
@@ -244,31 +252,37 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   const debug = { frozen: false }; // scripted browser runs drive the simulation themselves
   const frameClock = new THREE.Clock();
-  let lastBump = 0;
+  // Panels refresh on the timer only while what they show can change: the run moving, a replay, or the player's hand on the mouse or
+  // keys (the cursor read-outs, a dragged panel). Paused, idle or on the start screen, nothing re-renders.
+  let lastBump = 0, stirred = true, covered = false;
+  const stir = () => { stirred = true; };
   function frame() {
     const real = Math.min(frameClock.getDelta(), 0.05);
+    let n = 0;
     if (!debug.frozen && state.started && !state.over && clock.speed > 0) {
       // fixed-size steps: the same seed and laydown give the same run at any frame rate or speed
       simAcc += real * WORLD.timeScale * clock.speed;
-      let n = 0;
       while (simAcc >= SIM_STEP && n < 400 && !state.over) { sim.step(); simAcc -= SIM_STEP; n++; }
       if (n >= 400) simAcc = 0;
     }
+    gameView.labels.beginFrame();
     gameView.update(real);
     for (const fn of frameListeners) fn(real);
     replay.update(real, gameView.camera);
     placement.update();
-    gameView.draw();
+    if (!covered) gameView.draw(); // the profile screen hides the whole scene
     const now = performance.now();
-    if (now - lastBump >= PANEL_INTERVAL) { lastBump = now; bump(); }
+    if (now - lastBump >= PANEL_INTERVAL && (n || stirred || replay.active())) { lastBump = now; stirred = false; bump(); }
   }
 
   // Called once, when the canvas and label layer are in the page.
   function attach(canvas, labelLayer) {
+    for (const type of ['pointermove', 'pointerdown', 'wheel', 'keydown']) addEventListener(type, stir, { capture: true, passive: true });
     gameView = createGameView(canvas, labelLayer, sim, mapSource);
     placement = createPlacement({
-      scene: gameView.scene, camera: gameView.camera, canvas, getWorldMesh: gameView.getWorldMesh, sim,
+      scene: gameView.scene, camera: gameView.camera, canvas, sim,
       getTool: tools.get, defFor: (id) => unitDef(id, onVehicle(id, loadoutFor(id), tools.vehicle())), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
+      onDoubleClick: gameView.zoomInOn,
     });
     replay = createReplay({
       scene: gameView.scene, rec: sim.rec, labels: gameView.labels,
@@ -282,10 +296,11 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   return {
     packs, loadPack, ensureWorld, mapSource, cursor: () => placement?.cursor() ?? null,
     sim, commands, clock, setSpeed, reviewClock, subscribe, getTick, bump, attach, debug, api, saver, storage, pageClosing,
-    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, placeSystem, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
+    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, placeSystem, lastRefusal: () => refusal, select, getSelected, selectDrone, lookFrom, reveal,
     catalogue: tools.catalogue, openCatalogue: tools.openCatalogue, pickFromTray: tools.pickFromTray, startDrag: tools.startDrag, endDrag: tools.endDrag, dropAt,
     toast, onToast(fn) { toastListeners.add(fn); return () => toastListeners.delete(fn); },
     onFrame(fn) { frameListeners.add(fn); return () => frameListeners.delete(fn); },
+    setCovered(on) { covered = on; },
     getReplay: () => replay,
     getView: () => gameView,
     // settings shared with the 3D view
@@ -293,17 +308,9 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (key === 'zone' && sim.designLocked()) { toast(ZONE_LOCKED); return; }
       if (key === 'zone' && value && sim.getPatrol()) { toast(PATROL_FIRST); return; }
       view[key] = value;
+      if (key === 'truth' && !value) { view.drone = null; view.follow = false; }
       if (key === 'zone') syncZone();
       if (key === 'rings' && gameView) gameView.structures.setRingsVisible(value);
-      if (key === 'osm' && gameView) {
-        gameView.showOsm();
-        if (value) {
-          gameView.loadOsm().then(({ failed, total }) => {
-            if (failed === total) { view.osm = false; gameView.showOsm(); toast('The map could not load: it needs an internet connection'); bump(); }
-            else if (failed) toast(`${failed} of ${total} map tiles could not load`);
-          });
-        }
-      }
       if (key === 'planView' && gameView) gameView.viewFromAbove(value);
       if (['baseMap', 'mapRoads', 'mapGrid', 'mapContours'].includes(key) && gameView) {
         view.mapLoading = true;
@@ -321,7 +328,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     // Back to the start screen, to choose another world. A point makes it open on that place.
     leaveWorld(point = null) {
       tools.openCatalogue(null, false);
-      Object.assign(view, { startAt: point, zone: null, route: null, me: null, selected: null, mapPanel: false, planView: false });
+      Object.assign(view, { startAt: point, zone: null, route: null, me: null, selected: null, drone: null, follow: false, mapPanel: false, planView: false });
       if (gameView) gameView.viewFromAbove(false);
       commands.leave();
     },

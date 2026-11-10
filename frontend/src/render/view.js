@@ -7,6 +7,7 @@ export const view = {
   zoom: OPENING_ZOOM, // the camera's distance from what it looks at, scene units, kept by game-view.js each frame
   truth: true, // truth overlay: show every drone where it really is (grey if no sensor has it)
   labels: true, // name tags on every system and drone
+  symbols: false, // NATO map symbols in place of the models of drones and systems zoomed out. Off: the models stay at every zoom
   rings: true, // range rings on every system
   trackHi: false, // colour tracks by classification instead of drawing them faint and grey
   trails: false, // a line behind each drone of where it has flown: the real drone with the truth overlay, its track without
@@ -24,8 +25,9 @@ export const view = {
   people: { count: 10, protection: 'open', role: 'civilian' }, // the next group the People tool will place
   replayCasualties: null, // how many in each group were down at the moment being reviewed, or null when live
   selected: null, // the system the Unit panel is showing
+  drone: null, // the real drone the Drone panel is showing, clicked with the truth overlay on
+  follow: false, // the camera keeps that drone in the middle of the view
   eye: null, // the system whose mast the camera is on, for the ground view, or null for the map view
-  osm: false, // demo: OpenStreetMap tiles as the picture on the ground
   zone: null, // the area to defend as it is drawn: { points: [[x, z]...], closed }. game.js gives the simulation a closed one
   route: null, // a patrol route while it is being drawn, in the same shape. Once closed it goes to the simulation, which draws it from there
   spot: null, // a spot the wizard is suggesting: { x, z }

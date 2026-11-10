@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflows:
+    name: Validate GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned actionlint and verify its checksum
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" -o "$archive"
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check --strict
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+      - name: Validate workflow syntax, expressions and shell commands
+        run: '"$RUNNER_TEMP/actionlint" -color'
+
+  frontend:
+    name: Frontend build, tests and coverage
+    runs-on: ubuntu-24.04
+    # Generated worlds and precise coverage make the serial full suite long.
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci
+      - name: Build production frontend
+        run: npm run build
+      # This includes reference.test.js, which checks the recorded simulation digests.
+      # One worker keeps generated worlds from multiplying the memory needed.
+      - name: Test all frontend paths and reference digests with coverage
+        run: npm run coverage -- --maxWorkers=1 --no-file-parallelism
+
+  backend:
+    name: Backend tests and coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.11.26'
+          python-version: '3.13'
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Check lockfile and install backend dependencies
+        run: uv --directory backend sync --locked
+      - name: Test backend with its 90 percent coverage gate
+        run: uv --directory backend run --frozen pytest
+
+  map-builder:
+    name: Map builder tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.11.26'
+          python-version: '3.13'
+          enable-cache: true
+          cache-dependency-glob: tools/mapbuild/uv.lock
+      - name: Check lockfile and install map builder dependencies
+        run: uv --directory tools/mapbuild sync --locked
+      - name: Test map builder with synthetic inputs
+        run: uv --directory tools/mapbuild run --frozen pytest

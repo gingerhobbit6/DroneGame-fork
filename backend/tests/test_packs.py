@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from conftest import sign_up
-from app.services.packs import BuildBusy, PackBuilder, PackLibrary, read_summary
+from app.services.packs import BuildBusy, BuildRateLimited, BuildStorageLimited, PackBuilder, PackLibrary, read_summary
 
 API = "/api/v1/packs"
 HEADER = {"gridsSha256": "a" * 64, "name": "Test", "east": 422000, "north": 166000, "half": 15000, "tier": "lidar", "lidarHalf": 7000}
@@ -151,6 +151,22 @@ def test_the_build_route_checks_its_input_and_refuses_a_second_build(client):
     client.app.state.pack_builder = Busy()
     assert client.post(f"{API}/build", json={"east": 1, "north": 1, "lidar": True}).status_code == 409
     assert client.get(f"{API}/build").json()["running"] is True
+
+
+def test_build_route_reports_rate_and_storage_limits(client):
+    class Limited:
+        def __init__(self, error):
+            self.error = error
+
+        def start(self, *_):
+            raise self.error
+
+    client.app.state.pack_builder = Limited(BuildRateLimited(45))
+    rate = client.post(f"{API}/build", json={"east": 422000, "north": 166000, "lidar": False})
+    assert rate.status_code == 429 and rate.headers["retry-after"] == "45"
+    client.app.state.pack_builder = Limited(BuildStorageLimited("The map build stopped at the map storage limit."))
+    storage = client.post(f"{API}/build", json={"east": 422000, "north": 166000, "lidar": False})
+    assert storage.status_code == 409 and "storage limit" in storage.json()["detail"]
 
 
 def test_a_cross_site_form_cannot_start_a_build(client):

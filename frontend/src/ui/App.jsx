@@ -15,6 +15,7 @@ import { Sandbox } from './Sandbox.jsx';
 import { Overlay } from './Overlay.jsx';
 import { Dock } from './dock/Dock.jsx';
 import { UnitPanel } from './UnitPanel.jsx';
+import { DronePanel } from './DronePanel.jsx';
 import { ToolPicker } from './ToolPicker.jsx';
 import { Wizard, WizardButton } from './assistant/Wizard.jsx';
 
@@ -59,6 +60,7 @@ function Screen() {
       <WizardButton />
       <Dock open={dockOpen} onClose={() => setDockOpen(false)} tab={dockTab} onTab={setDockTab} />
       <UnitPanel />
+      <DronePanel />
       <EyeBar />
       <ToolPicker />
       <Sandbox />

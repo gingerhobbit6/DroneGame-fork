@@ -15,13 +15,14 @@ import { createBeliefViews } from './belief-view.js';
 import { createEffects } from './effects.js';
 import { createZoneView } from './zone-view.js';
 import { createEyeView } from './eye-view.js';
-import { createOsmMap } from './osm-map.js';
 import { createMapTexture } from './map-texture.js';
 import { setModelEnv } from './paint.js';
 import { sizeWideLines } from './wide-lines.js';
+import { createCameraKeys, fitDistance, framing } from './camera-moves.js';
 import { FOV, view } from './view.js';
 
 const FLIGHT_SECONDS = 0.7;
+const FIT_LEAST = u(300); // framing a single system still shows the ground around it
 // How the scene looks in the run's conditions: sky and fog colour, fog distance (m) and light. The look only; the physics is in sim/conditions.js.
 const LOOKS = {
   day: { sky: 0x0b1220, fog: [12000, 30000], hemi: 0.9, sun: 1.1, sunColour: 0xffffff },
@@ -50,8 +51,8 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   setModelEnv(pmrem.fromScene(room, 0.04).texture);
   room.dispose(); pmrem.dispose();
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b1220);
-  scene.fog = new THREE.Fog(0x0b1220, u(12000), u(30000));
+  scene.background = new THREE.Color();
+  scene.fog = new THREE.Fog(0); // colours, distances and light come from LOOKS on the first update
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.02, 8000); // 160 km: the far side of a 25 km ring, seen from right out
   camera.position.set(0, 300, 380);
   const controls = new OrbitControls(camera, canvas);
@@ -68,9 +69,9 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   // A pinch arrives as many tiny wheel steps with Ctrl held, so it zooms far more per step than a wheel notch. Both are tuned by hand.
   canvas.addEventListener('wheel', (e) => { controls.zoomSpeed = e.ctrlKey ? PINCH_ZOOM : WHEEL_ZOOM; }, { capture: true, passive: true });
 
-  const sky = new THREE.HemisphereLight(0xbcd4ff, 0x203020, 0.9);
+  const sky = new THREE.HemisphereLight(0xbcd4ff, 0x203020);
   scene.add(sky);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+  const sun = new THREE.DirectionalLight();
   sun.position.copy(SUN_FROM);
   sun.shadow.mapSize.set(2048, 2048);
   scene.add(sun, sun.target);
@@ -85,7 +86,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     c.left = c.bottom = -half; c.right = c.top = half; c.near = half; c.far = half * 8;
     c.updateProjectionMatrix();
   }
-  let lit = 'day', fogBase = LOOKS.day.fog.map(u);
+  let lit = null, fogBase = null;
   function light(name) {
     const look = LOOKS[name] ?? LOOKS.day;
     lit = name;
@@ -101,14 +102,8 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   const siteRing = drapedRing(u(SITE.radius), 0.8, 0xff5252, 0.6);
   const buildRing = drapedRing(u(BUILD.maxDist), 1.2, 0x5c7bb0, 0.4);
   scene.add(siteRing.mesh, buildRing.mesh);
-  let worldView = null, flash = 0, ownMaterial = null, relief = null;
-  const osmMap = createOsmMap(renderer);
+  let worldView = null, flash = 0, ownMaterial = null, relief = null, siteOpacity = 0.6;
   const map = createMapTexture(renderer, () => relief);
-  function showOsm() { // the demo picture on generated ground, and on the 2D maps
-    if (terrainState.data.geo) return; // a real world has its own map
-    worldView.mesh.material = view.osm ? osmMap.material : ownMaterial;
-    view.hillshade = view.osm ? osmMap.canvas : relief;
-  }
   // Paint the chosen picture onto a real world. Resolves with how a live map's tiles went.
   function refreshMap() {
     const data = terrainState.data, source = data.geo && getMapSource(sim.state.terrainSeed);
@@ -127,11 +122,10 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     for (const m of [worldView.mesh, ...worldView.scenery]) m.receiveShadow = true;
     ownMaterial = worldView.mesh.material;
     if (terrainState.data.geo) { worldView.mesh.material = map.material; refreshMap().catch(() => {}); } // the terrain still shows if its picture fails
-    else showOsm();
     siteRing.update(0, 0);
     buildRing.update(0, 0);
     siteRing.mesh.position.y = buildRing.mesh.position.y = groundU(0, 0); // a draped ring's heights are from the ground at its centre
-    siteRing.mesh.material.opacity = terrainState.data.geo ? 0.9 : 0.6; // a real map is bright, so these need more to show
+    siteOpacity = terrainState.data.geo ? 0.9 : 0.6; // a real map is bright, so these need more to show
     buildRing.mesh.material.opacity = terrainState.data.geo ? 0.9 : 0.4;
   }
   // Plan view is the same camera looking straight down, as the minimap reads its field of view and placement raycasts through it.
@@ -146,23 +140,54 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     }
     controls.enableRotate = !on;
   }
-  // Glide the camera over a point, keeping its angle, and coming in to `closest` if it is further out than that.
+  // Glide the camera to look at a point, from a new distance or compass angle (azimuth) if given, else its own. It turns the short way round.
   let flight = null;
-  function centreOn(x, z, closest = Infinity) {
-    const from = camera.position.clone().sub(controls.target), to = from.clone();
-    if (to.length() > closest) to.setLength(closest);
+  const _offset = new THREE.Vector3(), _at = new THREE.Spherical();
+  function glide(x, z, { distance, azimuth } = {}) {
+    const from = new THREE.Spherical().setFromVector3(_offset.subVectors(camera.position, controls.target)), to = from.clone();
+    if (distance != null) to.radius = THREE.MathUtils.clamp(distance, controls.minDistance, controls.maxDistance);
+    if (azimuth != null) to.theta = from.theta + THREE.MathUtils.euclideanModulo(azimuth - from.theta + Math.PI, Math.PI * 2) - Math.PI;
     flight = { t: 0, fromTarget: controls.target.clone(), toTarget: new THREE.Vector3(x, groundU(x, z), z), from, to };
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) flight.t = 1;
   }
+  // Glide over a point, keeping the camera's angle, and coming in to `closest` if it is further out than that.
+  const centreOn = (x, z, closest = Infinity) => glide(x, z, { distance: Math.min(camera.position.distanceTo(controls.target), closest) });
   controls.addEventListener('start', () => { flight = null; }); // the player has taken over
+  // Keep the followed drone in the middle of the view: the camera keeps its angle and distance, and catches up smoothly.
+  const _shift = new THREE.Vector3();
+  function follow(real) {
+    const d = view.drone;
+    if (!view.truth || !view.follow || !d || d.dead || view.eye) return;
+    flight = null;
+    _shift.subVectors(d.pos, controls.target).multiplyScalar(1 - Math.exp(-real * 6));
+    controls.target.add(_shift); camera.position.add(_shift);
+  }
   function fly(real) {
     if (!flight) return;
     flight.t = Math.min(flight.t + real / FLIGHT_SECONDS, 1);
-    const ease = flight.t * flight.t * (3 - 2 * flight.t);
+    const ease = flight.t * flight.t * (3 - 2 * flight.t), { from, to } = flight;
     controls.target.lerpVectors(flight.fromTarget, flight.toTarget, ease);
-    camera.position.copy(controls.target).add(flight.from.clone().lerp(flight.to, ease));
+    _at.set(from.radius + (to.radius - from.radius) * ease, from.phi + (to.phi - from.phi) * ease, from.theta + (to.theta - from.theta) * ease);
+    camera.position.copy(controls.target).add(_offset.setFromSpherical(_at));
     if (flight.t === 1) flight = null;
   }
+  const keys = createCameraKeys(camera, controls);
+  // From a mast the camera is the mast's, so these leave it alone.
+  function northUp() { if (!view.eye) glide(controls.target.x, controls.target.z, { azimuth: 0 }); }
+  // Frame every system, group of people and the area defended, keeping the camera's angle. With nothing placed, the build ring.
+  function fitLaydown() {
+    if (view.eye) return;
+    const points = [
+      ...sim.structures.map((s) => ({ x: s.pos.x, z: s.pos.z, r: 0 })),
+      ...sim.people.map((g) => ({ x: g.x, z: g.z, r: 0 })),
+      ...(view.zone?.points ?? sim.state.zone ?? []).map(([x, z]) => ({ x, z, r: 0 })),
+    ];
+    if (!sim.siteIsFree()) points.push({ x: 0, z: 0, r: u(points.length ? SITE.radius : BUILD.maxDist) });
+    const f = framing(points);
+    if (f) glide(f.x, f.z, { distance: fitDistance(Math.max(f.radius, FIT_LEAST), camera) });
+  }
+  // A double-click glides to the spot and closes in by half.
+  const zoomInOn = (x, z) => { if (!view.eye) centreOn(x, z, camera.position.distanceTo(controls.target) / 2); };
   const mePin = new THREE.Mesh(new THREE.CylinderGeometry(3, 0.4, 14, 12).translate(0, 7, 0), new THREE.MeshBasicMaterial({ color: 0x2979ff, depthTest: false, transparent: true }));
   mePin.renderOrder = 15; mePin.visible = false;
   scene.add(mePin);
@@ -221,10 +246,12 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     zone.sync();
     showMe();
     for (const m of worldView.scenery) m.visible = view.scenery || !terrainState.data.geo; // the switch is only offered on a real map
+    if (!view.eye && keys.step(real)) flight = null; // a held key takes over from a glide, as a drag does
     fly(real);
+    follow(real);
     flash = Math.max(0, flash - real);
     siteMat.emissiveIntensity = flash > 0 ? flash * 1.5 : 0;
-    siteRing.mesh.material.opacity = flash > 0 ? 1 : 0.6; // a real site has no station to light up
+    siteRing.mesh.material.opacity = flash > 0 ? 1 : siteOpacity; // a real site has no station to light up
     siteRing.mesh.visible = buildRing.mesh.visible = !sim.siteIsFree(); // a drawn area is the site, and you can build anywhere
   }
 
@@ -238,14 +265,14 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   resize();
 
   return {
-    scene, camera, controls, labels, structures, update, showOsm, loadOsm: () => osmMap.load(), refreshMap, mapPreviews, viewFromAbove, centreOn,
-    getWorldMesh: () => worldView && worldView.mesh,
+    scene, camera, controls, labels, structures, update, refreshMap, mapPreviews, viewFromAbove, centreOn, keys, northUp, fitLaydown, zoomInOn,
     draw() {
       if (eyeView.update()) view.zoom = u(20); // from a mast, what is near is drawn true size
       else { controls.update(); view.zoom = camera.position.distanceTo(controls.target); }
       // the haze starts beyond what the camera is looking at, so zoomed right out the map stays clear and only the horizon fades
       scene.fog.near = Math.max(fogBase[0], view.zoom * 1.25); scene.fog.far = scene.fog.near + fogBase[1] - fogBase[0];
       shade();
+      labels.declutter();
       renderer.render(scene, camera);
     },
     start(frame) { renderer.setAnimationLoop(frame); },

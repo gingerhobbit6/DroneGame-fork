@@ -20,6 +20,7 @@ from shapely import STRtree, box, intersects
 from shapely.geometry import mapping
 
 from .grid import CELL, Window, square_letters
+from .source_limits import check_raster_blocks, read_capped
 
 BASE = "https://environment.data.gov.uk/spatialdata"
 SERVICES = {
@@ -27,6 +28,10 @@ SERVICES = {
     "dsm": (f"{BASE}/lidar-composite-digital-surface-model-first-return-dsm-1m/wcs", "df4e3ec3-315e-48aa-aaaf-b5ae74d7b2bb__Lidar_Composite_Elevation_FZ_DSM_1m"),
 }
 SQUARE_M = 1000
+MAX_WCS_BYTES = 32_000_000
+ANSWER_S = 10  # good answers start within 2 s; in November 2026 about a third of requests hung with no answer, and asking again worked
+GIVE_UP_S = 900  # per request: an outage this long stops the build
+SQUARES_AT_ONCE = 8  # requests in flight, which hides the hung ones
 POSTS_PER_SQUARE = SQUARE_M // CELL + 1
 TALL_M = 5  # cover at least this tall counts as trees
 MIN_BUILDING_SHARE = 0.1  # of a cell, before a footprint makes the cell solid
@@ -86,10 +91,12 @@ def terrain50(data_root: str, window: Window) -> tuple[np.ndarray, np.ndarray]:
 
 
 def read_square(data: bytes, east: int, north: int) -> np.ndarray:
-    with MemoryFile(data) as memory, memory.open() as tif:
+    with MemoryFile(data) as memory, memory.open(driver="GTiff") as tif:
         t = tif.transform
-        if tif.width != SQUARE_M or tif.height != SQUARE_M or abs(t.a - 1) > 1e-6 or abs(t.e + 1) > 1e-6 or abs(t.c - east) > 1e-3 or abs(t.f - (north + SQUARE_M)) > 1e-3:
+        if (tif.count != 1 or tif.width != SQUARE_M or tif.height != SQUARE_M or abs(t.a - 1) > 1e-6 or abs(t.e + 1) > 1e-6
+                or abs(t.b) > 1e-9 or abs(t.d) > 1e-9 or abs(t.c - east) > 1e-3 or abs(t.f - (north + SQUARE_M)) > 1e-3):
             raise ValueError(f"unexpected answer for {east},{north}")
+        check_raster_blocks(tif)
         values = tif.read(1).astype("float32")
     values[(values < -1000) | (values > 2000)] = np.nan  # the service's "missing" value, which it does not always declare
     return values
@@ -99,18 +106,20 @@ def fetch_square(service: tuple[str, str], east: int, north: int) -> np.ndarray:
     url, coverage = service
     query = [("service", "WCS"), ("version", "2.0.1"), ("request", "GetCoverage"), ("CoverageId", coverage), ("format", "image/tiff"),
              ("subset", f"E({east},{east + SQUARE_M})"), ("subset", f"N({north},{north + SQUARE_M})"), ("geotiff:compression", "DEFLATE")]
-    wait = 5
-    for attempt in range(6):
+    give_up, wait, failures = time.time() + GIVE_UP_S, 2, 0
+    while True:
         try:
-            with urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(query)}", timeout=120) as reply:
-                return read_square(reply.read(), east, north)  # a damaged answer fails here, and is fetched again
+            with urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(query)}", timeout=ANSWER_S) as reply:
+                return read_square(read_capped(reply, MAX_WCS_BYTES, "lidar answer"), east, north)  # damaged answers are fetched again
         except (OSError, ValueError, urllib.error.URLError, Exception) as problem:  # noqa: B014 - rasterio raises its own errors
-            if attempt >= 2 and getattr(problem, "code", None) == 500:
+            failures += 1
+            if failures >= 3 and getattr(problem, "code", None) == 500:
                 return np.full((SQUARE_M, SQUARE_M), np.nan, "float32")  # some all-sea squares always fail
+            if time.time() + wait > give_up:
+                raise SystemExit(f"gave up fetching lidar at {east},{north}") from problem
             print(f"  retrying {east},{north}: {str(problem)[:100]}", file=sys.stderr)
             time.sleep(wait)
-            wait *= 2
-    raise SystemExit(f"gave up fetching lidar at {east},{north}")
+            wait = min(wait * 2, 30)
 
 
 def reduce_square(dtm: np.ndarray, dsm: np.ndarray, houses: np.ndarray) -> dict[str, np.ndarray]:
@@ -135,8 +144,6 @@ def reduce_square(dtm: np.ndarray, dsm: np.ndarray, houses: np.ndarray) -> dict[
     return out
 
 
-SQUARES_AT_ONCE = 4  # a square is two requests (ground and surface), so twice this many are out at once
-BATCH = 32           # squares handed to the pool together, so heights waiting their turn stay a few hundred MB at most
 CACHE_KEYS = ("ground", "tall", "houses")
 
 
@@ -163,49 +170,48 @@ def keep_square(folder: str, east: int, north: int, reduced: dict[str, np.ndarra
     os.replace(part, _cache_path(folder, east, north))
 
 
+def lidar_square(east: int, north: int, tree: STRtree, buildings, cache: str | None = None) -> dict[str, np.ndarray]:
+    saved = cached_square(cache, east, north) if cache else None
+    if saved:
+        return saved
+    dtm, dsm = (fetch_square(SERVICES[name], east, north) for name in ("dtm", "dsm"))
+    near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
+    houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
+    if len(near):
+        rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
+    reduced = reduce_square(dtm, dsm, houses.astype(bool))
+    # a square the service gave up on (all sea, or a fault that outlasted the retries) is not kept, so it is asked for again next time
+    if cache and not (np.isnan(dtm).all() or np.isnan(dsm).all()):
+        keep_square(cache, east, north, reduced)
+    return reduced
+
+
 def lidar(window: Window, half: int, buildings, say, cache: str | None = None) -> dict[str, np.ndarray]:
     """20 m results across the window's posts, for the central part reaching `half` metres from the middle. NaN elsewhere.
 
-    Several squares are fetched at once, as one takes the Environment Agency's service many seconds. With `cache`, a folder, each
-    finished square is kept there, so a build that stops carries on where it was, and a later pack that overlaps this one does not
-    fetch the shared squares again. A kept square holds its building heights, so clear the folder if the OS building data changes."""
+    With `cache`, a folder, each finished square is kept there, so a build that stops carries on where it was, and a later pack that
+    overlaps this one does not fetch the shared squares again. A kept square holds its building heights, so clear the folder if the
+    OS building data changes."""
     grids = {k: np.full((window.side, window.side), np.nan, "float32") for k in CACHE_KEYS}
     tree = STRtree(buildings)
     west, top = window.east - half, window.north + half
     count = 2 * half // SQUARE_M
-    squares = [(west + col * SQUARE_M, top - (row + 1) * SQUARE_M) for row in range(count) for col in range(count)]
+    corners = [(west + col * SQUARE_M, top - (row + 1) * SQUARE_M) for row in range(count) for col in range(count)]
     if cache:
         os.makedirs(cache, exist_ok=True)
-    began, done, reused = time.time(), 0, 0
-
-    def reduced_from(east: int, north: int, dtm: np.ndarray, dsm: np.ndarray) -> dict[str, np.ndarray]:
-        near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
-        houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
-        if len(near):
-            rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
-        reduced = reduce_square(dtm, dsm, houses.astype(bool))
-        # a square the service gave up on (all sea, or a fault that outlasted the retries) is not kept, so it is asked for again next time
-        if cache and not (np.isnan(dtm).all() or np.isnan(dsm).all()):
-            keep_square(cache, east, north, reduced)
-        return reduced
-
-    with ThreadPoolExecutor(2 * SQUARES_AT_ONCE) as pool:
-        for start in range(0, len(squares), BATCH):
-            batch = squares[start:start + BATCH]
-            kept = [cached_square(cache, east, north) if cache else None for east, north in batch]
-            waiting = [None if saved else [pool.submit(fetch_square, SERVICES[s], east, north) for s in SERVICES] for (east, north), saved in zip(batch, kept)]
-            # only the fetching is shared out: each square is worked out and placed here, in order, so the result is the same every time
-            for (east, north), saved, fetches in zip(batch, kept, waiting):
-                reduced = saved or reduced_from(east, north, *(f.result() for f in fetches))
-                reused += saved is not None
-                r0, c0 = (window.top - (north + SQUARE_M)) // CELL, (east - window.west) // CELL
-                for name, values in reduced.items():
-                    target = grids[name][r0:r0 + POSTS_PER_SQUARE, c0:c0 + POSTS_PER_SQUARE]
-                    target[np.isnan(target)] = values[np.isnan(target)]  # the first square to reach a shared edge post keeps it
-                done += 1
-                if done % 20 == 0:
-                    fetched = done - reused
-                    say(f"lidar {done}/{len(squares)} squares" + (f", {reused} already here" if reused else "") + (f", {(time.time() - began) / fetched:.1f} s each fetched" if fetched else ""))
+        here = sum(os.path.exists(_cache_path(cache, east, north)) for east, north in corners)
+        if here:
+            say(f"lidar: {here} of {len(corners)} squares are already here from an earlier build")
+    began = time.time()
+    with ThreadPoolExecutor(SQUARES_AT_ONCE) as pool:
+        squares = pool.map(lambda corner: lidar_square(*corner, tree, buildings, cache), corners)  # answers come back in order; a failure cancels the rest
+        for done, ((east, north), reduced) in enumerate(zip(corners, squares), 1):
+            r0, c0 = (window.top - (north + SQUARE_M)) // CELL, (east - window.west) // CELL
+            for name, values in reduced.items():
+                target = grids[name][r0:r0 + POSTS_PER_SQUARE, c0:c0 + POSTS_PER_SQUARE]
+                target[np.isnan(target)] = values[np.isnan(target)]  # the first square to reach a shared edge post keeps it
+            if done % 20 == 0:
+                say(f"lidar {done}/{count * count} squares, {(time.time() - began) / done:.1f} s each")
     return grids
 
 

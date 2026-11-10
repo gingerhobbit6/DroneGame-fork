@@ -14,11 +14,11 @@ import { noiseBands } from './jamming.js';
 import { terrainState } from './terrain.js';
 import { rand } from './rng.js';
 import { inArcOf } from './sensor-model.js';
-import { clamp } from './world.js';
+import { clamp, clearSight } from './world.js';
 
 const LOCAL = { ok: true, local: true, delay: 0, dropped: false };
 
-// deps: { getTime, nodes: Map, fusion, gui, getJammers: () => structure[] }
+// deps: { getTime, nodes: Map, fusion, gui }
 export function createComms(deps) {
   const { nodes, fusion, gui } = deps;
   const queues = new Map();   // key -> { busyUntil }
@@ -48,7 +48,7 @@ export function createComms(deps) {
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2;
       const r = T3.los(w.x, w.y, w.z, w.x + Math.cos(a) * dist, w.y + Math.tan(el) * dist, w.z + Math.sin(a) * dist, 0);
-      if (!r.clear || r.canopy > TERRAIN.opticalCanopyTol) blocked++;
+      if (!clearSight(r)) blocked++;
     }
     blocked /= 12;
     skyCache.set(s.nodeId, { blocked, x: w.x, z: w.z, y: w.y });
@@ -80,8 +80,8 @@ export function createComms(deps) {
     const w = where(s);
     let q = 1;
     const hits = [];
-    for (const j of deps.getJammers()) {
-      if (j.mode !== 'Jam' || !j.jamBands) continue;
+    for (const j of nodes.values()) {
+      if (j.mode !== 'Jam' || j.def.kind !== 'jammer' || !j.jamBands) continue;
       const jf = [...noiseBands(j)].flatMap((b) => (SPECTRUM.bands[b] ? SPECTRUM.bands[b].f : []));
       if (!overlaps(jf, bandF)) continue;
       const jw = where(j), d = Math.hypot(jw.x - w.x, jw.z - w.z), range = j.def.range;

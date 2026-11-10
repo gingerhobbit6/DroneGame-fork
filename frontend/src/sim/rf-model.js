@@ -40,9 +40,16 @@ export function radiates(droneDef) {
 // The drone bands this detector covers and monitors, or a jammer's receiver: the link bands it is fitted for.
 export const covers = (def) => LINK_BANDS.filter((b) => (def.kind === 'jammer' ? def.fitted.includes(b) : overlaps(SPECTRUM.bands[b].f, def.listens || []) && (!def.monitored || def.monitored.includes(b))));
 
-// The band a detector hears this drone on, or null: the lowest it can, because that carries furthest. deaf: bands it cannot hear now.
+// The band a detector hears this drone on, or null: the one it can that carries furthest (bandReach). deaf: bands it cannot hear now.
 export function heardBand(def, droneDef, deaf) {
   let best = null;
-  for (const b of radiates(droneDef)) if (!deaf?.has(b) && covers(def).includes(b) && (!best || bandGhz(b) < bandGhz(best))) best = b;
+  for (const b of radiates(droneDef)) if (!deaf?.has(b) && covers(def).includes(b) && (!best || bandReach(b, droneDef) > bandReach(best, droneDef))) best = b;
   return best;
 }
+
+// How far a drone's link on this band is heard, against the link a detector's range is quoted for: a small first-person-view drone's
+// 2.4 GHz control link. In free space, with the same antenna gain on every band, reach goes with wavelength (the Friis equation): a
+// 900 MHz link is heard 2.7 times as far, a 5.8 GHz one 0.42 times. A video sender is taken to be 5 dB louder than the return on a
+// control link, the 25 dBm against 20 dBm of the link budgets in config/sensors.js, which brings 5.8 GHz video to 0.75. Assumptions.
+const QUOTED_BAND = 'control24', VIDEO_LOUDER = 10 ** (5 / 20);
+export const bandReach = (band, droneDef) => (bandGhz(QUOTED_BAND) / bandGhz(band)) * (droneDef.links?.video === band ? VIDEO_LOUDER : 1);

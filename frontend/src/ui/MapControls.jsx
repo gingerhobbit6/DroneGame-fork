@@ -13,6 +13,7 @@ import { view } from '../render/view.js';
 import { useArmed, useGame, useTick } from './hooks.js';
 import { accuracyText, locateMe } from './locate.js';
 import { ZonePanel } from './ZonePanel.jsx';
+import { Compass } from './Compass.jsx';
 import './map-panel.css';
 import { Movable } from './Movable.jsx';
 
@@ -27,10 +28,7 @@ const REAL_MAPS = [
   ['live', 'Live map', 'OpenStreetMap, over the internet'],
 ];
 const ESTONIAN_MAPS = REAL_MAPS.map(([id, name, text]) => [id, name.replace('OS map', 'Basic map'), text.replace('OS map', 'basic map')]);
-const GENERATED_MAPS = [
-  ['generated', 'Generated', 'The invented ground'],
-  ['live', 'Live map demo', 'OpenStreetMap around Marlborough. A picture only: the hills stay as generated.'],
-];
+const GENERATED_MAPS = [['generated', 'Generated', 'The invented ground']];
 const OVERLAYS = [
   ['mapRoads', 'Roads and names', 'Also what makes satellite a hybrid view'],
   ['mapContours', 'Contours (C)', 'Height lines from this world\'s own ground'],
@@ -67,16 +65,14 @@ function Credits({ geo, source, here }) {
     credits.heights, // heights from another source, which its licence asks to credit whatever is shown
     credits.names, // names from another source past a border, likewise
   ];
+  // The data licences ask for these credits with the map, so they fold behind a © rather than going: the grid reference stays in view.
   return createPortal( // always on screen, outside any panel
     <div id="map-credit" className="muted map-note">
-      {here && <b id="map-here">{here}. </b>}{parts.filter(Boolean).join('. ')}. Masts are notional.
+      {here && <b id="map-here">{here}</b>}
+      <details id="map-sources"><summary title="Data sources and licences" aria-label="Data sources and licences">©</summary>{parts.filter(Boolean).join('. ')}. Masts are notional.</details>
     </div>,
     document.body,
   );
-}
-
-function OsmCredit() {
-  return createPortal(<div id="map-credit" className="muted map-note">Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors</div>, document.body);
 }
 
 function TopoLegend({ data }) {
@@ -96,6 +92,7 @@ const ICONS = {
   me: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10z',
   site: 'M4 20V10l8-6l8 6v10M9 20v-6h6v6',
   zone: 'M5 8l7-4l7 5l-2 10l-10 1z',
+  fit: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M9 12h6M12 9v6',
 };
 
 function Thumb({ id, pictures }) {
@@ -126,7 +123,7 @@ export function MapControls() {
   }, [gameView, seed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const m = WORLD.metresPerUnit;
-  const current = geo ? view.baseMap : view.osm ? 'live' : 'generated';
+  const current = geo ? view.baseMap : 'generated';
   const toScene = (e, n) => ({ x: (e - geo.e0) / m, z: (geo.n0 - n) / m });
   const inWorld = ({ x, z }) => Math.abs(x) * m <= data.R && Math.abs(z) * m <= data.R;
   const cursor = geo ? game.cursor() : null;
@@ -137,6 +134,7 @@ export function MapControls() {
   const centreOnMe = async () => {
     setLocating(true);
     say('Finding your location...');
+    if (geo && view.baseMap === 'live') game.setViewOption('baseMap', 'os'); // remove live tiles before centring on a private position
     try {
       const mark = (reading, at) => { // the camera only moves once: a better reading moves the pin, and leaves the player's view alone
         view.me = { ...at, accuracy: reading.accuracy / m };
@@ -151,7 +149,7 @@ export function MapControls() {
       } else {
         view.me = null;
         const text = geo ? `outside this world` : 'and this is generated ground';
-        if (onGrid(fix.e, fix.n)) say(`You are at ${where}, ${text}.`, { e: fix.e, n: fix.n, note: `Your location, ${quality}.` });
+        if (onGrid(fix.e, fix.n)) say(`You are at ${where}, ${text}.`, { e: fix.e, n: fix.n, note: `Your location, ${quality}.`, privateLocation: true });
         else say('You appear to be outside Great Britain and Estonia, which these maps cover.');
       }
     } catch (problem) { say(problem.message); }
@@ -180,7 +178,7 @@ export function MapControls() {
     }
     setZoneOpen(!zoneOpen);
   };
-  const choose = (id) => { if (geo) game.setViewOption('baseMap', id); else game.setViewOption('osm', id === 'live'); };
+  const choose = (id) => { if (geo) game.setViewOption('baseMap', id); };
   const forced = (key) => (key === 'mapRoads' && view.baseMap === 'hybrid') || (key === 'mapContours' && view.baseMap === 'topo');
   const showContours = geo && (view.mapContours || view.baseMap === 'topo');
 
@@ -197,18 +195,20 @@ export function MapControls() {
         <button id="map-switch" className={`${view.mapPanel ? 'on ' : ''}${view.mapLoading ? 'loading' : ''}`} aria-expanded={view.mapPanel} title="Change the map" onClick={() => game.setViewOption('mapPanel', !view.mapPanel)}>
           <Thumb id={current} pictures={pictures} />
         </button>
-        <button id="map-me" className={`${locating ? 'loading ' : ''}${view.me ? 'on' : ''}`} aria-label="Centre on my location" title="Centre on my location. It stays in this browser." disabled={locating} onClick={centreOnMe}><Icon path={ICONS.me} /></button>
+        <button id="map-me" className={`${locating ? 'loading ' : ''}${view.me ? 'on' : ''}`} aria-label="Centre on my location" title="Centre on my location. Live map tiles switch off first; choosing Live map again shares the viewed area with OpenStreetMap." disabled={locating} onClick={centreOnMe}><Icon path={ICONS.me} /></button>
         <button id="map-site" aria-label="Centre on the site" title="Centre on the site" onClick={() => gameView?.centreOn(0, 0)}><Icon path={ICONS.site} /></button>
+        <button id="map-fit" aria-label="Show the whole laydown (H)" title="Show the whole laydown (H)" onClick={() => gameView?.fitLaydown?.()}><Icon path={ICONS.fit} /></button>
+        <Compass />
         <button id="map-zone" className={zoneOpen ? 'on' : ''} aria-expanded={zoneOpen} aria-label="Draw the area to defend" title="Draw the area to defend" onClick={toggleZone}><Icon path={ICONS.zone} /></button>
         <button id="map-plan" className={view.planView ? 'on' : ''} aria-pressed={view.planView} title="Look straight down (P)" onClick={() => game.setViewOption('planView', !view.planView)}>{view.planView ? '3D' : '2D'}</button>
       </div>
 
       {view.mapPanel && (
         <Movable id="map-panel" title="Map" role="dialog" aria-label="Map">
-          <div className="map-panel-head"><b>Map</b><span className="muted">M changes it</span><button id="map-close" aria-label="Close the map panel" onClick={() => game.setViewOption('mapPanel', false)}>×</button></div>
+          <div className="map-panel-head"><b>Map</b>{geo && <span className="muted">M changes it</span>}<button id="map-close" aria-label="Close the map panel" onClick={() => game.setViewOption('mapPanel', false)}>×</button></div>
           <div id="map-types" role="radiogroup" aria-label="Map type">
             {maps.map(([id, label, about]) => {
-              const why = geo ? usable(id, source) : usable(id === 'generated' ? 'os' : id, source);
+              const why = geo && usable(id, source);
               const chosen = current === id;
               return (
                 <button key={id} id={`map-type-${id}`} role="radio" aria-checked={chosen} disabled={!!why} className={`map-card${chosen ? ' on' : ''}${chosen && view.mapLoading ? ' loading' : ''}`} title={why || about} onClick={() => choose(id)}>
@@ -225,7 +225,7 @@ export function MapControls() {
                 <button key={key} id={`map-overlay-${key}`} className={`map-chip${view[key] || forced(key) ? ' on' : ''}`} aria-pressed={view[key] || forced(key)} disabled={forced(key)} title={forced(key) ? 'Part of this map' : about} onClick={() => game.setViewOption(key, !view[key])}>{label}</button>
               ))}
               {gridChoices(isEstonian(geo.n0)).map(([id, label, about]) => (
-                <button key={id} id={`map-grid-${id}`} className={`map-chip${view.mapGrid === id ? ' on' : ''}`} aria-pressed={view.mapGrid === id} title={`${about}. G steps through the grids`} onClick={() => game.setViewOption('mapGrid', view.mapGrid === id ? false : id)}>{label}</button>
+                <button key={id} id={`map-grid-${id}`} className={`map-chip${view.mapGrid === id ? ' on' : ''}`} aria-pressed={view.mapGrid === id} title={`${about}. Click it again to hide the grid; G steps through the grids`} onClick={() => game.setViewOption('mapGrid', view.mapGrid === id ? false : id)}>{label}</button>
               ))}
             </div>
           )}
@@ -244,7 +244,7 @@ export function MapControls() {
       )}
       {zoneOpen && !view.mapPanel && <ZonePanel onClose={toggleZone} />}
       {!view.mapPanel && !zoneOpen && message && <Movable id="map-bubble" title="Map note"><button id="map-bubble-close" aria-label="Dismiss" onClick={() => say('')}>×</button>{message}</Movable>}
-      {geo ? <Credits geo={geo} source={source} here={here} /> : view.osm && <OsmCredit />}
+      {geo && <Credits geo={geo} source={source} here={here} />}
     </>
   );
 }

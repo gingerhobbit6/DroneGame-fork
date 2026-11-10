@@ -11,6 +11,8 @@ import zipfile
 import rasterio
 from rasterio.windows import Window as PixelWindow
 
+from .source_limits import MIN_FREE_BYTES, check_raster_blocks, enough_disk_room, safe_member
+
 CRS = 3301  # L-EST97
 AGENT = {"User-Agent": "site-guard-mapbuild"}
 DOWNLOAD = "https://geoportaal.maaruum.ee/index.php?lang_id=2&plugin_act=otsing&andmetyyp={kind}&dl=1&f={name}&page_id={page}"
@@ -22,7 +24,12 @@ FILES = {name: DOWNLOAD.format(kind=kind, name=name, page=page) for name, (kind,
 FILES[PLACES] = f"https://s3.pilw.io/rp-kemit-kataster/EHAK/{PLACES}"  # kept on the agency's file store, not the portal
 RETRIES = 8
 MAX_WAIT_S = 300
-ROOM_NEEDED = 8_000_000_000  # the national files, in bytes, with a little to spare
+ROOM_NEEDED = MIN_FREE_BYTES  # the national files, in bytes, with a little to spare
+MAX_FILE_BYTES = {HEIGHTS: 3_000_000_000, SURFACE: 6_000_000_000, PLACES: 500_000_000,
+                  **{name: 1_000_000_000 for name in (BUILDINGS, LAND, TRANSPORT, WATER, UTILITIES)}}
+MAX_ZIP_ENTRIES = 100_000
+MAX_ZIP_EXPANDED = 20_000_000_000
+MAX_ZIP_MEMBER = 768_000_000  # national ETAK .dbf and .shp members reach about 528 MB
 DEFLATE64 = 9  # the zip compression method
 SHEETS_TO_CHECK = 20
 
@@ -51,6 +58,8 @@ def _fetch(name: str, folder: str, say) -> None:
     """One fixed file, resumed if a download stopped part way. The agency publishes no checksums, so the size and opening it are the check."""
     target = os.path.join(folder, name)
     if os.path.exists(target):
+        if os.path.getsize(target) > MAX_FILE_BYTES[name]:
+            raise SystemExit(f"{name} is larger than expected")
         return
     os.makedirs(folder, exist_ok=True)
     part = target + ".part"
@@ -58,6 +67,9 @@ def _fetch(name: str, folder: str, say) -> None:
 
     def attempt() -> None:
         done = os.path.getsize(part) if os.path.exists(part) else 0
+        if done > MAX_FILE_BYTES[name]:
+            os.remove(part)
+            raise SystemExit(f"{name} is larger than expected")
         request = urllib.request.Request(url, headers={**AGENT, **({"Range": f"bytes={done}-"} if done else {})})
         try:
             reply = urllib.request.urlopen(request, timeout=120)
@@ -72,16 +84,30 @@ def _fetch(name: str, folder: str, say) -> None:
                 done = 0
             length = reply.headers.get("Content-Length")
             total = done + int(length) if length else None
+            if total and total > MAX_FILE_BYTES[name]:
+                if os.path.exists(part):
+                    os.remove(part)
+                raise SystemExit(f"{name} is larger than expected")
             say(f"downloading {name}" + (f", {total / 1e6:.0f} MB" if total else ""))
+            over = None
             with open(part, "ab" if done else "wb") as out:
-                while (chunk := reply.read(1 << 20)) and not (total and done > total):
-                    out.write(chunk)
+                while chunk := reply.read(1 << 20):
                     done += len(chunk)
+                    if done > MAX_FILE_BYTES[name]:
+                        over = f"{name} is larger than expected"
+                        break
+                    if total and done > total:
+                        over = f"{name} is longer than the agency said it would be"
+                        break
+                    if not enough_disk_room(folder, len(chunk)):
+                        over = f"not enough free space to download {name}"
+                        break
+                    out.write(chunk)
                     if done % (1 << 28) < len(chunk):
                         say(f"{name}: {done / 1e6:.0f} MB")
-        if total and done > total:
+        if over:
             os.remove(part)
-            raise SystemExit(f"{name} is longer than the agency said it would be")
+            raise SystemExit(over)
         if total and done != total:
             raise OSError(f"{name} stopped short")
 
@@ -94,8 +120,11 @@ def _fetch(name: str, folder: str, say) -> None:
 
 def _readable(address: str) -> bool:
     try:
-        with rasterio.open(address) as tif:
-            tif.read(1)
+        with rasterio.open(address, driver="GTiff") as tif:
+            if tif.count != 1 or tif.width > 1000 or tif.height > 1000:
+                return False
+            check_raster_blocks(tif)
+            tif.read(1, window=PixelWindow(tif.width - 1, tif.height - 1, 1, 1))
         return True
     except rasterio.errors.RasterioIOError:
         return False
@@ -107,20 +136,26 @@ def _is_whole_zip(path: str) -> bool:
     try:
         with zipfile.ZipFile(path) as z:
             members = z.infolist()
-            if not members:
+            if (not members or len(members) > MAX_ZIP_ENTRIES or len({m.filename.casefold() for m in members}) != len(members)
+                    or sum(m.file_size for m in members) > MAX_ZIP_EXPANDED
+                    or any(m.file_size > MAX_ZIP_MEMBER or not safe_member(m.filename) for m in members)):
                 return False
-            if members[0].compress_type != DEFLATE64:
+            if not any(member.compress_type == DEFLATE64 for member in members):
                 return z.testzip() is None
     except zipfile.BadZipFile:
         return False
-    return all(_readable(f"/vsizip/{{{path}}}/{member.filename}") for member in members[:: max(len(members) // SHEETS_TO_CHECK, 1)])
+    sheets = [member for member in members if member.filename.lower().endswith(".tif")]
+    return bool(sheets) and all(_readable(f"/vsizip/{{{path}}}/{member.filename}") for member in sheets[:: max(len(sheets) // SHEETS_TO_CHECK, 1)])
 
 
 def _is_estonian_raster(path: str) -> bool:
     try:
-        with rasterio.open(path) as tif:
-            if tif.crs is None or tif.crs.to_epsg() != CRS:
+        with rasterio.open(path, driver="GTiff") as tif:
+            t = tif.transform
+            if (tif.crs is None or tif.crs.to_epsg() != CRS or tif.count != 1 or tif.width > 100_000 or tif.height > 100_000
+                    or abs(t.a - 10) > 1e-6 or abs(t.e + 10) > 1e-6 or abs(t.b) > 1e-9 or abs(t.d) > 1e-9):
                 return False
+            check_raster_blocks(tif)
             tif.read(1, window=PixelWindow(tif.width - 1, tif.height - 1, 1, 1))  # the far end, which a short file would not have
             return True
     except rasterio.errors.RasterioIOError:

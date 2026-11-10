@@ -1,9 +1,10 @@
 // Range from where a system really stands: the radio path model, the prediction around a spot, and that both agree with play.
 
 import { describe, expect, it } from 'vitest';
-import { DRONES, STRUCTURES } from '../src/sim/config/index.js';
+import { DRONES, STRUCTURES, WORLD, importFigures, resetAllFigures, setFigure } from '../src/sim/config/index.js';
 import { foliageLoss, knifeEdgeLoss, pathLoss, reachFactor } from '../src/sim/propagation.js';
 import { pathReport, predictRange, reachFor, reachOnPath, antennaHeight } from '../src/sim/site-range.js';
+import { createSimulation } from '../src/sim/simulation.js';
 import { unitDef } from '../src/sim/unit-config.js';
 import { makeWorld } from '../src/sim/world.js';
 
@@ -57,6 +58,13 @@ describe('a path over the ground', () => {
     expect(atLow).toBeGreaterThan(0);
     expect(atHigh).toBeGreaterThan(atLow);
     expect(pathLoss(high, on(9), to, 5.8).loss).toBeGreaterThan(atHigh);
+  });
+
+  it('does not step over a wall one cell wide on a long path', () => {
+    // 4 km is 200 cells. With 64 points the path was looked at every 62.5 m, at 1,000 m and 1,062 m, and missed the cell between them.
+    const w = worldWith();
+    for (let j = 0; j < N; j++) w.ground[j * N + Math.round((1020 + R) / cell)] = 100;
+    expect(pathLoss(w, on(9), { x: 4000, y: 20, z: 0 }, 2.4).loss).toBeGreaterThan(20);
   });
 
   it('is eased by a taller mast', () => {
@@ -149,5 +157,33 @@ describe('the path report', () => {
   it('stops at the edge of the map', () => {
     const r = pathReport(STRUCTURES.rf_l, DRONES.fpv, flat, 7000, 0, 90);
     expect(r.D).toBeLessThanOrEqual(1000);
+  });
+
+  it('bounds the path for large but server-accepted figures', () => {
+    importFigures({ structures: { camera: { published: 1e12 } }, world: { rangeScale: 1e12 } });
+    try {
+      expect(STRUCTURES.camera.range).toBe(1e24);
+      const r = pathReport(STRUCTURES.camera, DRONES.fpv, flat, 0, 0, 90);
+      expect(Number.isFinite(r.D)).toBe(true);
+      expect(r.D).toBeLessThanOrEqual(flat.R);
+      expect(r.points.length).toBeLessThanOrEqual(121);
+    } finally { resetAllFigures(); }
+  });
+
+  it('rejects an overflowing range scale before replacing existing figures', () => {
+    resetAllFigures();
+    setFigure('structures', 'camera', 'published', 3000);
+    try {
+      expect(() => importFigures({ world: { rangeScale: 1e308 } }, true)).toThrow('not a figures file');
+      expect(WORLD.rangeScale).toBe(1);
+      expect(STRUCTURES.camera.published).toBe(3000);
+    } finally { resetAllFigures(); }
+  });
+
+  it('rejects an overflowing range scale through the game command', () => {
+    const sim = createSimulation();
+    expect(() => sim.commands.setRangeScale(1e308)).toThrow('Range scale');
+    expect(WORLD.rangeScale).toBe(1);
+    expect(STRUCTURES.camera.range).toBe(STRUCTURES.camera.published);
   });
 });

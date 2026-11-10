@@ -94,9 +94,14 @@ export function validate(msg) {
     case 'registration':
       need(c.node_definition && c.node_definition.length, 'node_definition is mandatory');
       need(c.icd_version, 'icd_version is mandatory');
-      need(c.name, 'name is mandatory');
-      need(c.short_name, 'short_name is mandatory');
+      need(c.capabilities?.length, 'capabilities is mandatory');
       need(c.status_definition && c.status_definition.status_interval, 'status_definition.status_interval is mandatory');
+      need(c.config_data?.length && c.config_data.every((d) => d.manufacturer && d.model), 'config_data with manufacturer and model is mandatory');
+      need(c.mode_definition?.length, 'mode_definition is mandatory');
+      for (const m of c.mode_definition || []) {
+        need(m.mode_name && m.mode_type && m.settle_time, 'each mode_definition needs mode_name, mode_type and settle_time');
+        need(m.task?.region_definition, `mode ${m.mode_name}: task with a region_definition is mandatory`);
+      }
       break;
     case 'registration_ack': need(typeof c.acceptance === 'boolean', 'acceptance is mandatory'); break;
     case 'status_report':

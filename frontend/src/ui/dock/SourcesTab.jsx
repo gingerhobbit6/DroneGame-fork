@@ -2,8 +2,8 @@
 // assumptions or game rules), with the evidence beside them. Editing a number changes the game straight away; the arrow
 // resets it to the researched value. "Export" saves just your changes as JSON so an experiment can be repeated.
 
-import { useRef, useState } from 'react';
-import { COMMS, DRONES, FIGURE_FIELDS, PATROL, PEOPLE, RESEARCHED, STRUCTURES, THREAT_GROUPS, WAVES, WORLD, exportFigures } from '../../sim/config/index.js';
+import { memo, useRef, useState } from 'react';
+import { COMMS, DRONES, FIGURE_FIELDS, MAX_RANGE_SCALE, PATROL, PEOPLE, RESEARCHED, STRUCTURES, THREAT_GROUPS, WAVES, WORLD, exportFigures } from '../../sim/config/index.js';
 import { download, hex, useGame } from '../hooks.js';
 import { NumberInput } from '../NumberInput.jsx';
 import { SourceLinks } from './SourceLinks.jsx';
@@ -48,7 +48,8 @@ function Figures({ kind, id, def, onChange }) {
 const Row = ({ k, children }) => <div><span className="k">{k}</span> {children}</div>;
 const Conf = ({ text }) => <span className={`conf${isAssumption(text) ? ' assume' : ''}`}>{text}</span>;
 
-export function SourcesTab({ active }) {
+// Memoised: it builds about 750 inputs, and the dock re-renders every tab on each click. It redraws itself after its own edits.
+export const SourcesTab = memo(function SourcesTab({ active }) {
   const game = useGame();
   const { commands } = game;
   const [, setVersion] = useState(0);
@@ -65,7 +66,7 @@ export function SourcesTab({ active }) {
       <div className="sys note">
         Every number here can be changed and takes effect at once. <b>published</b> and <b>price</b> figures come from the sources shown (mostly vendor claims; check them before relying on them), <b>ASSUMPTION</b> had no verified figure, <b>game rule</b> is a balance setting. Message formats follow <a href="https://github.com/dstl/SAPIENT-Proto-Files" target="_blank" rel="noopener noreferrer">BSI Flex 335 v2.0</a>.
         <div className="src-tools">
-          <label>Range scale <NumberInput id="src-rangescale" value={WORLD.rangeScale} step={0.1} min={0.1} onCommit={(v) => { if (v > 0) { commands.setRangeScale(v); changed(); } }} /> x published</label>
+          <label>Range scale <NumberInput id="src-rangescale" value={WORLD.rangeScale} step={0.1} min={0.1} max={MAX_RANGE_SCALE} clampMax={false} onCommit={(v) => { commands.setRangeScale(v); changed(); }} /> x published</label>
           <label>First-person-view drone gap <NumberInput id="src-fpvgap" value={WAVES.fpvGap} step={1} min={1} onCommit={(v) => { if (v > 0) commands.setFpvGap(v); }} /> s</label>
           <button id="src-reset" onClick={() => { commands.resetAllFigures(); changed(); }}>Reset all</button>
           <button id="src-export" onClick={() => download('site-guard-figures.json', JSON.stringify(exportFigures(), null, 2), 'application/json')}>Export changes</button>
@@ -139,4 +140,4 @@ export function SourcesTab({ active }) {
       ))}
     </>
   );
-}
+});

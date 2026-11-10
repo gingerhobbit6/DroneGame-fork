@@ -3,6 +3,9 @@ import { cleanSeed, createGame } from './game.js';
 import { parseWorldId } from './sim/world-pack.js';
 import { Root } from './ui/account/Root.jsx';
 import './style.css';
+import './ui/unit-panels.css';
+import './ui/assistant/wizard.css';
+import './ui/map-panels.css';
 import './ui/catalogue.css';
 import './mobile.css'; // last, so its narrow-screen rules win over the desktop ones
 

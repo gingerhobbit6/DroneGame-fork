@@ -135,7 +135,7 @@ CREATE TABLE figure_sets (
 
 **Correction to the earlier outline:** a seed and laydown alone cannot regenerate a run. Engagement approvals, jam band changes and the moment each wave starts all affect the result, as do tuned figures. That is why `figures` and `commands` are stored too.
 
-SAPIENT messages are not stored, because one run produces thousands. The existing NDJSON export still covers saving a log.
+[SAPIENT](SAPIENT.md) messages are not stored, because one run produces thousands. The existing NDJSON export still covers saving a log.
 
 ## API
 
@@ -850,6 +850,33 @@ Tests cover behaviour that could really break. Coverage thresholds go in the con
 ## Settled decisions
 
 1. **`parked-friendlies-roe-spectrum` stays parked.** It is untested and branched before Three.js was bundled locally. The feature gets rebuilt on the new structure after Phase 5, using the branch as reference only.
-2. **No GitHub remote yet.** CI in Phase 8 is therefore skipped. The risk is that this work has no off-machine backup until a remote is added.
+2. **GitHub backup and CI.** A remote now exists. CI, audits, secret scanning and dependency updates were added on 9 November 2026. The new workflows still need their first remote run and required-check rules; see [CI.md](CI.md).
 3. **Default branch renamed from `master` to `main`.**
 4. **Rounds are paid for when loaded, not when fired.** This matches how stock is really bought, and separates money tied up in munitions from money fired.
+
+## Quality review fixes, 9 November 2026
+
+- [x] Deduplicate replay labels, discard label work at every frame boundary even when drawing is skipped, and measure rectangles before changing visibility.
+- [x] Close the selected-drone panel and stop Follow when Truth overlay is disabled. Report a strike on a deployed system explicitly.
+- [x] Keep patrol strikes finite at the exact hold point, without consuming randomness or changing nonzero movement.
+- [x] Display map-build failures returned immediately, and cover the start, success, failure and retry paths.
+- [x] Refuse negative lidar widths before fitting or fetching, and verify cached OS files by checksum before reuse.
+- [x] Split the oversized stylesheet into smaller files while preserving the cascade order.
+- [x] Check replay labels, Truth overlay/Follow, and returning from the profile screen in a real browser using a disposable database.
+- [x] Add CI, dependency audits, secret scanning and dependency updates with pinned actions and read-only permissions for pull request jobs.
+- [ ] Finish the full frontend coverage run and review its reference digest results. Targeted regression checks and the map builder suite pass.
+- [ ] After the changes are pushed, inspect the first GitHub runs and configure required checks. CodeQL and dependency review also need an eligible private-repository licence before enabling them.
+
+## Realism audit, 9 November 2026
+
+A read-through of the sensor, effector, drone, radio terrain and SAPIENT models. The ticked items are done. The rest are candidates from the audit, not yet agreed.
+
+- [x] Guns and beam-riding missiles (`beamRider`: `missile_rr`, `missile_hvm`) need a clear line of sight from the muzzle to accept a task and to fire, and a beam-rider misses if the line is lost before it arrives. Range rings and the Range panel follow.
+- [ ] Add confusers: birds and neutral aircraft that form tracks, and classification that can be wrong.
+- [ ] Let your own jammers affect your own radio-controlled interceptor drones.
+- [x] Give an RF detector's open-field reach a frequency term: `bandReach` in `sim/rf-model.js` scales it by wavelength against the 2.4 GHz control link its range is quoted for, with a video sender 5 dB louder. Reference digests recorded again.
+- [x] Sample radio paths at up to 256 points, not 64, so every 20 m cell is looked at out to 5.1 km. Reading every cell on longer paths gave the same mean ranges to three figures and cost up to twice as much again, so it was not done.
+- [x] Measure the tables in `FUSION_AND_TARGETING.md` again. The script that first made them was not kept, so `frontend/tools/measure-fusion.js` (`npm run measure`) was written from the page's definitions and checked against the old tables on the old behaviour: it gave every figure but one.
+- [ ] Consider the operator's transmitter as an emitter an RF detector can hear, and a control link's duty cycle.
+- [ ] SAPIENT: send a TaskAck when its Task arrives, report `field_of_view` and `coverage` in status reports, and keep the conformance check in `tools/`.
+- [ ] Drone flight: wind, endurance, turn limits and terrain-masking routes. Replace the jamming slow-down and timer with a signal threshold.

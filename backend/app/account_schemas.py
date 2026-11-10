@@ -82,6 +82,7 @@ class ProfileIn(Strict):
 
 
 class Profile(BaseModel):
+    id: int
     username: str
     display_name: str
     rank: str

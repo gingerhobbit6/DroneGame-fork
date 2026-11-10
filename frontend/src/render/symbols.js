@@ -4,14 +4,18 @@
 // bottom); unseen is the hostile frame in grey, for a drone no sensor has.
 
 import * as THREE from 'three';
+import { WORLD } from '../sim/config/index.js';
 import { VIEW_HEIGHT, view } from './view.js';
 
 // A model drawn more than this many times life size gives way to its symbol: a system's from about 1.5 km of zoom, while at a few
 // hundred metres it is 2 to 4 times life size and keeps its model.
-export const SYMBOL_OVER = 12;
+const SYMBOL_OVER = 12;
 export const SYMBOL_PX = 36; // how big a symbol is drawn on the screen, in pixels
-// Whether something drawn this many times life size is shown as its symbol. Never in the ground view, where everything is near.
-export const asSymbol = (timesLife) => !view.eye && timesLife > SYMBOL_OVER;
+// Whether something drawn this many times life size is shown as its symbol: only with map symbols switched on, and never in the
+// ground view, where everything is near.
+const farOut = (timesLife) => !view.eye && timesLife > SYMBOL_OVER;
+export const asSymbol = (timesLife) => view.symbols && farOut(timesLife);
+const HALO_PX = 44; // with map symbols off, a drone zoomed out has a ring this many pixels across round it, so a thin quadcopter still shows
 
 const S = 64, K = 0.38; // the canvas, and its pixels per unit of the 200 x 200 box the standard draws symbols in
 const FILL = { friend: '#80e0ff', hostile: '#ff8080', unknown: '#ffff80', pending: '#ffff80', unseen: '#8a94a3' };
@@ -79,5 +83,51 @@ export const trackSymbol = (tr) => (tr.status === 'tentative' ? 'pending:uav'
 // A true drone's symbol: hostile once a sensor has it, grey while none does.
 export const droneSymbol = (def, tracked) => `${tracked ? 'hostile' : 'unseen'}:${def.airframe === 'Multirotor' ? 'rotary' : 'uav'}`;
 
+// A ring with a faint middle, worked out here as tests have no canvas. Hollow, so it marks a drone without covering it.
+function ringDot(n = 64) {
+  const data = new Uint8Array(n * n * 4).fill(255);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const r = Math.hypot(i + 0.5 - n / 2, j + 0.5 - n / 2) / (n / 2);
+    data[(j * n + i) * 4 + 3] = 255 * (r > 1 ? 0 : Math.max(Math.max(0, 1 - Math.abs(r - 0.85) / 0.12), 0.18 * (1 - r)));
+  }
+  const t = new THREE.DataTexture(data, n, n);
+  t.magFilter = t.minFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+}
+const RING = ringDot();
+// The ring round a drone, coloured by styleDrone. Drawn over the ground, as a symbol is: so large a flat sprite would sink into
+// the hills. Its owner disposes its material and geometry, never the texture.
+export function haloSprite() {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: RING, sizeAttenuation: false, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }));
+  s.renderOrder = 14; // under a symbol and the health bar
+  s.geometry = s.geometry.clone();
+  return s;
+}
+
 // The scale that draws a symbol px pixels tall under a parent drawn `parent` times its size.
 export const symbolScale = (px = SYMBOL_PX, parent = 1) => (px * VIEW_HEIGHT) / (globalThis.innerHeight || 768) / parent;
+
+// The same drawing for the live view and the replay. A drone shows as its model, the grey model of one no sensor has, or its symbol.
+export function styleDrone(o, def, tracked, symbol, k) {
+  o.model.visible = tracked && !symbol; o.unseen.visible = !tracked && !symbol; o.symbol.visible = symbol;
+  o.halo.visible = !symbol && farOut(k * WORLD.metresPerUnit);
+  if (o.halo.visible) { o.halo.material.color.setHex(tracked ? def.color : 0xe8eef5); o.halo.scale.setScalar(symbolScale(HALO_PX, k)); } // white while unseen: grey vanished against the hills
+  if (!symbol) return;
+  setSymbol(o.symbol, droneSymbol(def, tracked));
+  o.symbol.material.opacity = tracked ? 1 : 0.85; // grey already says no sensor has it: fainter than this was lost against the hills
+  o.symbol.scale.setScalar(symbolScale(SYMBOL_PX, k));
+}
+// How far above a drone its name tag goes, clear of what is drawn; dist is how far the camera is from it.
+export const droneTagHeight = (def, symbol, k, dist) => (symbol ? symbolScale(SYMBOL_PX * 0.75) * dist : def.size * k * 0.7);
+
+// A track's symbol is smaller while tentative, darker while coasting, and faded unless tracks are highlighted.
+export function styleTrack(sprite, tr, highlight) {
+  setSymbol(sprite, trackSymbol(tr));
+  sprite.material.color.setScalar(tr.status === 'coasting' ? 0.55 : 1);
+  sprite.material.opacity = highlight ? 1 : 0.55;
+  sprite.scale.setScalar(symbolScale(tr.status === 'tentative' ? SYMBOL_PX * 0.75 : SYMBOL_PX));
+}
+// A track's name tag: a tentative one shows only while tracks are highlighted.
+export const trackTagShown = (tr, highlight) => highlight || tr.status !== 'tentative';
+export const trackTagOpacity = (tr, highlight) => (highlight ? (tr.status === 'tentative' ? '0.55' : '1') : (tr.status === 'tentative' ? '0.4' : '0.75'));

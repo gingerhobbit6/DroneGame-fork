@@ -3,25 +3,26 @@
 
 import { useEffect, useState } from 'react';
 import { useGame } from '../hooks.js';
-import { describeTotals, packTotals, useAccount } from './pack.js';
+import { describeTotals, fetchPacks, packTotals, useAccount } from './pack.js';
 
 export function PackPicker() {
   const { api } = useGame(), account = useAccount();
-  const [packs, setPacks] = useState(null);
-  const [failed, setFailed] = useState(false);
-  const who = account?.user?.username, covered = !!account?.covered;
+  const [result, setResult] = useState({ ownerId: null, packs: null, failed: false });
+  const ownerId = account?.user?.id, covered = !!account?.covered;
   useEffect(() => {
-    if (!who || covered) return undefined; // fetched again whenever the profile closes: packs may have been built or deleted there
+    if (!ownerId || covered) return undefined; // fetched again whenever the profile closes: packs may have been built or deleted there
     let live = true;
-    setPacks(null); setFailed(false); // never the last account's packs, or an old failure
-    // the list holds summaries, so each pack's kit is fetched too; a profile has at most 50
-    api.units.list().then((rows) => Promise.all(rows.map((p) => api.units.get(p.id))))
-      .then((all) => { if (live) setPacks(all); }, () => { if (live) setFailed(true); });
+    setResult({ ownerId, packs: null, failed: false });
+    fetchPacks(api).then(
+      (packs) => { if (live) setResult({ ownerId, packs, failed: false }); },
+      () => { if (live) setResult({ ownerId, packs: null, failed: true }); },
+    );
     return () => { live = false; };
-  }, [api, who, covered]);
-  if (!who) return null;
+  }, [api, ownerId, covered]);
+  if (!ownerId) return null;
+  const { packs, failed } = result.ownerId === ownerId && !covered ? result : { packs: null, failed: false };
   const active = account.activeUnit;
-  const choose = (id) => account.deploy(packs.find((p) => String(p.id) === id) ?? null);
+  const choose = (id) => { if (packs) account.deploy(packs.find((p) => String(p.id) === id) ?? null); };
   return (
     <div className="start-pack" id="start-pack">
       <label htmlFor="start-pack-select"><b>Deployment pack</b></label>

@@ -115,7 +115,7 @@ export function updatePatrol(w, dt) {
   const p = w.patrol, { state } = w;
   if (!p || !(state.wave > 0 || state.sandbox)) return;
   p.halted = p.escorts.some(({ s }) => s.task && s.def.fire !== 'jam' && w.structures.includes(s)); // a jammer works on the move
-  const total = p.ends.at(-1);
+  const total = p.ends.at(-1), { dist, dir } = p;
   if (p.phase === 'home' && (state.wave > p.homeWave || state.sandbox)) { p.phase = 'out'; p.dir = 1; w.rec.event('patrol', 'Patrol set out'); }
   if (p.phase === 'end') {
     p.wait -= dt;
@@ -125,5 +125,5 @@ export function updatePatrol(w, dt) {
     if (p.phase === 'out' && p.dist >= total) { p.dist = total; p.phase = 'end'; p.wait = FOOT.endDelay; w.rec.event('patrol', 'Patrol reached the end'); w.emit('toast', `Patrol at the end: back in ${Math.round(FOOT.endDelay)} s`); }
     if (p.phase === 'back' && p.dist <= 0) { p.dist = 0; p.phase = 'home'; p.homeWave = state.wave; p.trips++; w.rec.event('patrol', 'Patrol back at the start'); w.emit('toast', 'Patrol back at the start: it sets out again with the next wave'); }
   }
-  placeAll(w);
+  if (p.dist !== dist || p.dir !== dir) placeAll(w); // where everyone stands follows only from these, so a waiting patrol is left as it is
 }

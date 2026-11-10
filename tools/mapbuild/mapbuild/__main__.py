@@ -39,8 +39,8 @@ def british(data_root: str, window: Window, lidar_km: int, say) -> Inputs:
 
 def size_problem(size: int, lidar_km: int) -> str | None:
     """Why these widths cannot be built, or None. A pack as wide as a world is the least the game takes: the site cannot then be moved."""
-    if size % 2 or lidar_km % 2 or not WORLD_KM <= size <= 80 or lidar_km > size:
-        return f"--size must be even, from {WORLD_KM} to 80, and --lidar-km must be even and no bigger than --size"
+    if size % 2 or lidar_km % 2 or not WORLD_KM <= size <= 80 or not 0 <= lidar_km <= size:
+        return f"--size must be even, from {WORLD_KM} to 80, and --lidar-km must be even, non-negative and no bigger than --size"
     return None
 
 

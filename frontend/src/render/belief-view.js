@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { WORLD } from '../sim/config/index.js';
 import { u } from '../sim/units.js';
-import { SYMBOL_PX, setSymbol, symbolScale, symbolSprite, trackSymbol } from './symbols.js';
+import { styleTrack, symbolSprite, trackTagOpacity, trackTagShown } from './symbols.js';
 import { view } from './view.js';
 import { createTrail } from './trail.js';
 import { setStyle, setText } from './labels.js';
@@ -60,11 +60,9 @@ export function createBeliefViews(scene, net, labels) {
       if (!b) { b = makeBelief(); beliefs.set(tr.id, b); }
       _p.set(tr.est.east / m, tr.est.up / m, -tr.est.north / m);
       if (!b.placed) { b.pos.copy(_p); b.placed = true; } else b.pos.lerp(_p, 0.5);
-      setSymbol(b.symbol, trackSymbol(tr));
-      b.symbol.material.color.setScalar(tr.status === 'coasting' ? 0.55 : 1);
+      styleTrack(b.symbol, tr, trackHi);
       b.ring.material.color.setHex(trackColour(tr));
-      b.symbol.material.opacity = trackHi ? 1 : 0.55; b.ring.material.opacity = trackHi ? 0.7 : 0.25; b.link.material.opacity = trackHi ? 0.6 : 0.2;
-      b.symbol.scale.setScalar(symbolScale(tr.status === 'tentative' ? SYMBOL_PX * 0.75 : SYMBOL_PX));
+      b.ring.material.opacity = trackHi ? 0.7 : 0.25; b.link.material.opacity = trackHi ? 0.6 : 0.2;
       b.group.position.copy(b.pos);
       b.group.visible = true;
       b.trail.push(b.pos); // what the fusion node believes it has flown
@@ -77,9 +75,9 @@ export function createBeliefViews(scene, net, labels) {
         const p = b.link.geometry.attributes.position;
         p.setXYZ(0, b.pos.x, b.pos.y, b.pos.z); p.setXYZ(1, tr.drone.pos.x, tr.drone.pos.y, tr.drone.pos.z); p.needsUpdate = true;
       }
-      const show = trackHi || tr.status !== 'tentative'; // tentative labels only when highlighting
+      const show = trackTagShown(tr, trackHi);
       labels.place(b.label, b.pos.x, b.pos.y, b.pos.z, show, 8); // clear of the symbol, wider than the diamond it replaced
-      setStyle(b.label, 'opacity', trackHi ? (tr.status === 'tentative' ? '0.55' : '1') : (tr.status === 'tentative' ? '0.4' : '0.75'));
+      setStyle(b.label, 'opacity', trackTagOpacity(tr, trackHi));
       if (show) {
         const cls = tr.model ?? (tr.airframe && tr.airframe !== 'Unknown' ? tr.airframe : 'UAV');
         const err = `±${Math.round(tr.estErr || 0)} m`;

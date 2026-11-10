@@ -200,6 +200,20 @@ def test_the_composite_ignores_missing_data_and_outliers():
     assert picture[0, 0, 0] == 177  # the median of 100 and 255: two scenes alone cannot rule a cloud out
 
 
+def test_the_composite_taken_in_strips_matches_the_whole_picture():
+    rng = np.random.default_rng(1)
+    layers = [rng.integers(0, 256, (3, 23, 9), dtype="uint8") for _ in range(5)]
+    for layer in layers:
+        layer[:, rng.random((23, 9)) < 0.3] = 0  # pixels this scene does not reach
+        layer[:, 0, 0] = 0  # and one no scene reaches
+    cube = np.stack(layers).astype("float32")
+    cube[cube == 0] = np.nan
+    with pytest.warns(RuntimeWarning):
+        whole = np.nan_to_num(np.nanmedian(cube, axis=0), nan=0).clip(0, 255).astype("uint8")
+    picture = pictures.composite(layers, rows=5)  # 23 rows: four strips of 5 and one of 3
+    assert picture.dtype == np.uint8 and np.array_equal(picture, whole)
+
+
 def test_estonian_cells_average_the_ground_and_ignore_gaps():
     fine = np.array([[1, 3, 10, 10], [1, 3, 10, 10], [np.nan, np.nan, 2, np.nan], [np.nan, np.nan, np.nan, np.nan]], "float32")
     means = estonia.cell_mean(fine, 2)
@@ -215,6 +229,18 @@ def test_estonian_cells_take_the_90th_percentile_and_can_ask_for_enough_pixels()
     assert high[0, 0] == 14  # the 90th percentile of 0 to 15, so the single tallest pixel does not count
     assert np.isnan(high[1, 0]) and high[1, 1] == 7
     assert np.isnan(estonia.cell_high(fine, 4, minimum=2)[1, 1])  # one pixel is not enough to call a cell a building
+
+
+def test_estonian_cells_reduced_in_bands_match_the_whole_window():
+    rng = np.random.default_rng(1)
+    fine = rng.uniform(0, 30, (28, 28)).astype("float32")  # 7 cells of 4 a side, so the last band of 2 cells is short
+    fine[rng.random(fine.shape) < 0.3] = np.nan
+    fine[0:4, 0:4] = np.nan  # a cell with no data at all
+    parts = estonia.bands(len(fine), 4, band_cells=2)
+    assert len(parts) == 4
+    for reduce in (estonia.cell_mean, estonia.cell_high, lambda f, n: estonia.cell_high(f, n, 5)):
+        whole, banded = reduce(fine, 4), np.concatenate([reduce(fine[b], 4) for b in parts])
+        assert banded.dtype == np.float32 and np.array_equal(banded, whole, equal_nan=True)
 
 
 def test_estonian_road_types_become_the_games_classes_and_multilines_split():

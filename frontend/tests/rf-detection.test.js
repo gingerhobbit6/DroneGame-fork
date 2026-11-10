@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DRONES, STRUCTURES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
-import { bandGhz, heardBand, radiates } from '../src/sim/rf-model.js';
+import { bandGhz, bandReach, heardBand, radiates } from '../src/sim/rf-model.js';
 import { reachFor } from '../src/sim/site-range.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { terrainState } from '../src/sim/terrain.js';
@@ -39,6 +39,27 @@ describe('the bands a drone is heard on', () => {
   });
 });
 
+describe('how far a band carries', () => {
+  it('leaves every detector its quoted range against a small first-person-view drone, heard on 2.4 GHz', () => {
+    for (const id of ['rf_s', 'rf', 'rf_elysion', 'rf_airfence', 'rf_l']) expect(reachFor(unitDef(id), DRONES.fpv), id).toBe(unitDef(id).range);
+  });
+  it('goes with wavelength, and a video sender is 5 dB louder than a control link', () => {
+    expect(bandReach('control24', DRONES.fpv)).toBe(1);
+    expect(bandReach('control900', DRONES.spotter)).toBeCloseTo(bandGhz('control24') / bandGhz('control900'), 6);
+    expect(bandReach('control900', DRONES.spotter)).toBeCloseTo(2.73, 2);
+    expect(bandReach('video58', DRONES.fpv)).toBeCloseTo(0.75, 2); // 0.42 for the band, 1.78 for the power
+    const loud = Math.sqrt(DRONES.spotter.rfPower);
+    expect(reachFor(unitDef('rf'), DRONES.spotter)).toBeCloseTo(unitDef('rf').range * loud * 2.73, -2); // on 900 MHz: about 15 km
+    expect(reachFor(unitDef('rf_s'), DRONES.spotter)).toBeCloseTo(unitDef('rf_s').range * loud * 0.75, -2); // only its video: about 2.4 km
+  });
+  it('shortens the reach of a detector deafened on the band that carries furthest', () => {
+    const rf = unitDef('rf'), on58 = heardBand(rf, DRONES.fpv, new Set(['control24']));
+    expect(on58).toBe('video58');
+    expect(reachFor(rf, DRONES.fpv, on58)).toBeCloseTo(rf.range * 0.75, -2);
+    expect(reachFor(rf, DRONES.fpv, heardBand(rf, DRONES.fpv, new Set(['control24', 'video58'])))).toBe(0);
+  });
+});
+
 describe('your own jammer', () => {
   it('deafens a detector within its range on the bands it jams, while it jams', () => {
     const rf = sim.addStructure('rf', u(300), u(300)), jammer = sim.addStructure('jammer', u(400), u(300)), fpv = eastOf(rf, 'fpv', 1000);
@@ -49,7 +70,7 @@ describe('your own jammer', () => {
     expect(sim.net.pd(rf, eastOf(rf, 'spotter', 1000, 400))).toBeGreaterThan(0.5); // still heard on 900 MHz
     jammer.jamBands = new Set(['control24']);
     expect(sim.net.pd(rf, fpv)).toBeGreaterThan(0); // its video is still heard
-    expect(sim.net.pd(rf, fpv)).toBeLessThanOrEqual(heard); // on a higher band, which carries less far
+    expect(sim.net.pd(rf, fpv)).toBeLessThan(heard); // on a higher band, which carries less far even over open ground
   });
   it('leaves a detector beyond its range alone', () => {
     const rf = sim.addStructure('rf', u(300), u(300)), jammer = sim.addStructure('jammer', u(-1500), u(300)); // 1.8 km off, and it reaches 1 km

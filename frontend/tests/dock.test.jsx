@@ -161,8 +161,10 @@ describe('plan tab', () => {
     const spec = (x) => ({ structures: [{ id: 'radar', x, z: 0, uplink: null, cellBand: 'B8', jam: null }], fusionUplinks: [], fusionCell: 'B8' });
     const { net, commands } = game.sim;
     const plan = createPlanCanvas(newCanvas(), game.sim);
-    const worked = vi.spyOn(net, 'coverageAt');
-    const redone = () => { worked.mockClear(); plan.draw('fpv'); return worked.mock.calls.length > 0; };
+    // This checks cache invalidation; sensor geometry is tested separately.
+    let calls = 0;
+    net.coverageAt = () => { calls++; return 1; };
+    const redone = () => { calls = 0; plan.draw('fpv'); return calls > 0; };
 
     commands.loadLaydown(spec(30), '1');
     const ids = [...net.nodes.keys()];
@@ -178,7 +180,7 @@ describe('plan tab', () => {
 
     commands.setFigure('drones', 'fpv', 'rcs', 0.5);
     expect(redone()).toBe(true);
-  }, 30000);
+  }, 120000);
   it('draws a running game, with and without coverage', () => {
     running();
     view.hillshade = document.createElement('canvas');

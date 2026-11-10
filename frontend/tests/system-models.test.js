@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { MOUNTS, PATROL_VEHICLES, STRUCTURES, STRUCT_SCALE, WORLD } from '../src/sim/config/index.js';
 import { buildModel } from '../src/render/models.js';
 import { TRUE_UNIT, drawnUnit } from '../src/render/system-parts.js';
+import { view } from '../src/render/view.js';
 
 const height = (group) => new THREE.Box3().setFromObject(group).max.y;
 
@@ -36,7 +37,10 @@ describe('system models', () => {
     expect(metres).toBeGreaterThan(25);
     expect(metres).toBeLessThan(30);
     expect(drawnUnit(0.25)).toBe(TRUE_UNIT);
+    view.symbols = true; // its symbol takes over beyond this
     expect(drawnUnit(1200)).toBe(STRUCT_SCALE);
+    view.symbols = false; // nothing else would show it, so it keeps growing
+    expect(drawnUnit(1200)).toBeGreaterThan(STRUCT_SCALE * 10);
   });
 
   it('puts each system that rides in a patrol on every vehicle that can carry it', () => {
