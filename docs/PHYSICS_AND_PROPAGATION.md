@@ -163,7 +163,7 @@ Generated ground has a relief setting of 380 m, a flat platform 450 m round the 
 
 `pathLoss` ([`propagation.js:50`](../frontend/src/sim/propagation.js#L50)) works out the loss, in dB beyond free space, on the path from a to b at a frequency. Free-space loss is already inside each system's open-field range, so only the excess counts.
 
-1. **Profile.** The path is sampled at up to 64 points (`MAX_SAMPLES`, [`propagation.js:10`](../frontend/src/sim/propagation.js#L10)): one per 20 m cell on short paths, coarser on long ones (about 47 m apart on a 3 km path). Each point gets ground height plus building height (the hard profile), and that plus tree height (the soft profile). Trees within 50 m of the transmitting end are taken as cleared (`endClear`, [`world.js:61`](../frontend/src/sim/config/world.js#L61)).
+1. **Profile.** The path is sampled at up to 256 points (`MAX_SAMPLES`, [`propagation.js:10`](../frontend/src/sim/propagation.js#L10)): one per 20 m cell on paths up to 5.1 km, and coarser beyond (about 55 m apart on a 14 km path), where a single roof can fall between two points. Each point gets ground height plus building height (the hard profile), and that plus tree height (the soft profile). Trees within 50 m of the transmitting end are taken as cleared (`endClear`, [`world.js:61`](../frontend/src/sim/config/world.js#L61)).
 2. **Earth curvature and refraction.** The earth's bulge is added at each point with the standard 4/3 effective earth radius (8,495 km), which allows for normal atmospheric refraction ([`propagation.js:9`](../frontend/src/sim/propagation.js#L9), [`propagation.js:18`](../frontend/src/sim/propagation.js#L18)): h = d₁d₂ / (2kR). On a 3 km path the bulge at the middle is 0.13 m; on 20 km it is 5.9 m.
 3. **Diffraction over terrain and buildings.** The Bullington method of [ITU-R P.526](https://www.itu.int/rec/R-REC-P.526/en) (the code follows P.526-15, section 4.5.1, equations 31 and 49 to 57) replaces the whole profile with one equivalent knife edge. If the path is clear, the edge is the point that comes closest to the ray; if not, it is where the steepest lines from each end cross ([`propagation.js:32`](../frontend/src/sim/propagation.js#L32)). Its height above the ray gives the Fresnel-Kirchhoff parameter
 
@@ -197,11 +197,13 @@ The frequency used is the radar's own band, the band an RF detector hears the dr
 
 The optical line has **no earth curvature and no refraction**. At game ranges this matters little: with the 4/3 radius the bulge at the middle of a 6.4 km line (the large camera fully zoomed) is 0.6 m.
 
-A camera or laser keeps its full reach if the line is clear and has none if it is not ([`site-range.js:63`](../frontend/src/sim/site-range.js#L63)). There is no partial loss through haze or thin canopy.
+A camera, laser, gun or beam-riding missile keeps its full reach if the line is clear and has none if it is not ([`site-range.js:63`](../frontend/src/sim/site-range.js#L63)). There is no partial loss through haze or thin canopy.
 
 ### Systems that need no path
 
-Every effector whose `fire` is `guided` is cued over the terrain and needs no line of sight from where it stands ([`site-range.js:28`](../frontend/src/sim/site-range.js#L28), [`effectors.js:25`](../frontend/src/sim/effectors.js#L25)). That includes interceptor drones and missiles, and also **every gun** in the catalogue, because guns are modelled as guided rounds (see [section 11](#11-weapons-hit-chance-time-of-flight-and-beam-dwell)). Guns worked by a crew off the network do need the crew to see the drone ([`crew.js`](../frontend/src/sim/crew.js)).
+An interceptor drone, or a missile with its own seeker, is cued over the terrain and needs no line of sight from where it stands ([`site-range.js:28`](../frontend/src/sim/site-range.js#L28), [`effectors.js:25`](../frontend/src/sim/effectors.js#L25)).
+
+Two kinds of effector whose `fire` is `guided` do need the optical line above, from the muzzle their rounds leave ([`site-range.js:29`](../frontend/src/sim/site-range.js#L29), [`site-range.js:32`](../frontend/src/sim/site-range.js#L32)): **every gun**, and a **beam-riding missile** (`beamRider`: the Rapid Ranger and the Stormer HVM, whose launcher holds a laser beam on the target). Their rounds still fly as guided rounds (see [section 11](#11-weapons-hit-chance-time-of-flight-and-beam-dwell)). The line is checked when the weapon is offered a task and each time it fires, and for a beam-rider once more as the missile arrives: if the launcher has lost the target by then, it misses ([`effectors.js:136`](../frontend/src/sim/effectors.js#L136)). Guns worked by a crew off the network also need the crew to see the drone ([`crew.js`](../frontend/src/sim/crew.js)).
 
 ### One model for prediction and play
 
@@ -234,13 +236,23 @@ A fibre-optic drone (`fo`) and an autonomous fixed-wing strike drone (`fw`) have
 
 ### Which band it is heard on
 
-A detector covers a link band if its receiver's frequency range overlaps the band and (if set) it monitors that band ([`rf-model.js:41`](../frontend/src/sim/rf-model.js#L41)). Of the bands it covers, it hears a drone on the **lowest** one, because lower frequencies carry further ([`rf-model.js:44`](../frontend/src/sim/rf-model.js#L44)). Bands your own switched-on jammers fill near the detector are deaf to it ([`jamming.js:45`](../frontend/src/sim/jamming.js#L45)). The path loss is worked out at the middle of the heard band.
+A detector covers a link band if its receiver's frequency range overlaps the band and (if set) it monitors that band ([`rf-model.js:41`](../frontend/src/sim/rf-model.js#L41)). Of the bands it covers, it hears a drone on the one that **carries furthest** ([`rf-model.js:44`](../frontend/src/sim/rf-model.js#L44)), which for the link bands in the catalogue is the lowest. Bands your own switched-on jammers fill near the detector are deaf to it ([`jamming.js:45`](../frontend/src/sim/jamming.js#L45)). The path loss is worked out at the middle of the heard band.
 
 ### Reach
 
-$$R = R_{pub}\sqrt{P_{rel}}\cdot 2^{(S_0 - S)/6}$$
+$$R = R_{pub}\sqrt{P_{rel}}\cdot\frac{f_0}{f}\,V\cdot 2^{(S_0 - S)/6}$$
 
-`P_rel` is the drone's link power relative to a small FPV (`rfPower`, an assumption, for example 2.5 for the spotter, [`site-range.js:40`](../frontend/src/sim/site-range.js#L40)). `S` is the receiver sensitivity setting in dBm against its catalogue `S₀`: every 6 dB more sensitive doubles reach ([`unit-config.js:150`](../frontend/src/sim/unit-config.js#L150)). Both follow the Friis free-space equation, P_r = P_t G_t G_r (λ / 4πd)², in which range goes with the square root of transmit power and doubles for each 6 dB of extra receiver sensitivity.
+`P_rel` is the drone's link power relative to a small FPV (`rfPower`, an assumption, for example 2.5 for the spotter, [`site-range.js:40`](../frontend/src/sim/site-range.js#L40)). `S` is the receiver sensitivity setting in dBm against its catalogue `S₀`: every 6 dB more sensitive doubles reach ([`unit-config.js:150`](../frontend/src/sim/unit-config.js#L150)). `f` is the middle of the band the link is heard on and `f₀` that of the 2.4 GHz control band (2.442 GHz), the link a detector's range is quoted for. `V` is 1.78 (5 dB) for a video link and 1 for a control link ([`rf-model.js:55`](../frontend/src/sim/rf-model.js#L55)).
+
+All of it follows the Friis free-space equation, P_r = P_t G_t G_r (λ / 4πd)². Range goes with the square root of transmit power, doubles for each 6 dB of extra receiver sensitivity, and, with the same antenna gain on every band, goes with wavelength:
+
+| Link heard | f₀ / f | V | Reach against the quoted range |
+|---|---|---|---|
+| 900 MHz control (0.895 GHz) | 2.73 | 1 | 2.73 |
+| 2.4 GHz control (2.442 GHz) | 1 | 1 | 1 |
+| 5.8 GHz video (5.788 GHz) | 0.42 | 1.78 | 0.75 |
+
+The 5 dB is an assumption taken from the config's own link budgets, which give a video sender 25 dBm and the return on a control link 20 dBm. Jamming has no such term: the jammer and the link it drowns are on the same frequency, so wavelength cancels.
 
 The open-field ranges are assessed, not computed from a link budget. The config records the check used ([`sensors.js:6`](../frontend/src/sim/config/sensors.js#L6), [`sensors.js:110`](../frontend/src/sim/config/sensors.js#L110)): a small FPV sending 25 dBm, a 6 dBi antenna and -90 dBm sensitivity give 4.6 km at 5.8 GHz (free-space loss 107.7 dB at 1 km, which `freeSpaceLoss` reproduces), while the game uses 3.5 km, the middle of the Dedrone datasheet's 2 to 5 km.
 
@@ -258,7 +270,7 @@ The classifier library affects only what the detector names, not whether it dete
 | Airfence (`rf_airfence`) | 10000 | 0.07 to 6 | control900, control24, video58 | -95 | angle of arrival | 3° | 9 | 0.04 |
 | Large RF detector (`rf_l`) | 14000 | 0.02 to 8 | control900, control24, video58 | -100 | angle of arrival | 2° | 9 | 0.03 |
 
-**Real physics.** A real detector's reach depends on the drone's actual transmit power and duty cycle (a video link transmits continuously, a control link in bursts), antenna patterns on both ends, the noise floor and interference in the band, and the detector's processing. The game reduces all of that to one assessed range per detector, scaled by `rfPower` and sensitivity, then applies the terrain path. A real detector hears whichever link arrives strongest, which need not be the lowest band.
+**Real physics.** A real detector's reach depends on the drone's actual transmit power and duty cycle (a video link transmits continuously, a control link in bursts), antenna patterns on both ends, the noise floor and interference in the band, and the detector's processing. The game reduces all of that to one assessed range per detector, scaled by `rfPower`, the band and sensitivity, then applies the terrain path. It takes the same antenna gain on every band and a control link that sends all the time, so a real detector may hear a bursting 900 MHz link less far than the 2.73 here.
 
 ## 5. Optical (EO/IR) cameras and the human eye
 
@@ -616,8 +628,8 @@ The Medium RF detector (Dedrone class) is on its 9 m mast, with 3,500 m range an
 
 | Drone | Radiates on | Heard on | Open-field reach |
 |---|---|---|---|
-| FPV | control24, video58 | control24 (2.442 GHz), the lowest | 3,500 m |
-| Spotter (rfPower 2.5) | control900, video58 | control900 (0.895 GHz) | 3,500 x √2.5 = 5,534 m |
+| FPV | control24, video58 | control24 (2.442 GHz), which carries furthest | 3,500 m |
+| Spotter (rfPower 2.5) | control900, video58 | control900 (0.895 GHz) | 3,500 x √2.5 x 2.73 = 15,098 m |
 | Fibre-optic | nothing | none | 0 |
 | Shahed class | nothing (GNSS is receive only) | none | 0 |
 
@@ -670,14 +682,14 @@ The models are good for comparing laydowns, seeing why a mast or a ridge matters
 
 ## Limits and simplifications
 
-- **Radio:** no ground reflection (plane-earth loss), multipath, ducting, gas absorption, rain on radio paths, or statistical variability. One Bullington edge per path, at most 64 samples per path. Trees count only where the ray passes through them, not where they enter the Fresnel zone. Not checked against ITM or measurements. Rain changes radar range by one factor per band.
+- **Radio:** no ground reflection (plane-earth loss), multipath, ducting, gas absorption, rain on radio paths, or statistical variability. One Bullington edge per path, at most 256 samples per path, so beyond 5.1 km not every 20 m cell is looked at. An RF detector's reach by band assumes the same antenna gain on every band and ignores a link's duty cycle. Trees count only where the ray passes through them, not where they enter the Fresnel zone. Not checked against ITM or measurements. Rain changes radar range by one factor per band.
 - **Radar:** no Swerling fluctuation, aspect-dependent RCS, or multipath lobes. The clutter rule uses total speed rather than radial speed, and no current drone flies slowly enough to trigger it. Pd is a function of range ratio, not of SNR and threshold. False alarms are one roll per scan, at most one per scan.
 - **RF detection:** the lowest covered band is used, not the strongest. No duty cycle, antenna pattern, noise floor or interference beyond your own jammers. RF detectors give bearing only.
 - **Optical:** no contrast, background, atmospheric transmission or turbulence; a clear line is all or nothing; no earth curvature on optical lines. Weather factors are fixed shares.
 - **Acoustic:** no wind, temperature gradients or frequency content; three fixed halving factors.
 - **Jamming:** quoted ranges, not link budgets. GNSS jamming reach equals link jamming reach. Link loss is a timer; anti-jam is a rate. The operator is always at the launch point.
 - **Flight:** point masses at constant speed with instant turns; no wind; evasion is statistical only.
-- **Weapons:** guns are modelled as steered rounds with no line-of-sight check; the hit roll uses the type's catalogue speed, not its current speed. Most `pk` values are assumptions.
+- **Weapons:** guns are modelled as steered rounds, and a beam-riding missile's line of sight is checked when it fires and when it arrives, not along its flight; the hit roll uses the type's catalogue speed, not its current speed. Most `pk` values are assumptions.
 - **Blast:** cube-root radii anchored on one grenade; fragments, TNT equivalence and building damage are not modelled.
 
 ## Where this lives in the code

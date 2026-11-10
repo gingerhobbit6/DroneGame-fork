@@ -10,6 +10,7 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "balance": "node tools/balance.js",
+    "measure": "node tools/measure-fusion.js",
     "models": "node tools/export-drone-models.js"
   },
   "dependencies": {

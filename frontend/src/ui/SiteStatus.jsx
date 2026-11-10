@@ -1,7 +1,7 @@
 // What the chosen spot already has on this computer, and what building a map of it would still download. It is worked out here from
 // the list of downloads, so the position itself never leaves the browser until the player presses Build.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { WORLD, WORLD_KM } from '../sim/config/index.js';
 import { squaresAround } from '../sim/bng.js';
 import { gridRef, isEstonian } from '../sim/grids.js';
@@ -56,24 +56,39 @@ function Builder({ point, downloads, onBuilt }) {
   const [lidar, setLidar] = useState(true);
   const [status, setStatus] = useState(null);
   const [problem, setProblem] = useState('');
+  const latestOnBuilt = useRef(onBuilt);
+  useLayoutEffect(() => { latestOnBuilt.current = onBuilt; }, [onBuilt]); // parent renders must not restart the progress timer
   const plan = downloads && needs(point, downloads, lidar);
   const words = WORDS[isEstonian(point.n) ? 'estonian' : 'british'];
 
+  // A build can finish before its first response, so starts and progress polls share the same outcome handling.
+  const receiveStatus = useCallback((now) => {
+    setStatus(now);
+    if (!now.running) {
+      if (now.ok) latestOnBuilt.current();
+      else setProblem(now.message || 'The map could not be built.');
+    }
+  }, []);
+
   useEffect(() => {
     if (!status?.running) return undefined;
-    const timer = setInterval(async () => {
+    let active = true, timer;
+    // Wait for each answer before scheduling another poll, and ignore answers from an abandoned attempt.
+    const poll = async () => {
       try {
         const now = await api.packs.buildStatus();
-        setStatus(now);
-        if (!now.running) { clearInterval(timer); if (now.ok) onBuilt(); else setProblem(now.message || 'The map could not be built.'); }
-      } catch (e) { setProblem(e.message); clearInterval(timer); }
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [status?.running]); // eslint-disable-line react-hooks/exhaustive-deps
+        if (!active) return;
+        receiveStatus(now);
+        if (now.running) timer = setTimeout(poll, 2000);
+      } catch (e) { if (active) receiveStatus({ running: false, ok: false, message: e.message }); }
+    };
+    timer = setTimeout(poll, 2000);
+    return () => { active = false; clearTimeout(timer); };
+  }, [api, receiveStatus, status?.running]);
 
   const start = async () => {
     setProblem('');
-    try { setStatus(await api.packs.build({ east: Math.round(point.e), north: Math.round(point.n), lidar })); } catch (e) { setProblem(e.message); }
+    try { receiveStatus(await api.packs.build({ east: Math.round(point.e), north: Math.round(point.n), lidar })); } catch (e) { setProblem(e.message); }
   };
   return (
     <div id="pack-build" className="sys note">
@@ -89,7 +104,7 @@ function Builder({ point, downloads, onBuilt }) {
       {status?.running
         ? <div id="pack-progress" className="muted">Building... {status.message}</div>
         : <button id="pack-build-go" className="primary" onClick={start}>Build this map</button>}
-      {problem && <div id="pack-build-error" className="saved-error">{problem}</div>}
+      {problem && <div id="pack-build-error" className="saved-error" role="alert">{problem}</div>}
     </div>
   );
 }

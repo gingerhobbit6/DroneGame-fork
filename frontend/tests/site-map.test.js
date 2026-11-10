@@ -109,6 +109,9 @@ describe('the start map', () => {
     expect(made.map.getZoom()).toBe(before);
     made.show({ e: 422000, n: 166000 });
     expect(fit).toHaveBeenCalled();
+    made.show({ e: 422000, n: 166000 }, { planned: true }); // a map to build is fitted to the build, not a country around it
+    const fitted = fit.mock.calls.at(-1)[0];
+    expect(fitted.getNorth() - fitted.getSouth()).toBeLessThan(1.1); // under about 120 km of latitude, where padding the world by its width gave 160
     made.remove();
   });
   it('offers satellite and hybrid from EOX, with its credit, only once chosen', () => {

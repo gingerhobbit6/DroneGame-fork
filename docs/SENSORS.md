@@ -49,7 +49,7 @@ A sensor's range is quoted against the reference drone. Against another drone it
 
 - radar: by the fourth root of radar cross-section over 0.01 m² (the radar equation);
 - camera: in proportion to the drone's size over 0.35 m (pixels on target);
-- RF detector: by the square root of the drone's link power, as a multiple of a small first-person-view (FPV) drone's;
+- RF detector: by the square root of the drone's link power, as a multiple of a small first-person-view (FPV) drone's, and by the band the link is on, against the FPV's 2.4 GHz control link (see [RF detectors](#rf-detectors));
 - acoustic sensor: in proportion to the drone's loudness, as a multiple of a small FPV drone's.
 
 The four drone types the waves send (from `DRONES`, see [DRONES.md](DRONES.md)):
@@ -71,11 +71,11 @@ That gives each sensor's open-field reach against each type, as the Unit panel s
 | [`radar`](../frontend/src/sim/config/sensors.js#L8) | 6,101 | 3,100 | 3,100 | 6,556 |
 | [`radar_giraffe`](../frontend/src/sim/config/uk-systems.js#L29) | 7,872 | 4,000 | 4,000 | 8,459 |
 | [`radar_l`](../frontend/src/sim/config/sensors.js#L85) | 8,462 | 4,300 | 4,300 | 9,093 |
-| [`rf_s`](../frontend/src/sim/config/sensors.js#L137) | 3,162 | cannot hear | 2,000 | cannot hear |
-| [`rf`](../frontend/src/sim/config/sensors.js#L110) | 5,534 | cannot hear | 3,500 | cannot hear |
-| [`rf_elysion`](../frontend/src/sim/config/sensors.js#L161) | 5,534 | cannot hear | 3,500 | cannot hear |
-| [`rf_airfence`](../frontend/src/sim/config/eu-systems.js#L5) | 15,811 | cannot hear | 10,000 | cannot hear |
-| [`rf_l`](../frontend/src/sim/config/sensors.js#L180) | 22,136 | cannot hear | 14,000 | cannot hear |
+| [`rf_s`](../frontend/src/sim/config/sensors.js#L137) | 2,373 | cannot hear | 2,000 | cannot hear |
+| [`rf`](../frontend/src/sim/config/sensors.js#L110) | 15,098 | cannot hear | 3,500 | cannot hear |
+| [`rf_elysion`](../frontend/src/sim/config/sensors.js#L161) | 4,152 | cannot hear | 3,500 | cannot hear |
+| [`rf_airfence`](../frontend/src/sim/config/eu-systems.js#L5) | 43,137 | cannot hear | 10,000 | cannot hear |
+| [`rf_l`](../frontend/src/sim/config/sensors.js#L180) | 60,392 | cannot hear | 14,000 | cannot hear |
 | [`camera_s`](../frontend/src/sim/config/sensors.js#L230) | 2,229 | 260 | 260 | 1,857 |
 | [`camera`](../frontend/src/sim/config/sensors.js#L203) | 5,571 | 650 | 650 | 4,643 |
 | [`camera_l`](../frontend/src/sim/config/sensors.js#L250) | 3,857 | 450 | 450 | 3,214 |
@@ -126,11 +126,11 @@ Where each range comes from:
 
 An RF detector is a passive receiver that hears a drone's control and video links and reports a bearing to it, and the band it heard. It gives no range and no elevation, so the fusion node needs two bearings that cross, or another sensor, to place the drone.
 
-- **What it hears.** A drone radiates on the bands of its control and video links ([`rf-model.js:33`](../frontend/src/sim/rf-model.js#L33)). A detector hears it on a band its `listens` range covers, and picks the lowest such band, because a lower frequency carries further ([`rf-model.js:44`](../frontend/src/sim/rf-model.js#L44)). It cannot hear the fibre-optic strike drone or the autonomous fixed-wing strike drone, which send nothing.
+- **What it hears.** A drone radiates on the bands of its control and video links ([`rf-model.js:33`](../frontend/src/sim/rf-model.js#L33)). A detector hears it on a band its `listens` range covers, and picks the one that carries furthest ([`rf-model.js:44`](../frontend/src/sim/rf-model.js#L44)). In free space reach goes with wavelength, so against the 2.4 GHz control link its range is quoted for, a 900 MHz control link is heard 2.7 times as far. A 5.8 GHz link is heard 0.42 times as far, or 0.75 times for a video sender, which is taken to be 5 dB louder than a control link ([`rf-model.js:55`](../frontend/src/sim/rf-model.js#L55)). A wide detector therefore hears the spotter's 900 MHz link at about 15 km, where one that covers only 2.4 and 5.8 GHz hears its video at about 2.4 km. It cannot hear the fibre-optic strike drone or the autonomous fixed-wing strike drone, which send nothing.
 - **Your own jammers.** A detector inside the range of one of your jammers that is on cannot hear the bands that jammer fills ([`jamming.js:45`](../frontend/src/sim/jamming.js#L45)). A standard jammer fills both 2.4 and 5.8 GHz, so a Wingman inside its range cannot hear an FPV drone at all while it jams.
 - **Classifier library.** A library names the airframe of a link family it knows ([`rf-model.js:14`](../frontend/src/sim/rf-model.js#L14)). Every catalogue detector comes with the commercial library (DJI, Autel), which knows neither the FPV drone's hobby link nor the spotter's tactical link; a better library is a unit setting.
 - **Bearing.** Angle of arrival gives a bearing good to a few degrees, good enough to cross with another detector's. A sector bearing (30°) only says roughly which way.
-- **Range.** The range is for a clear radio path. Terrain and trees are applied on top from the map, on the band it hears ([`sensors.js:5`](../frontend/src/sim/config/sensors.js#L5)).
+- **Range.** The range is for a clear radio path, against a small FPV heard on its 2.4 GHz control link. Terrain and trees are applied on top from the map, on the band it hears ([`sensors.js:5`](../frontend/src/sim/config/sensors.js#L5)).
 
 | System | Product | Size | Price | Range (m) | Mast (m) | Listens (GHz) | Drone link bands heard | Scan (s) |
 |---|---|---|---|---|---|---|---|---|

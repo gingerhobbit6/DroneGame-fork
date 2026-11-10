@@ -4,6 +4,8 @@ This document says how well Site Guard follows Secure by Design practice, with t
 
 Review date: 9 November 2026, branch `docs/handbook`, read from the code. Nothing here was exploited. The only command run was `npm audit --package-lock-only` (see [Dependencies](#6-dependencies)). No server was started, no test suite was run, and no code or configuration was changed.
 
+**Remediation update, 9 November 2026:** the later quality review added CI, dependency audits, Gitleaks, Dependabot and conditional CodeQL/dependency-review workflows. Their local validation and audits passed; the first remote workflow run and required-check settings remain outstanding. Cached OS downloads now have their checksums verified before reuse. See [CI.md](CI.md) and [SECURITY_NOTES.md](SECURITY_NOTES.md). The findings and scorecard below remain the original review snapshot, rather than a new accreditation assessment.
+
 ## Contents
 
 1. [Frameworks used, and what could not be verified](#1-frameworks-used-and-what-could-not-be-verified)

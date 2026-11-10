@@ -22,6 +22,23 @@ def _pick(product: str, area: str, fmt: str, sub: str | None) -> dict | None:
     return found[0] if found else None
 
 
+def _cached_matches(path: str, size: int, checksum: str) -> bool:
+    if not os.path.isfile(path) or os.path.getsize(path) != size:
+        return False
+    # Equal length does not rule out a damaged cache. Read at most the advertised size plus one byte,
+    # so even a file changed while it is checked cannot cause an unbounded read.
+    digest = hashlib.md5(usedforsecurity=False)
+    remaining = size
+    with open(path, "rb") as cached:
+        while remaining:
+            chunk = cached.read(min(1 << 20, remaining))
+            if not chunk:
+                return False
+            digest.update(chunk)
+            remaining -= len(chunk)
+        return not cached.read(1) and digest.hexdigest() == checksum.lower()
+
+
 def _fetch(item: dict, folder: str, say) -> None:
     name = os.path.basename(item["fileName"])
     if name != item["fileName"] or name.startswith("."):
@@ -33,7 +50,7 @@ def _fetch(item: dict, folder: str, say) -> None:
         raise SystemExit(f"refusing a download OS did not describe properly: {name}")
     os.makedirs(folder, exist_ok=True)
     target = os.path.join(folder, name)
-    if os.path.exists(target) and os.path.getsize(target) == item["size"]:
+    if _cached_matches(target, item["size"], md5):
         return
     say(f"downloading {name}, {item['size'] / 1e6:.0f} MB")
     digest, done = hashlib.md5(usedforsecurity=False), 0

@@ -48,7 +48,7 @@ function foot(g, color) {
 
 const rotorMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide });
 let darkMat = null; // made with the first drone, after game-view.js has made the models' reflection
-const unseenMat = new THREE.MeshBasicMaterial({ color: 0x8a94a3, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
+const unseenMat = new THREE.MeshBasicMaterial({ color: 0x8a94a3, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide });
 
 // One shared model per drone type, plus a grey copy for drones that no sensor has (shown when the truth overlay is on).
 const droneTemplates = {};

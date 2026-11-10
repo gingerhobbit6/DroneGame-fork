@@ -2,7 +2,7 @@
 // marks a further real system of a size. `product` is the name the toolbar lists it by.
 // Costs are in US dollars, and each system's `ref` says where its numbers come from. Prices marked ASSUMPTION had no verified public figure.
 // `mount` is how high a sensor sits on its mast (m), an assumption: below the 12-20 m tree tops, trees hide most low flyers. RF systems default to 9 m.
-// RF ranges are for a clear path. Terrain and trees are applied on top, from the map, so these figures must not also allow for them.
+// RF ranges are for a clear path, against a small FPV heard on its 2.4 GHz control link: rf-model.js scales them for a link on another band. Terrain and trees are applied on top, from the map, so these figures must not also allow for them.
 // RF link budget used to check them, an assumption: a small FPV sends 25 dBm at 5.8 GHz, where path loss is 107.7 + 20 log10(km) dB.
 export const SENSORS = {
   radar: {

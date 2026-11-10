@@ -22,7 +22,7 @@ Each system has a `mobile` field: `'manpack'` is drawn on a tripod, `'vehicle'` 
 
 - a sensor's or jammer's antenna stands at its mast height, `mount`, which sets its line of sight ([`site-range.js:32`](../frontend/src/sim/site-range.js#L32));
 - a laser's emitter stands at `mount`, or 4 m without one;
-- a launcher's rounds leave from its muzzle, `muzzleY` model units of 2.2 m, scaled with the model ([`effectors.js:22`](../frontend/src/sim/effectors.js#L22)). Rounds are cued over the terrain, so a launcher needs no line of sight;
+- a launcher's rounds leave from its muzzle, `muzzleY` model units of 2.2 m, scaled with the model ([`effectors.js:22`](../frontend/src/sim/effectors.js#L22)). An interceptor drone or a missile with its own seeker is cued over the terrain, so its launcher needs no line of sight; a gun or a beam-riding missile sights from its muzzle ([`site-range.js:32`](../frontend/src/sim/site-range.js#L32));
 - a crewed gun's gunner looks from 2.5 m, standing in the vehicle ([`crew.js:14`](../frontend/src/sim/crew.js#L14)).
 
 Once placed, a system stays where it is for the whole run. The only systems that move are a patrol's escort.
@@ -65,18 +65,18 @@ The generated world's trees are 12 to 20 m tall ([`world.js:55`](../frontend/src
 | [`interceptor_p1`](../frontend/src/sim/config/effectors.js#L95) | interceptor | fixed | rounds leave 3.5 m up; no sight line needed | fixed | light | 1 | 30 |
 | [`interceptor_l`](../frontend/src/sim/config/effectors.js#L197) | interceptor | fixed | rounds leave 4.9 m up; no sight line needed | fixed | no | 1 | 30 |
 | [`missile_s`](../frontend/src/sim/config/effectors.js#L217) | missile | fixed | rounds leave 3.4 m up; no sight line needed | fixed | light | 1 | 30 |
-| [`missile_rr`](../frontend/src/sim/config/uk-systems.js#L107) | missile | fixed | rounds leave 4.8 m up; no sight line needed | fixed | medium | 1 | 30 |
-| [`missile_hvm`](../frontend/src/sim/config/uk-systems.js#L134) | missile | fixed | rounds leave 4.8 m up; no sight line needed | fixed | no | 2 | 30 |
+| [`missile_rr`](../frontend/src/sim/config/uk-systems.js#L107) | missile | fixed | rounds leave 4.8 m up, and it sights from there | fixed | medium | 1 | 30 |
+| [`missile_hvm`](../frontend/src/sim/config/uk-systems.js#L134) | missile | fixed | rounds leave 4.8 m up, and it sights from there | fixed | no | 2 | 30 |
 | [`missile`](../frontend/src/sim/config/effectors.js#L114) | missile | fixed | rounds leave 4.8 m up; no sight line needed | fixed | no | 1 | 30 |
 | [`missile_l`](../frontend/src/sim/config/effectors.js#L237) | missile | fixed | rounds leave 6.8 m up; no sight line needed | fixed | no | 1 | 30 |
 | [`missile_skysabre`](../frontend/src/sim/config/uk-systems.js#L175) | missile | fixed | rounds leave 6.8 m up; no sight line needed | fixed | no | 1 | 30 |
 | [`gun_s`](../frontend/src/sim/config/crew.js#L28) | gun | vehicle, crewed, off the network | rounds leave 2.6 m up; the gunner looks from 2.5 m | fixed | medium | 1 | 20 |
 | [`gun_50`](../frontend/src/sim/config/crew.js#L40) | gun | vehicle, crewed, off the network | rounds leave 2.6 m up; the gunner looks from 2.5 m | fixed | medium | 1 | 20 |
-| [`gun_hmg`](../frontend/src/sim/config/effectors.js#L305) | gun | vehicle | rounds leave 2.6 m up; no sight line needed | fixed | light | 1 | 30 |
-| [`missile_paladin`](../frontend/src/sim/config/uk-systems.js#L155) | gun | fixed | rounds leave 3.9 m up; no sight line needed | fixed | heavy | 1 | 30 |
-| [`gun_skyranger`](../frontend/src/sim/config/eu-systems.js#L65) | gun | vehicle | rounds leave 5.3 m up; no sight line needed | fixed | heavy | 2 | 40 |
-| [`gun_gepard`](../frontend/src/sim/config/eu-systems.js#L83) | gun | vehicle | rounds leave 5.3 m up; no sight line needed | fixed | no | 2 | 40 |
-| [`gun_l`](../frontend/src/sim/config/eu-systems.js#L47) | gun | fixed | rounds leave 5.3 m up; no sight line needed | fixed | no | 1 | 40 |
+| [`gun_hmg`](../frontend/src/sim/config/effectors.js#L305) | gun | vehicle | rounds leave 2.6 m up, and it sights from there | fixed | light | 1 | 30 |
+| [`missile_paladin`](../frontend/src/sim/config/uk-systems.js#L155) | gun | fixed | rounds leave 3.9 m up, and it sights from there | fixed | heavy | 1 | 30 |
+| [`gun_skyranger`](../frontend/src/sim/config/eu-systems.js#L65) | gun | vehicle | rounds leave 5.3 m up, and it sights from there | fixed | heavy | 2 | 40 |
+| [`gun_gepard`](../frontend/src/sim/config/eu-systems.js#L83) | gun | vehicle | rounds leave 5.3 m up, and it sights from there | fixed | no | 2 | 40 |
+| [`gun_l`](../frontend/src/sim/config/eu-systems.js#L47) | gun | fixed | rounds leave 5.3 m up, and it sights from there | fixed | no | 1 | 40 |
 | [`laser_rfdew`](../frontend/src/sim/config/uk-systems.js#L200) | laser | vehicle | 3 m | fixed | no | 1 | 30 |
 | [`laser_s`](../frontend/src/sim/config/effectors.js#L258) | laser | vehicle | 3 m | fixed | no | 1 | 30 |
 | [`laser`](../frontend/src/sim/config/effectors.js#L143) | laser | fixed | 4 m | fixed | no | 1 | 30 |

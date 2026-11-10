@@ -112,6 +112,7 @@ describe('choosing a world', () => {
     fireEvent.click($('#use-my-location'));
     await until(() => $('#site-info')?.textContent.includes('Start point'));
     expect($('#world-note').textContent).toContain('Your location, good to about 40 m');
+    expect($('#world-note').textContent).toContain('choose Street or Satellite above the map'); // why the map has gone blank, and how to get one
     const noLive = [...document.querySelectorAll('.site-map-styles button')].find((b) => b.textContent === 'No live map');
     expect(noLive.getAttribute('aria-pressed')).toBe('true');
     const tiles = [];

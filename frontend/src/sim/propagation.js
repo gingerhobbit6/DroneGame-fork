@@ -7,7 +7,7 @@ import { TERRAIN } from './config/index.js';
 
 const GHZ_METRES = 0.299792458;  // wavelength in metres = this / frequency in GHz
 const EARTH_M = 8495000;         // 4/3 of the earth's radius, for standard refraction
-const MAX_SAMPLES = 64;          // points along one path. Every sensor checks every drone on every scan, so this bounds the cost.
+const MAX_SAMPLES = 256;         // points along one path: every sensor checks every drone on every scan, so this bounds the cost. shortcut: a point for every 20 m cell only out to 5.1 km, further apart beyond, where a roof can fall between two; raise it if long paths over towns matter.
 const FOLIAGE_MAX_M = 400;       // Weissberger's model stops here. Beyond it, the signal goes over the trees instead.
 
 // Scratch profile, so that a path allocates no arrays.

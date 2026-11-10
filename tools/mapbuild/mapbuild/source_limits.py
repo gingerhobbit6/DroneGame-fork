@@ -9,7 +9,7 @@ import numpy as np
 from pyogrio.raw import read as ogr_read
 
 MAX_SHAPE_BYTES = 768_000_000  # ETAK building/road .dbf and woodland .shp members each exceed 500 MB
-MAX_SHAPE_FEATURES = 500_000
+MAX_SHAPE_FEATURES = 2_000_000  # OS OpenMap Local's TQ Building layer has 1.8 million; a London pack reads 1.06 million of them
 MAX_SHAPE_BUNDLE_BYTES = 1_250_000_000  # the largest observed ETAK layer is about 868 MB expanded
 MAX_SHAPE_ARCHIVE_BYTES = 3_000_000_000  # kolvikud has about 2.18 GB across its national layers
 MAX_SHAPE_AUX_BYTES = 32_000_000

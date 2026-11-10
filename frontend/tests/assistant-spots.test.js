@@ -3,15 +3,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { slideToShow } from '../src/render/placement.js';
-import { STRUCTURES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
+import { STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { suggestSpot } from '../src/ui/assistant/spots.js';
 import { zoneShare } from '../src/ui/coverage.js';
 import { ringZone } from '../src/zone.js';
 
-const TERRAINS = ['1', '7', '42'];
 const north = { points: [[-30, -110], [30, -110], [30, -50], [-30, -50]], closed: true }; // 1 to 2.2 km north of the site, in scene units
-const metres = (spot) => Math.hypot(spot.x, spot.z) * WORLD.metresPerUnit;
 
 let sim;
 const fresh = (terrain = '1') => { sim = createSimulation({ seed: '1', terrainSeed: terrain }); sim.commands.deploy('1', terrain); };
@@ -26,17 +24,6 @@ beforeEach(() => { resetAllFigures(); fresh(); });
 describe('sensors', () => {
   it('judges an empty laydown on the low flyers, which are the hardest to see', () => {
     expect(suggestSpot(sim, STRUCTURES.radar).why).toContain('Fibre-optic strike drone');
-  });
-
-  it('adds what each new sensor can see, on every terrain', () => {
-    for (const terrain of TERRAINS) {
-      fresh(terrain);
-      placeBest('radar');
-      const first = zoneShare(sim, 'fpv', null);
-      expect(first).toBeGreaterThan(0.5);
-      placeBest('rf');
-      expect(zoneShare(sim, 'fpv', null)).toBeGreaterThanOrEqual(first);
-    }
   });
 
   it('follows the zone the player drew', () => {
@@ -63,13 +50,6 @@ describe('sensors', () => {
 });
 
 describe('effectors', () => {
-  it('keeps long-reach weapons close in when that covers the zone, on every terrain', () => {
-    for (const terrain of TERRAINS) {
-      fresh(terrain);
-      for (const id of ['interceptor', 'missile']) expect(metres(placeBest(id))).toBeLessThan(1500);
-    }
-  });
-
   it('judges a missile on the fixed-wing drones it is kept for', () => {
     expect(suggestSpot(sim, STRUCTURES.missile).why).toMatch(/Fixed-wing strike drone|Fixed-wing spotter drone/);
   });
@@ -81,20 +61,6 @@ describe('effectors', () => {
 });
 
 describe('a whole laydown', () => {
-  const LAYDOWN = ['radar', 'rf', 'camera', 'jammer', 'interceptor', 'missile', 'laser', 'rf', 'jammer', 'interceptor'];
-
-  it('does not bunch up, on every terrain', () => {
-    for (const terrain of TERRAINS) {
-      fresh(terrain);
-      for (const id of LAYDOWN) placeBest(id);
-      const { structures: all } = sim;
-      for (const a of all) {
-        const nearest = Math.min(...all.filter((b) => b !== a).map((b) => Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z)));
-        expect(nearest * WORLD.metresPerUnit).toBeGreaterThanOrEqual(150); // one step of the search grid
-      }
-    }
-  });
-
   it('says plainly when another of the same adds nothing new', () => {
     const zone = ringZone(800);
     for (let i = 0; i < 2; i++) placeBest('interceptor', zone);

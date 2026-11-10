@@ -95,6 +95,10 @@ Press **Start wave**. The laydown locks and the fusion node takes over: it build
 
 With **Truth overlay** on, a tag like `First-person-view` marks where a drone really is, and a marker like `T88 · UAV ±52 m` marks where the fusion node believes it is. Tracks can lag, get confused or turn out to be ghosts, and effectors only hit a real drone they find at the cued position. How the fusion engine decides, and how well it does, is in [FUSION_AND_TARGETING.md](FUSION_AND_TARGETING.md).
 
+Zoomed out, each drone has a ring round it: white while no sensor has it, then the colour of its type once it is tracked. Where name tags would overlap, the ones further down the order give way: the selected system or drone first, then drones, then tracks, then systems and people. Tick **Map symbols** to show NATO map symbols in place of the drone and system models when zoomed out. It is off by default.
+
+With the truth overlay on, click a drone to open the **Selected drone** panel: what it is, whether a sensor tracks it, its speed, height, range and bearing from the site, warhead, health, radio links, how well it resists jamming, how hard it is to hit and what it costs. **Follow** keeps it in the middle of the view. Once it is shot down, hits its target or leaves, the panel says which. Esc or a click on empty ground closes it. Turning off **Truth overlay** also closes the panel and stops following, so hidden drone positions are no longer revealed.
+
 ![Wave 5 in progress: drones approach the site while the fusion node tracks them and tasks interceptors](screenshots/wave.jpg)
 
 ## 6. Read the messages
@@ -152,7 +156,7 @@ Keys are ignored while you type in a field, and Ctrl, Alt and Cmd combinations b
 | 1 to 8, 0 | Pick a kind's systems in turn: 1 radar, 2 RF detector, 3 camera, 4 jammer, 5 interceptor, 6 missile, 7 laser, 8 acoustic, 0 gun ([`systems.js:13`](../frontend/src/sim/config/systems.js#L13)). With a deployment pack deployed, they open that kind's list of the pack's kit instead ([`game.js:123`](../frontend/src/game.js#L123)) |
 | 9 | The People tool |
 | X | The Remove tool: the next system clicked is removed, with its cost back unless a pack is deployed |
-| Esc | The first that applies: leave the mast view, close the map panel, drop the tool, close the list, clear the selection |
+| Esc | The first that applies: leave the mast view, close the map panel, drop the tool, close the list, clear the selected system and drone |
 | Space | Pause and resume, or play and pause a replay |
 | Left, Right | Step back and forward through a replay |
 | R, T, L | Range rings, truth overlay, labels |

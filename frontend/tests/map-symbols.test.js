@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// Zoomed out, systems and drones are drawn as NATO map symbols instead of models far larger than life; tracks always are.
+// With map symbols on, zoomed out, systems and drones are drawn as NATO map symbols instead of models far larger than life; tracks
+// always are. With them off (the default), the models stay, and a drone has a ring round it.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
@@ -14,7 +15,7 @@ import { OPENING_ZOOM, view } from '../src/render/view.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 import { setUp } from './support/scenarios.js';
 
-const sprite = (group) => group.children.find((o) => o.isSprite);
+const sprite = (group) => group.children.find((o) => o.isSprite && o.userData.symbol);
 let game, camera, labels;
 
 beforeEach(() => {
@@ -22,8 +23,9 @@ beforeEach(() => {
   game = createGame({ seed: '1', terrainSeed: '1', api: createFakeApi(), storage: createFakeStorage() });
   camera = new THREE.PerspectiveCamera();
   labels = createLabels(document.createElement('div'), camera);
+  view.symbols = true;
 });
-afterEach(() => { view.zoom = OPENING_ZOOM; view.eye = null; });
+afterEach(() => { view.zoom = OPENING_ZOOM; view.eye = null; view.symbols = false; });
 
 describe('map symbols', () => {
   it('a system shows its friend symbol zoomed out and its model zoomed in, never a symbol from a mast', () => {
@@ -76,12 +78,28 @@ describe('map symbols', () => {
     const [group] = scene.children;
     expect(sprite(group).visible).toBe(true);
     expect(sprite(group).userData.symbol).toBe('hostile:rotary');
-    expect(group.children[0].visible).toBe(false);
+    expect(group.children[1].visible).toBe(false); // the model
     d.detected = false; views.sync(0);
     expect(sprite(group).userData.symbol).toBe('unseen:rotary');
     view.zoom = u(50); d.detected = true; views.sync(0);
     expect(sprite(group).visible).toBe(false);
-    expect(group.children[0].visible).toBe(true);
+    expect(group.children[1].visible).toBe(true);
+  });
+
+  it('with map symbols off, a drone keeps its model zoomed out, with a ring round it in its colour once tracked', () => {
+    view.symbols = false;
+    const d = { type: 'fpv', def: DRONES.fpv, detected: false, hp: 20, uid: 1, heading: 0, bank: 0, pos: new THREE.Vector3(0, 5, 0), launch: new THREE.Vector3() };
+    const scene = new THREE.Scene();
+    const views = createDroneViews(scene, { drones: [d] }, labels, camera);
+    view.zoom = u(3000); views.sync(0);
+    const [group] = scene.children, [ring] = group.children;
+    expect(sprite(group).visible).toBe(false);
+    expect(group.children[2].visible).toBe(true); // the grey model of a drone no sensor has
+    expect(ring.visible).toBe(true);
+    d.detected = true; views.sync(0);
+    expect(ring.material.color.getHex()).toBe(DRONES.fpv.color);
+    view.zoom = u(50); views.sync(0);
+    expect(ring.visible).toBe(false); // close in, the model is enough
   });
 
   it('a track takes the hostile frame once classified, sharing one texture per symbol', () => {

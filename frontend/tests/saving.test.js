@@ -146,7 +146,7 @@ describe('replaying a saved run', () => {
     sim.commands.setAuthority('all');
     sim.commands.startWave();
     let answered = 0, approve = true;
-    for (let i = 0; i < 6000; i++) {
+    for (let i = 0; i < 9000; i++) { // 450 s: the first drone is tracked about 310 s in, once it clears the hills
       sim.step();
       for (const req of [...sim.net.pendingRequests]) { sim.commands.decide(req.id, approve); approve = !approve; answered++; }
     }

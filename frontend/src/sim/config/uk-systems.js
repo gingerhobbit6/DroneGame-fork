@@ -107,9 +107,9 @@ export const UK_SYSTEMS = {
   missile_rr: {
     product: 'Thales Rapid Ranger (LMM)', variantOf: 'missile', size: 'M', name: 'Rapid Ranger', short: 'RRG', model: 'missile', cost: 1500000, shotCost: 150000, color: 0xf50057, role: 'effector', kind: 'missile', published: 7000, muzzleY: 2.2, fire: 'guided',
     health: 30, signature: 0.2, emits: [],
-    engagePolicy: 'fixed-wing',
+    engagePolicy: 'fixed-wing', beamRider: true, // it rides a laser beam its launcher holds on the target, so the launcher must see it (site-range.js)
     pk: 0.98, damage: 70, splash: 30, fuze: 30, cooldown: 3, missileSpeed: 400, magazine: 4, storage: 8, reloadTime: 60, minRange: 300,
-    desc: 'British four-round launcher firing the LMM Martlet, the same missile as the RAF’s Rapid Sentry. It has shot down Shahed-type drones in Ukraine. The fusion node saves it for fixed-wing tracks.',
+    desc: 'British four-round launcher firing the LMM Martlet, the same missile as the RAF’s Rapid Sentry. It has shot down Shahed-type drones in Ukraine. The fusion node saves it for fixed-wing tracks. Its missile rides a laser beam, so the launcher must keep the target in sight.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Laser beam-riding'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Vehicle-mounted very short range air defence',
@@ -134,9 +134,9 @@ export const UK_SYSTEMS = {
   missile_hvm: {
     product: 'Stormer HVM (Starstreak)', variantOf: 'missile', size: 'M', name: 'Stormer HVM', short: 'HVM', model: 'missile', cost: 3000000, shotCost: 150000, color: 0xd500f9, role: 'effector', kind: 'missile', published: 7000, muzzleY: 2.2, fire: 'guided',
     health: 30, armour: 2, signature: 0.2, emits: [],
-    engagePolicy: 'fixed-wing',
+    engagePolicy: 'fixed-wing', beamRider: true, // as the Rapid Ranger: Starstreak's darts ride a laser beam held on the target
     pk: 0.98, damage: 100, splash: 30, fuze: 30, cooldown: 3, missileSpeed: 400, magazine: 8, storage: 8, reloadTime: 120, minRange: 300,
-    desc: 'British Army armoured launcher with eight Starstreak missiles, among the fastest short-range missiles in service. The fusion node saves it for fixed-wing tracks.',
+    desc: 'British Army armoured launcher with eight Starstreak missiles, among the fastest short-range missiles in service. The fusion node saves it for fixed-wing tracks. Its darts ride a laser beam, so the launcher must keep the target in sight.',
     sapient: { nodeType: 'NODE_TYPE_KINETIC', subType: ['Missile', 'Laser beam-riding'], scan: 'SCAN_TYPE_STEERABLE' },
     ref: {
       class: 'Armoured close air defence vehicle',

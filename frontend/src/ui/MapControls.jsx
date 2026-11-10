@@ -64,9 +64,11 @@ function Credits({ geo, source, here }) {
     credits.heights, // heights from another source, which its licence asks to credit whatever is shown
     credits.names, // names from another source past a border, likewise
   ];
+  // The data licences ask for these credits with the map, so they fold behind a © rather than going: the grid reference stays in view.
   return createPortal( // always on screen, outside any panel
     <div id="map-credit" className="muted map-note">
-      {here && <b id="map-here">{here}. </b>}{parts.filter(Boolean).join('. ')}. Masts are notional.
+      {here && <b id="map-here">{here}</b>}
+      <details id="map-sources"><summary title="Data sources and licences" aria-label="Data sources and licences">©</summary>{parts.filter(Boolean).join('. ')}. Masts are notional.</details>
     </div>,
     document.body,
   );
@@ -219,7 +221,7 @@ export function MapControls() {
                 <button key={key} id={`map-overlay-${key}`} className={`map-chip${view[key] || forced(key) ? ' on' : ''}`} aria-pressed={view[key] || forced(key)} disabled={forced(key)} title={forced(key) ? 'Part of this map' : about} onClick={() => game.setViewOption(key, !view[key])}>{label}</button>
               ))}
               {gridChoices(isEstonian(geo.n0)).map(([id, label, about]) => (
-                <button key={id} id={`map-grid-${id}`} className={`map-chip${view.mapGrid === id ? ' on' : ''}`} aria-pressed={view.mapGrid === id} title={`${about}. G steps through the grids`} onClick={() => game.setViewOption('mapGrid', view.mapGrid === id ? false : id)}>{label}</button>
+                <button key={id} id={`map-grid-${id}`} className={`map-chip${view.mapGrid === id ? ' on' : ''}`} aria-pressed={view.mapGrid === id} title={`${about}. Click it again to hide the grid; G steps through the grids`} onClick={() => game.setViewOption('mapGrid', view.mapGrid === id ? false : id)}>{label}</button>
               ))}
             </div>
           )}

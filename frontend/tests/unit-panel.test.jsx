@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { createGame } from '../src/game.js';
 import { DRONES, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { reachFor } from '../src/sim/network/sensors.js';
+import { usesPath } from '../src/sim/site-range.js';
 import { pickStructure, selectionFrom } from '../src/render/placement.js';
 import { labelLift } from '../src/render/structure-view.js';
 import { view } from '../src/render/view.js';
@@ -211,7 +212,7 @@ describe('the panel', () => {
     const text = panel().textContent;
     expect(text).toContain('Fibre-optic strike dronecannot hear');
     expect(text).toContain('Fixed-wing strike dronecannot hear');
-    expect(text).toContain('Fixed-wing spotter drone5.5 km');
+    expect(text).toContain('Fixed-wing spotter drone15.1 km'); // heard on its 900 MHz control link, which carries 2.7 times as far
     expect(text).toContain('Bearing ±3°');
     expect(text).not.toContain('range ±');
   });
@@ -451,7 +452,7 @@ describe('the Range side', () => {
       pick(unit(id));
       openRange();
       const def = STRUCTURES[id];
-      if (def.fire === 'guided') expect($('#sr-guided').textContent).toContain(`${(def.range / 1000).toFixed(1)} km`);
+      if (!usesPath(def)) expect($('#sr-guided').textContent).toContain(`${(def.range / 1000).toFixed(1)} km`); // not a gun or a beam-rider, which must see
       else {
         expect(panel().textContent).toContain('in an open field. Here:');
         expect($('#sr-polar')).not.toBeNull();

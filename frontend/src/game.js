@@ -9,7 +9,7 @@ import { createSimulation, SIM_STEP } from './sim/simulation.js';
 import { onVehicle } from './sim/laydown.js';
 import { createGameView } from './render/game-view.js';
 import { hereU } from './sim/units.js';
-import { PLACING_PICK_PX, createPlacement, pickStructure, selectionFrom, slideToShow } from './render/placement.js';
+import { PLACING_PICK_PX, createPlacement, pickDrone, pickStructure, selectionFrom, slideToShow } from './render/placement.js';
 import { createReplay } from './render/replay-view.js';
 import { view } from './render/view.js';
 import { createApi } from './api/client.js';
@@ -177,6 +177,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   // The system the Unit panel shows. It is view state, not a command, so it is not logged and cannot change a run.
   function select(s) { view.selected = s; bump(); }
   function lookFrom(s) { view.eye = s ?? null; bump(); } // the ground view from this system's mast, or back to the map
+  function selectDrone(d) { view.drone = d; if (!d) view.follow = false; bump(); } // view state too
   function getSelected() { // sold or destroyed systems drop out of the list
     if (view.selected && !sim.structures.includes(view.selected)) view.selected = null;
     return view.selected;
@@ -191,10 +192,13 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (s) commands.sell(s.pos.x, s.pos.z);
       return !!s;
     }
+    const drone = !tool && view.truth && view.replayT == null && pickDrone(sim.drones, gameView.camera, x, y); // drones are drawn only with the truth overlay
+    if (drone) { selectDrone(drone); return true; }
     const chosen = selectionFrom(tool, tagged, tool ? () => pickStructure(sim.structures, gameView.camera, x, y, innerWidth, innerHeight, PLACING_PICK_PX) : pick);
     if (chosen === undefined) return false;
     selectHinted = true;
     select(chosen);
+    if (!chosen) selectDrone(null); // a click on empty ground closes both panels
     return true;
   }
   // If this ground point is hidden behind a panel or off the screen, slide the camera so it appears at (px, py) instead.
@@ -236,6 +240,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   // is left (which can set the speed) before the speed is set for the new run.
   sim.on('reset', ({ kept, begin, loading }) => {
     view.selected = rebuilt(view.selected); view.eye = rebuilt(view.eye); // the ground view stays on its system too
+    view.drone = null; view.follow = false;
     if (replay) replay.reset();
     if (gameView) gameView.clear();
     simAcc = 0; pausedForApproval = false;
@@ -260,6 +265,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       while (simAcc >= SIM_STEP && n < 400 && !state.over) { sim.step(); simAcc -= SIM_STEP; n++; }
       if (n >= 400) simAcc = 0;
     }
+    gameView.labels.beginFrame();
     gameView.update(real);
     for (const fn of frameListeners) fn(real);
     replay.update(real, gameView.camera);
@@ -289,7 +295,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   return {
     packs, loadPack, ensureWorld, mapSource, cursor: () => placement?.cursor() ?? null,
     sim, commands, clock, setSpeed, reviewClock, subscribe, getTick, bump, attach, debug, api, saver, storage, pageClosing,
-    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, placeSystem, lastRefusal: () => refusal, select, getSelected, lookFrom, reveal,
+    getTool: tools.get, toolVehicle: tools.vehicle, setTool, toolChoice: tools.choice, cycleTool, loadoutFor, setLoadout, usePackLoadouts, placeSystem, lastRefusal: () => refusal, select, getSelected, selectDrone, lookFrom, reveal,
     catalogue: tools.catalogue, openCatalogue: tools.openCatalogue, pickFromTray: tools.pickFromTray, startDrag: tools.startDrag, endDrag: tools.endDrag, dropAt,
     toast, onToast(fn) { toastListeners.add(fn); return () => toastListeners.delete(fn); },
     onFrame(fn) { frameListeners.add(fn); return () => frameListeners.delete(fn); },
@@ -301,6 +307,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
       if (key === 'zone' && sim.designLocked()) { toast(ZONE_LOCKED); return; }
       if (key === 'zone' && value && sim.getPatrol()) { toast(PATROL_FIRST); return; }
       view[key] = value;
+      if (key === 'truth' && !value) { view.drone = null; view.follow = false; }
       if (key === 'zone') syncZone();
       if (key === 'rings' && gameView) gameView.structures.setRingsVisible(value);
       if (key === 'planView' && gameView) gameView.viewFromAbove(value);
@@ -320,7 +327,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     // Back to the start screen, to choose another world. A point makes it open on that place.
     leaveWorld(point = null) {
       tools.openCatalogue(null, false);
-      Object.assign(view, { startAt: point, zone: null, route: null, me: null, selected: null, mapPanel: false, planView: false });
+      Object.assign(view, { startAt: point, zone: null, route: null, me: null, selected: null, drone: null, follow: false, mapPanel: false, planView: false });
       if (gameView) gameView.viewFromAbove(false);
       commands.leave();
     },

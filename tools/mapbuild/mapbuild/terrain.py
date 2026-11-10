@@ -29,6 +29,9 @@ SERVICES = {
 }
 SQUARE_M = 1000
 MAX_WCS_BYTES = 32_000_000
+ANSWER_S = 10  # good answers start within 2 s; in November 2026 about a third of requests hung with no answer, and asking again worked
+GIVE_UP_S = 900  # per request: an outage this long stops the build
+SQUARES_AT_ONCE = 8  # requests in flight, which hides the hung ones
 POSTS_PER_SQUARE = SQUARE_M // CELL + 1
 TALL_M = 5  # cover at least this tall counts as trees
 MIN_BUILDING_SHARE = 0.1  # of a cell, before a footprint makes the cell solid
@@ -103,18 +106,20 @@ def fetch_square(service: tuple[str, str], east: int, north: int) -> np.ndarray:
     url, coverage = service
     query = [("service", "WCS"), ("version", "2.0.1"), ("request", "GetCoverage"), ("CoverageId", coverage), ("format", "image/tiff"),
              ("subset", f"E({east},{east + SQUARE_M})"), ("subset", f"N({north},{north + SQUARE_M})"), ("geotiff:compression", "DEFLATE")]
-    wait = 5
-    for attempt in range(6):
+    give_up, wait, failures = time.time() + GIVE_UP_S, 2, 0
+    while True:
         try:
-            with urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(query)}", timeout=120) as reply:
+            with urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(query)}", timeout=ANSWER_S) as reply:
                 return read_square(read_capped(reply, MAX_WCS_BYTES, "lidar answer"), east, north)  # damaged answers are fetched again
         except (OSError, ValueError, urllib.error.URLError, Exception) as problem:  # noqa: B014 - rasterio raises its own errors
-            if attempt >= 2 and getattr(problem, "code", None) == 500:
+            failures += 1
+            if failures >= 3 and getattr(problem, "code", None) == 500:
                 return np.full((SQUARE_M, SQUARE_M), np.nan, "float32")  # some all-sea squares always fail
+            if time.time() + wait > give_up:
+                raise SystemExit(f"gave up fetching lidar at {east},{north}") from problem
             print(f"  retrying {east},{north}: {str(problem)[:100]}", file=sys.stderr)
             time.sleep(wait)
-            wait *= 2
-    raise SystemExit(f"gave up fetching lidar at {east},{north}")
+            wait = min(wait * 2, 30)
 
 
 def reduce_square(dtm: np.ndarray, dsm: np.ndarray, houses: np.ndarray) -> dict[str, np.ndarray]:
@@ -139,30 +144,32 @@ def reduce_square(dtm: np.ndarray, dsm: np.ndarray, houses: np.ndarray) -> dict[
     return out
 
 
+def lidar_square(east: int, north: int, tree: STRtree, buildings) -> dict[str, np.ndarray]:
+    dtm, dsm = (fetch_square(SERVICES[name], east, north) for name in ("dtm", "dsm"))
+    near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
+    houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
+    if len(near):
+        rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
+    return reduce_square(dtm, dsm, houses.astype(bool))
+
+
 def lidar(window: Window, half: int, buildings, say) -> dict[str, np.ndarray]:
     """20 m results across the window's posts, for the central part reaching `half` metres from the middle. NaN elsewhere."""
     grids = {k: np.full((window.side, window.side), np.nan, "float32") for k in ("ground", "tall", "houses")}
     tree = STRtree(buildings)
     west, top = window.east - half, window.north + half
     count = 2 * half // SQUARE_M
-    began, done = time.time(), 0
-    with ThreadPoolExecutor(2) as pool:
-        for row in range(count):
-            for col in range(count):
-                east, north = west + col * SQUARE_M, top - (row + 1) * SQUARE_M
-                dtm, dsm = pool.map(lambda s: fetch_square(SERVICES[s], east, north), SERVICES)
-                near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
-                houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
-                if len(near):
-                    rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
-                reduced = reduce_square(dtm, dsm, houses.astype(bool))
-                r0, c0 = (window.top - (north + SQUARE_M)) // CELL, (east - window.west) // CELL
-                for name, values in reduced.items():
-                    target = grids[name][r0:r0 + POSTS_PER_SQUARE, c0:c0 + POSTS_PER_SQUARE]
-                    target[np.isnan(target)] = values[np.isnan(target)]  # the first square to reach a shared edge post keeps it
-                done += 1
-                if done % 20 == 0:
-                    say(f"lidar {done}/{count * count} squares, {(time.time() - began) / done:.1f} s each")
+    corners = [(west + col * SQUARE_M, top - (row + 1) * SQUARE_M) for row in range(count) for col in range(count)]
+    began = time.time()
+    with ThreadPoolExecutor(SQUARES_AT_ONCE) as pool:
+        squares = pool.map(lambda corner: lidar_square(*corner, tree, buildings), corners)  # answers come back in order; a failure cancels the rest
+        for done, ((east, north), reduced) in enumerate(zip(corners, squares), 1):
+            r0, c0 = (window.top - (north + SQUARE_M)) // CELL, (east - window.west) // CELL
+            for name, values in reduced.items():
+                target = grids[name][r0:r0 + POSTS_PER_SQUARE, c0:c0 + POSTS_PER_SQUARE]
+                target[np.isnan(target)] = values[np.isnan(target)]  # the first square to reach a shared edge post keeps it
+            if done % 20 == 0:
+                say(f"lidar {done}/{count * count} squares, {(time.time() - began) / done:.1f} s each")
     return grids
 
 

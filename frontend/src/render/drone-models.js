@@ -10,9 +10,10 @@ import { VIEW_HEIGHT, view } from './view.js';
 
 // Scene units per metre. Close up a drone is drawn at true size. Farther out a 2.5 m Shahed's span keeps WORLD.droneOnScreen
 // of the screen's height, other spans growing with the 0.4 power of the real one so a 20 m Wing Loong reads bigger without
-// shrinking a 0.3 m quadcopter out of sight, up to the size it has zoomed right out.
+// shrinking a 0.3 m quadcopter out of sight. With map symbols on it stops growing where its symbol takes over; with them off it
+// keeps its size on the screen at every zoom, as nothing else would show it.
 export const drawScale = (def, zoom = view.zoom) => clamp((WORLD.droneOnScreen * VIEW_HEIGHT * zoom * (def.size / 2.5) ** 0.4) / def.size,
-  1 / WORLD.metresPerUnit, WORLD.droneVisualScale * 3 * def.size ** -0.6);
+  1 / WORLD.metresPerUnit, view.symbols ? WORLD.droneVisualScale * 3 * def.size ** -0.6 : Infinity);
 
 // Builds a model from simple parts, each given the name of its material; finish() merges them into one mesh per material.
 export function kit() {

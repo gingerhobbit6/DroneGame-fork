@@ -145,14 +145,18 @@ function paintRoads(f, features, data) {
   g.globalAlpha = 1;
 }
 
-function paintNames(f, features, data) {
-  const { g } = f, { atX, atZ } = packToFrame(f, data);
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 7; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.fillStyle = '#fff';
-  for (const [text, kind, height, x, z] of features.names || []) {
-    const big = height === 'Large' ? 54 : height === 'Medium' ? 38 : 0;
-    if (!big || kind === 'Landform') continue;
-    g.font = `600 ${big}px system-ui`; // canvas text, never HTML: names come from the pack file
-    g.strokeText(String(text), atX(x), atZ(z)); g.fillText(String(text), atX(x), atZ(z));
+// Place names, larger places first, skipping any that would overlap one drawn. At about 13 m a canvas pixel, 24 px is letters 300 m tall.
+const NAME_PX = { Large: 24, Medium: 17 };
+export function paintNames(f, features, data) {
+  const { g } = f, { atX, atZ } = packToFrame(f, data), kept = [];
+  const names = (features.names || []).filter(([, kind, height]) => NAME_PX[height] && kind !== 'Landform').sort((a, b) => NAME_PX[b[2]] - NAME_PX[a[2]]);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.lineJoin = 'round'; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.fillStyle = '#fff';
+  for (const [text, , height, x, z] of names) {
+    const size = NAME_PX[height], name = String(text), cx = atX(x), cy = atZ(z);
+    g.font = `600 ${size}px system-ui`; // canvas text, never HTML: names come from the pack file
+    const w = g.measureText(name).width / 2 + 4, h = size / 2 + 2, box = [cx - w, cy - h, cx + w, cy + h];
+    if (kept.some((k) => box[0] < k[2] && box[2] > k[0] && box[1] < k[3] && box[3] > k[1])) continue;
+    kept.push(box); g.strokeText(name, cx, cy); g.fillText(name, cx, cy);
   }
   g.textAlign = 'start'; g.textBaseline = 'alphabetic';
 }
@@ -171,7 +175,7 @@ function paintContours(f, lines, data, baseMap, withLabels) {
   stroke(lines.minor, 5, onPhoto ? 'rgba(255,240,190,0.5)' : 'rgba(120,75,35,0.55)');
   stroke(lines.index, 11, onPhoto ? 'rgba(255,240,190,0.9)' : 'rgba(105,60,25,0.9)');
   if (!withLabels) return;
-  g.font = '600 30px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.font = '600 18px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
   for (const { level, x, z, angle } of lines.labels) {
     g.save();
     g.translate(ax(x), az(z)); g.rotate(angle);
@@ -197,22 +201,22 @@ export function paintBeyond(f, data, rings, topo) {
 }
 
 function gridLabel(g, text, x, y) {
-  g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.fillStyle = '#0b3ea8';
+  g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.fillStyle = '#0b3ea8';
   g.strokeText(text, x, y); g.fillText(text, x, y);
 }
 const kmDigits = (v) => String(Math.floor(v / 1000) % 100).padStart(2, '0');
 
 function paintGrid({ g, west, top, span, size, px }) {
   const label = (text, x, y) => gridLabel(g, text, x, y);
-  g.font = '600 26px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
+  g.font = '600 16px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
   for (let e = Math.ceil(west / 1000) * 1000; e <= west + span; e += 1000) {
-    g.strokeStyle = 'rgba(30,110,255,0.75)'; g.lineWidth = e % 10000 ? 2 : 4;
+    g.strokeStyle = 'rgba(30,110,255,0.45)'; g.lineWidth = e % 10000 ? 1.5 : 3;
     g.beginPath(); g.moveTo(px(e - west), 0); g.lineTo(px(e - west), size); g.stroke();
     const n = Math.ceil((top - span) / 1000) * 1000 + 1000;
     for (let v = n; v < top; v += 5000) label(kmDigits(e), px(e - west) + 6, px(top - v));
   }
   for (let n = Math.ceil((top - span) / 1000) * 1000; n <= top; n += 1000) {
-    g.strokeStyle = 'rgba(30,110,255,0.75)'; g.lineWidth = n % 10000 ? 2 : 4;
+    g.strokeStyle = 'rgba(30,110,255,0.45)'; g.lineWidth = n % 10000 ? 1.5 : 3;
     g.beginPath(); g.moveTo(0, px(top - n)); g.lineTo(size, px(top - n)); g.stroke();
     for (let v = Math.ceil(west / 1000) * 1000 + 1000; v < west + span; v += 5000) label(kmDigits(n), px(v - west) + 6, px(top - n) - 2);
   }
@@ -234,13 +238,13 @@ function paintMgrs({ g, west, top, span, px }, data) {
   }
   const along = (from, to) => { const list = []; for (let v = from; v < to; v += STEP) list.push(v); return [...list, to]; };
   const line = (points) => { g.beginPath(); points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
-  g.strokeStyle = 'rgba(30,110,255,0.75)';
-  for (let e = e0; e <= e1; e += 1000) { g.lineWidth = e % 10000 ? 2 : 4; line(along(n0, n1).map((n) => at(e, n))); }
-  for (let n = n0; n <= n1; n += 1000) { g.lineWidth = n % 10000 ? 2 : 4; line(along(e0, e1).map((e) => at(e, n))); }
-  g.font = '600 26px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
+  g.strokeStyle = 'rgba(30,110,255,0.45)'; // faint enough to read the map through, as on a printed one
+  for (let e = e0; e <= e1; e += 1000) { g.lineWidth = e % 10000 ? 1.5 : 3; line(along(n0, n1).map((n) => at(e, n))); }
+  for (let n = n0; n <= n1; n += 1000) { g.lineWidth = n % 10000 ? 1.5 : 3; line(along(e0, e1).map((e) => at(e, n))); }
+  g.font = '600 16px system-ui'; g.textBaseline = 'bottom'; g.lineJoin = 'round';
   for (let e = e0; e <= e1; e += 1000) for (let v = Math.ceil(n0 / 5000) * 5000; v < n1; v += 5000) { const [x, y] = at(e, v); gridLabel(g, kmDigits(e), x + 6, y); }
   for (let n = n0; n <= n1; n += 1000) for (let v = Math.ceil(e0 / 5000) * 5000 + 2000; v < e1; v += 5000) { const [x, y] = at(v, n); gridLabel(g, kmDigits(n), x + 6, y - 2); }
-  g.font = '700 44px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '700 28px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let sx = Math.floor(e0 / 100000) * 100000; sx < e1; sx += 100000) {
     for (let sy = Math.floor(n0 / 100000) * 100000; sy < n1; sy += 100000) {
       const e = (Math.max(sx, e0) + Math.min(sx + 100000, e1)) / 2, n = (Math.max(sy, n0) + Math.min(sy + 100000, n1)) / 2, [x, y] = at(e, n);

@@ -13,7 +13,7 @@ What is still open now the rebuild to React, FastAPI and SQLite is on `main`. De
 
 ## Now there is a remote
 
-- [ ] Add CI: both test suites, the map builder's tests, the reference digests, the build, `npm audit` and `pip-audit`. There are no workflows yet.
+- [x] Add CI: frontend coverage and reference digests, backend coverage, map builder tests, production build, dependency audits and secret scanning. Workflows are in `.github/workflows/`; see [CI.md](CI.md) for private-repository limits and the remaining GitHub setup.
 
 ## Planned features
 

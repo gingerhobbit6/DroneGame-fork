@@ -14,6 +14,8 @@ import { view } from '../render/view.js';
 import { accuracyText, locateMe } from './locate.js';
 
 const OUTSIDE = 'outside Great Britain and Estonia, which these maps cover so far.';
+// Said after a location is found, as the map has just gone blank but for any map pack there.
+const PRIVATE = 'No live map is on, so no map server has seen where you are. To see the area, choose Street or Satellite above the map, which shares it with that provider.';
 const covers = (entry, e, n) => Math.abs(e - entry.east) <= entry.half - WORLD.radius && Math.abs(n - entry.north) <= entry.half - WORLD.radius;
 const inside = (entry, e, n) => Math.abs(e - entry.east) <= entry.half && Math.abs(n - entry.north) <= entry.half;
 const clamp = (v, middle, room) => Math.min(Math.max(v, middle - room), middle + room);
@@ -109,7 +111,7 @@ export function WorldPicker({ wantReal, onWantReal, onWorld, guiding, onStopGuid
       const fix = await locateMe();
       setPrivateLocationRequest((n) => n + 1); // remove live tiles before moving the map to this position
       if (!onGrid(fix.e, fix.n)) { showElsewhere(fix, `You appear to be ${OUTSIDE}`); return; }
-      await goTo(fix, `Your location, ${accuracyText(fix.accuracy)}.`, null, true);
+      await goTo(fix, `Your location, ${accuracyText(fix.accuracy)}. ${PRIVATE}`, null, true);
     } catch (e) { setNote(e.message); }
   };
   const goTyped = (e) => {

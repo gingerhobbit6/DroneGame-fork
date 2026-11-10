@@ -174,7 +174,7 @@ describe('approvals', () => {
     game.sim.state.warnedWire = true;
     game.sim.commands.startWave();
     game.setSpeed(2);
-    for (let i = 0; i < 6000 && !game.sim.net.pendingRequests.length; i++) game.sim.step();
+    for (let i = 0; i < 9000 && !game.sim.net.pendingRequests.length; i++) game.sim.step(); // the first request comes about 310 s in
     expect(game.clock.speed).toBe(0);
     refresh();
     expect($('#approval').className).not.toContain('hidden');

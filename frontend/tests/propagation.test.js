@@ -60,6 +60,13 @@ describe('a path over the ground', () => {
     expect(pathLoss(high, on(9), to, 5.8).loss).toBeGreaterThan(atHigh);
   });
 
+  it('does not step over a wall one cell wide on a long path', () => {
+    // 4 km is 200 cells. With 64 points the path was looked at every 62.5 m, at 1,000 m and 1,062 m, and missed the cell between them.
+    const w = worldWith();
+    for (let j = 0; j < N; j++) w.ground[j * N + Math.round((1020 + R) / cell)] = 100;
+    expect(pathLoss(w, on(9), { x: 4000, y: 20, z: 0 }, 2.4).loss).toBeGreaterThan(20);
+  });
+
   it('is eased by a taller mast', () => {
     const w = worldWith({ ridge: { x: 1000, h: 30 } }), to = { x: 3000, y: 20, z: 0 };
     expect(pathLoss(w, on(40), to, 2.4).loss).toBeLessThan(pathLoss(w, on(5), to, 2.4).loss);

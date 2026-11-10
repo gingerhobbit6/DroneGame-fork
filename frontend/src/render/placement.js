@@ -45,6 +45,20 @@ export function pickStructure(structures, camera, px, py, width = innerWidth, he
   return best;
 }
 
+const DRONE_PICK_PX = 20; // a drone's map symbol is 36 pixels across
+
+// The drone whose position on the screen is nearest a point, or null if none is within the tolerance.
+export function pickDrone(drones, camera, px, py, width = innerWidth, height = innerHeight, tolerance = DRONE_PICK_PX) {
+  let best = null, bd = tolerance;
+  for (const d of drones) {
+    _base.copy(d.pos).project(camera);
+    if (_base.z >= 1) continue; // behind the camera
+    const dist = Math.hypot(px - ((_base.x + 1) / 2) * width, py - ((1 - _base.y) / 2) * height);
+    if (dist < bd) { bd = dist; best = d; }
+  }
+  return best;
+}
+
 // What a left click selects, with null clearing the selection, or undefined if the click belongs to the tool. A system beats a
 // placement tool: the ground behind a model can be far enough away to buy a second one. A click never selects with the Sell or zone tool.
 export function selectionFrom(tool, tagged, pick) {

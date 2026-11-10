@@ -147,6 +147,15 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) flight.t = 1;
   }
   controls.addEventListener('start', () => { flight = null; }); // the player has taken over
+  // Keep the followed drone in the middle of the view: the camera keeps its angle and distance, and catches up smoothly.
+  const _shift = new THREE.Vector3();
+  function follow(real) {
+    const d = view.drone;
+    if (!view.truth || !view.follow || !d || d.dead || view.eye) return;
+    flight = null;
+    _shift.subVectors(d.pos, controls.target).multiplyScalar(1 - Math.exp(-real * 6));
+    controls.target.add(_shift); camera.position.add(_shift);
+  }
   function fly(real) {
     if (!flight) return;
     flight.t = Math.min(flight.t + real / FLIGHT_SECONDS, 1);
@@ -214,6 +223,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     showMe();
     for (const m of worldView.scenery) m.visible = view.scenery || !terrainState.data.geo; // the switch is only offered on a real map
     fly(real);
+    follow(real);
     flash = Math.max(0, flash - real);
     siteMat.emissiveIntensity = flash > 0 ? flash * 1.5 : 0;
     siteRing.mesh.material.opacity = flash > 0 ? 1 : siteOpacity; // a real site has no station to light up
@@ -237,6 +247,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
       // the haze starts beyond what the camera is looking at, so zoomed right out the map stays clear and only the horizon fades
       scene.fog.near = Math.max(fogBase[0], view.zoom * 1.25); scene.fog.far = scene.fog.near + fogBase[1] - fogBase[0];
       shade();
+      labels.declutter();
       renderer.render(scene, camera);
     },
     start(frame) { renderer.setAnimationLoop(frame); },

@@ -10,9 +10,10 @@ import { VIEW_HEIGHT, view } from './view.js';
 const { PI } = Math;
 
 // Scene units per model unit. Close up a system is true size; farther out its height (taken as 3 units) keeps
-// WORLD.systemOnScreen of the screen, up to STRUCT_SCALE zoomed right out. modelScale makes a large or small product bigger or smaller.
+// WORLD.systemOnScreen of the screen: with map symbols on, up to STRUCT_SCALE, where its symbol takes over; with them off, at every
+// zoom, as nothing else would show it. modelScale makes a large or small product bigger or smaller.
 export const TRUE_UNIT = SYSTEM_UNIT_M / WORLD.metresPerUnit;
-export const drawnUnit = (zoom = view.zoom) => clamp((WORLD.systemOnScreen * VIEW_HEIGHT * zoom) / 3, TRUE_UNIT, STRUCT_SCALE);
+export const drawnUnit = (zoom = view.zoom) => clamp((WORLD.systemOnScreen * VIEW_HEIGHT * zoom) / 3, TRUE_UNIT, view.symbols ? STRUCT_SCALE : Infinity);
 export const MAX_K = STRUCT_SCALE / TRUE_UNIT; // the most a system is drawn larger than life
 
 // body is the product's own paint and drab its vehicle's, cases' and boxes' (paint.js), matt; glass is a laser's dark window, which glints.

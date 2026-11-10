@@ -3,6 +3,9 @@ import { cleanSeed, createGame } from './game.js';
 import { parseWorldId } from './sim/world-pack.js';
 import { Root } from './ui/account/Root.jsx';
 import './style.css';
+import './ui/unit-panels.css';
+import './ui/assistant/wizard.css';
+import './ui/map-panels.css';
 import './ui/catalogue.css';
 
 // The scenario seed fixes every chance event: wave contents, sensor noise, message IDs. The terrain seed is separate, so you

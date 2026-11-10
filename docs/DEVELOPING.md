@@ -71,13 +71,13 @@ Useful while developing:
 
 | Suite | Runner | Files | Coverage gate |
 |---|---|---|---|
-| Frontend | Vitest, in Node, or jsdom for files that start with `// @vitest-environment jsdom` | 78 in [`frontend/tests/`](../frontend/tests/) | Statements 90%, branches 80%, functions 90%, lines 90%, over `game.js`, `api/`, `sim/` and `ui/` ([`vitest.config.js:12`](../frontend/vitest.config.js#L12)). `render/` is left out, because it draws through WebGL |
-| Backend | pytest, pytest-cov and FastAPI's test client | 8 in [`backend/tests/`](../backend/tests/) | 90%, with branch coverage, and the run fails below it ([`pyproject.toml:19`](../backend/pyproject.toml#L19)) |
-| Map builder | pytest | 3 in [`tools/mapbuild/tests/`](../tools/mapbuild/tests/) | None set |
+| Frontend | Vitest, in Node, or jsdom for files that start with `// @vitest-environment jsdom` | [`frontend/tests/`](../frontend/tests/) | Statements 90%, branches 80%, functions 90%, lines 90%, over `game.js`, `api/`, `sim/` and `ui/` ([`vitest.config.js:12`](../frontend/vitest.config.js#L12)). `render/` is left out of coverage, but label lifecycle, model and symbol behaviour have unit tests |
+| Backend | pytest, pytest-cov and FastAPI's test client | [`backend/tests/`](../backend/tests/) | 90%, with branch coverage, and the run fails below it ([`pyproject.toml:19`](../backend/pyproject.toml#L19)) |
+| Map builder | pytest | [`tools/mapbuild/tests/`](../tools/mapbuild/tests/) | None set |
 
 ### Frontend, gently
 
-Many frontend test files build a generated world 54 km across before their tests, which takes seconds and a lot of memory. The test and hook timeouts were raised to 60 s for this reason ([`vitest.config.js:7`](../frontend/vitest.config.js#L7)), and many files building worlds side by side multiply the memory used. Run one file at a time where you can, with more heap and one worker. From `frontend/`, in a POSIX shell:
+Many frontend test files build a generated world 54 km across before their tests, which takes seconds and a lot of memory. Tests and setup hooks both allow 180 s: under precise V8 coverage on GitHub's runners a test that builds two worlds took 96 s, and many others 45 to 57 s ([`vitest.config.js:7`](../frontend/vitest.config.js#L7)), after a measured setup reached about 130 s. UI-only fixtures that do not assert terrain extent can use a small real world and restore `WORLD.radius` afterwards, as the drone panel and frame tests do. Many files building worlds side by side multiply the memory used. Run one file at a time where you can, with more heap and one worker. From `frontend/`, in a POSIX shell:
 
 ```bash
 export NODE_OPTIONS=--max-old-space-size=4096
@@ -117,6 +117,10 @@ uv --directory tools/mapbuild run pytest
 ```
 
 These tests use small made-up inputs and download nothing.
+
+### Continuous integration
+
+[CI.md](CI.md) describes the workflows, dependency audits, secret scan and update proposals. CI runs the full frontend coverage suite, including the reference digests, with one worker; it also builds the frontend and checks both Python suites. New workflows have been validated locally and still need their first GitHub run after push. Required-check rules and private-repository CodeQL eligibility are configured in GitHub, not by these files.
 
 ## Reference digests
 
@@ -241,6 +245,7 @@ A new kind of system, fire mode or generic drone type reaches much further than 
 ## Other tools
 
 - `npm --prefix frontend run balance` plays several laydowns on several seeds in Node and prints how far each got ([`tools/balance.js`](../frontend/tools/balance.js)). It is heavy: run it alone.
+- `npm --prefix frontend run measure` plays the five reference runs and three more seeds of the mixed laydown, watches the fusion node's picture and tasking at every step, and prints the tables of [FUSION_AND_TARGETING.md](FUSION_AND_TARGETING.md#measured-performance) ([`tools/measure-fusion.js`](../frontend/tools/measure-fusion.js)). It stops if a reference run does not end on its recorded digest. Run it after recording digests again, and copy the new figures into that page.
 - `npm --prefix frontend run models -- [folder]` saves every drone model as a `.glb` file, by default to `frontend/models/`, which git ignores ([`tools/export-drone-models.js`](../frontend/tools/export-drone-models.js)).
 
 ## Limits and simplifications
@@ -249,9 +254,8 @@ These are the tooling gaps as of 2026-11-09, checked by searching the repository
 
 - **No JavaScript linter or formatter.** There is no ESLint or Prettier configuration, and neither is installed, yet eight files carry `eslint-disable` comments: `game.js`, `ui/hooks.js`, `ui/MapControls.jsx`, `ui/SiteMap.jsx`, `ui/SiteStatus.jsx`, `ui/WorldPicker.jsx`, `ui/account/ProfileHub.jsx` and `ui/assistant/Wizard.jsx`. Those comments do nothing today.
 - **No Python linter or type checker.** Neither `pyproject.toml` configures ruff, flake8, black, mypy or pyright, and there are no separate configuration files for them.
-- **No continuous integration.** There is no `.github` folder, so nothing runs the tests on a push or pull request. Run them by hand before committing.
 - **No automated browser test.** `render/` is outside the coverage measure and is checked by hand.
-- **The 350-line check covers `frontend/src` only.** It does not look at CSS ([`style.css`](../frontend/src/style.css) has 444 lines), at Python, or at tests, several of which are longer: `real-world-ui.test.jsx` (576), `tools/mapbuild/tests/test_mapbuild.py` (551), `unit-panel.test.jsx` (506), `unit-config.test.jsx` (406), `account.test.jsx` (366) and `backend/tests/test_api.py` (352). Every Python source file is within it.
+- **The 350-line check covers JavaScript under `frontend/src` only.** It does not look at CSS, Python or tests. The former 446-line stylesheet is now split into the 274-line `style.css`, `ui/unit-panels.css`, `ui/assistant/wizard.css` and `ui/map-panels.css`, imported in the original cascade order. Several older test files exceed 350 lines.
 - **The map builder's tests have no coverage gate.**
 - **No gentle test script.** The memory-safe frontend command above is not an npm script.
 

@@ -153,8 +153,13 @@ function moveSpotter(w, d, spd, dt) {
 function holdOff(w, d, tgt, hrem, spd, dt) {
   d.holdT = (d.holdT || 0) + dt;
   if (d.holdT > PATROL.enemy.holdTime) return escape(w, d, 'gave up waiting for a fix');
-  let dx = (tgt.x - d.pos.x) / hrem, dz = (tgt.z - d.pos.z) / hrem;
-  if (hrem < u(PATROL.enemy.holdRadius)) [dx, dz] = [-dz, dx]; // round, not in
+  let dx, dz;
+  if (hrem === 0) { // no radial direction at the centre: keep its heading without drawing a random number
+    dx = Math.sin(d.heading); dz = Math.cos(d.heading);
+  } else {
+    dx = (tgt.x - d.pos.x) / hrem; dz = (tgt.z - d.pos.z) / hrem;
+    if (hrem < u(PATROL.enemy.holdRadius)) [dx, dz] = [-dz, dx]; // round, not in
+  }
   d.pos.x += dx * spd; d.pos.z += dz * spd;
   d.pos.y = Math.max(d.pos.y, hereU(d.pos.x, d.pos.z) + u(d.def.minAgl || 30));
   return true;

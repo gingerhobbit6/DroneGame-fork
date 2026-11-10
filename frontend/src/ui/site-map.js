@@ -175,8 +175,10 @@ export function createSiteMap(container, { onPick, onChange = () => {}, storage 
       if (!point) return;
       const world = outline(square(point.e, point.n, WORLD.radius), { color: SITE, weight: 2, fillOpacity: 0.06 }).addTo(map);
       marks.push(world, L.circleMarker(onMap(point.e, point.n), { radius: 5, color: SITE, fillOpacity: 1, interactive: false }).addTo(map));
-      if (planned) marks.push(outline(square(Math.floor(point.e / 1000) * 1000, Math.floor(point.n / 1000) * 1000, BUILT_HALF), { color: SITE, weight: 1, dashArray: '6 5', fill: false }).addTo(map));
-      if (move && (map.getZoom() < CLOSE_ENOUGH || !map.getBounds().contains(world.getBounds()))) map.fitBounds(world.getBounds().pad(planned ? 1 : 0.5));
+      const plan = planned && outline(square(Math.floor(point.e / 1000) * 1000, Math.floor(point.n / 1000) * 1000, BUILT_HALF), { color: SITE, weight: 1, dashArray: '6 5', fill: false }).addTo(map);
+      if (plan) marks.push(plan);
+      // a planned map is fitted snugly: padding the world by its own width left the spot a speck in the middle of the country
+      if (move && (map.getZoom() < CLOSE_ENOUGH || !map.getBounds().contains(world.getBounds()))) map.fitBounds((plan || world).getBounds().pad(plan ? 0.15 : 0.5));
     },
     // Mark a spot these maps do not cover, { lat, lon }, leaving any start point as it is.
     markElsewhere(point) {

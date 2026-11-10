@@ -48,8 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fetch", action="store_true", help="download any files that are missing from --data")
     parser.add_argument("--no-satellite", action="store_true", help="leave out the satellite picture")
     args = parser.parse_args(argv)
-    if args.size % 2 or args.lidar_km % 2 or not WORLD_KM + 2 <= args.size <= 80 or args.lidar_km > args.size:
-        parser.error(f"--size must be even, from {WORLD_KM + 2} to 80, and --lidar-km must be even and no bigger than --size")
+    if args.size % 2 or args.lidar_km % 2 or not WORLD_KM + 2 <= args.size <= 80 or not 0 <= args.lidar_km <= args.size:
+        parser.error(f"--size must be even, from {WORLD_KM + 2} to 80, and --lidar-km must be even, non-negative and no bigger than --size")
 
     began = time.time()
     say = lambda text: print(f"[{time.time() - began:5.0f}s] {text}", flush=True)

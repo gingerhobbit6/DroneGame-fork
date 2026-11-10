@@ -75,6 +75,7 @@ describe('choosing a world', () => {
         expect($(`#map-type-${id}`).textContent).toContain('Not in this map pack');
       }
       expect($('#map-credit').textContent).toContain('OS credit');
+      expect($('#map-sources').open).toBe(false); // folded behind its ©, leaving the grid reference to read
       expect(nextBaseMap('live')).toBe('os');
       expect(nextBaseMap('dark')).toBe('topo'); // skips what this pack does not have
       expect(nextBaseMap('dark', { pictures: [{ layer: 'satellite' }] })).toBe('satellite');

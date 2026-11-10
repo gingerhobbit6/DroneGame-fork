@@ -1,13 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
 import { STRUCTURES } from '../src/sim/config/systems.js';
 import { bus } from '../src/sim/sapient.js';
 import { setUp } from './support/scenarios.js';
 
+let sim;
+beforeAll(() => { sim = createSimulation(); }); // full terrain construction uses the setup budget, not the assertion timeout
+
 // Every system in the catalogue joins the network with a registration the middleware accepts, declaring the commands it takes.
 describe('registrations', () => {
   it('are accepted for every system, and declare what each can be told to do', () => {
-    const sim = createSimulation();
     const ids = Object.keys(STRUCTURES);
     setUp(sim, { seed: '1', laydown: ids.map((id, i) => [id, Math.cos(i) * (300 + 20 * i), Math.sin(i) * (300 + 20 * i)]) });
     const regs = bus.entries.filter((e) => e.type === 'registration');

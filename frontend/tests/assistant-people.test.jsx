@@ -2,8 +2,9 @@
 // The wizard's optional people step: the same size and protection choices as the People tool, from inside the wizard.
 
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
+import { WORLD } from '../src/sim/config/index.js';
 import { view } from '../src/render/view.js';
 import { App } from '../src/ui/App.jsx';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
@@ -11,6 +12,11 @@ import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 let game;
 const $ = (sel) => document.querySelector(sel);
 const button = (text) => [...document.querySelectorAll('#wizard button')].find((b) => b.textContent.includes(text));
+
+// These controls do not depend on terrain extent. A small real world keeps setup within the timeout under V8 coverage too.
+const radius = WORLD.radius;
+beforeAll(() => { WORLD.radius = 3000; });
+afterAll(() => { WORLD.radius = radius; });
 
 beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = () => null;

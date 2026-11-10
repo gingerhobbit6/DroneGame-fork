@@ -45,11 +45,11 @@ export function createSensors(core, feed) {
   // the band a detector hears this drone on now, not through your own jamming (deaf: the bands it cannot hear), or null
   const bandOn = (s, d, deaf = deafAt(s, nodes.values())) => heardBand(s.def, d.def, deaf);
 
-  // How far this sensor reaches along the real path to this drone, from its open-field reach. A radio detector works it out on the band it hears it on.
+  // How far this sensor reaches along the real path to this drone, from its open-field reach. A radio detector works both out on the band it hears it on now.
   function reachTo(s, d, open, deaf) {
     const m = mpu(), band = s.def.kind === 'rf' && bandOn(s, d, deaf);
     if (band === null) return 0;
-    return reachOnPath(s.def, d.def, terrainState.data, { x: s.pos.x * m, y: antennaM(s), z: s.pos.z * m }, { x: d.pos.x * m, y: d.pos.y * m, z: d.pos.z * m }, band && bandGhz(band), open);
+    return reachOnPath(s.def, d.def, terrainState.data, { x: s.pos.x * m, y: antennaM(s), z: s.pos.z * m }, { x: d.pos.x * m, y: d.pos.y * m, z: d.pos.z * m }, band && bandGhz(band), band ? reachFor(s.def, d.def, band) : open);
   }
 
   // The chance that this sensor detects this drone on one scan. It depends on:

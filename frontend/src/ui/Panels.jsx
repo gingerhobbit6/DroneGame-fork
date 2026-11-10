@@ -37,7 +37,7 @@ export function Legend() {
     <Movable id="hud-bottom-left" title="Legend" startMin>
       <div className="label">THREATS</div>
       {LEGEND.map(([c, text]) => <div key={c}><i style={{ background: c }} />{text}</div>)}
-      <div className="hint">Click a system for details · drag to move · right-drag or Shift-drag to turn · scroll or pinch to zoom</div>
+      <div className="hint">Click a system or drone for details · drag to move · right-drag or Shift-drag to turn · scroll or pinch to zoom</div>
     </Movable>
   );
 }

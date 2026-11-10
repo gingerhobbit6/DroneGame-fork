@@ -51,7 +51,9 @@ An independent security review on the same date found one low-severity bug, now 
 
 Accounts and packs were checked on 2026-11-07. `backend/tests/test_accounts.py` and `test_units.py` cover hashing, lockout, expiry, cookie flags, revocation, every route refusing a missing session, and another account's packs answering `404`. Since 2026-11-08 the session test calls every route in the API schema rather than a hand-kept list, which had missed several writes, so a router added without the session check fails the tests. The whole flow was also walked through in a real browser against a local server. An independent security review on the same date found the lockout could be beaten by sending many tries at once, as each was counted after its slow hash and they overwrote each other. Tries are now counted first, in one statement, with a test that fails on the old code. The review's other findings are low and listed under accepted limits.
 
-`npm audit` and `pip-audit` reported nothing on that date. Neither is run automatically: the repository has a GitHub remote but no CI workflow yet.
+`npm audit` and `pip-audit` reported nothing on that date. On 9 November 2026, CI workflows were added for tests, coverage, production builds, dependency audits and Gitleaks, with weekly audits and Dependabot update proposals. Local npm and Python audits reported no known vulnerabilities, and Gitleaks found no secrets in 133 commits. The workflow configuration and permissions were reviewed, but the workflows have not yet run on GitHub with these changes. See [CI.md](CI.md) for the remaining GitHub setup and private-repository limits.
+
+The same quality review added checksum verification before an OS download is reused from the cache. A same-size damaged file is replaced only after a new download has passed its size and checksum checks; a failed replacement keeps the old file for diagnosis. Regression tests cover valid reuse, damaged data and failed replacement.
 
 ## Accepted limits
 

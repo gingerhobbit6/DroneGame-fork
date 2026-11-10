@@ -10,7 +10,7 @@ import { droneTemplate } from './models.js';
 import { trackColour } from './belief-view.js';
 import { labelLift } from './structure-view.js';
 import { hexCss, setStyle, setText } from './labels.js';
-import { asSymbol, droneTagHeight, styleDrone, styleTrack, symbolSprite, trackTagOpacity, trackTagShown } from './symbols.js';
+import { asSymbol, droneTagHeight, haloSprite, styleDrone, styleTrack, symbolSprite, trackTagOpacity, trackTagShown } from './symbols.js';
 
 // deps: what lives in the game: { scene, rec, labels, getStructures, labelOf, hideLive, getLastSpeed, setPaused, resume }
 export function createReplay(deps) {
@@ -34,10 +34,10 @@ export function createReplay(deps) {
     const g = new THREE.Group();
     const model = droneTemplate(d.type, false).clone();
     const unseen = droneTemplate(d.type, true).clone();
-    const symbol = symbolSprite('hostile:uav', 16);
-    g.add(model, unseen, symbol);
+    const symbol = symbolSprite('hostile:uav', 16), halo = haloSprite();
+    g.add(halo, model, unseen, symbol);
     group.add(g);
-    o = { group: g, model, unseen, symbol, label: labels.make(def.label, hexCss(def.color), 'dlabel') };
+    o = { group: g, model, unseen, symbol, halo, label: labels.make(def.label, hexCss(def.color), 'dlabel') };
     droneObjs.set(d.u, o);
     return o;
   }
@@ -154,7 +154,7 @@ export function createReplay(deps) {
     exit();
     for (const o of droneObjs.values()) {
       group.remove(o.group); o.label.remove();
-      o.symbol.material.dispose(); o.symbol.geometry.dispose(); // the models share their template's buffers; the sprite has its own
+      o.symbol.material.dispose(); o.symbol.geometry.dispose(); o.halo.material.dispose(); o.halo.geometry.dispose(); // the models share their template's buffers; the sprite has its own
     }
     droneObjs.clear();
   }

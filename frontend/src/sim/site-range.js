@@ -1,10 +1,10 @@
 // How far a system reaches from where it actually stands. A catalogue range means an open field: flat, clear ground, on its standard mast.
 // reachOnPath takes that down for one real path, and is what detection and jamming use, so the prediction here cannot disagree with play.
 
-import { SENSING, TERRAIN } from './config/index.js';
+import { SENSING, TERRAIN, muzzleHeight } from './config/index.js';
 import { earthBulge, freeSpaceLoss, fresnelRadius, pathLoss, reachFactor } from './propagation.js';
 import { coverKey, inCover } from './sensor-model.js';
-import { bandGhz, heardBand } from './rf-model.js';
+import { bandGhz, bandReach, heardBand } from './rf-model.js';
 import { clearSight } from './world.js';
 
 // How much ground clutter hides low flyers from radar, by ground cover (open, forest, built, power-line corridor):
@@ -23,21 +23,21 @@ export const BEARINGS = 90;      // directions a prediction looks in
 const STEPS = 32;                // points checked along each direction
 
 const isRadio = (def) => def.kind === 'radar' || def.kind === 'rf' || def.kind === 'jammer';
-// A weapon whose round or interceptor flies to the target. It is cued over the terrain, so it needs no sight line and reaches as far
-// anywhere, but its round must be able to catch what it is sent at. Every other system works along a clear path from where it stands.
+// A weapon whose round or interceptor flies to the target, so its round must be able to catch what it is sent at. Most are cued over the
+// terrain and reach as far anywhere. A gun, and a missile riding a beam its launcher holds on the target (beamRider), must also see it.
 export const flies = (def) => def.fire === 'guided';
-export const usesPath = (def) => !flies(def);
+export const usesPath = (def) => !flies(def) || def.kind === 'gun' || !!def.beamRider; // works along a clear path from where it stands
 // A drone's usual height: the middle of its height band, or the average of the middles of its bands if it flies more than one.
 export const typicalAltitude = (droneDef) => { const bands = droneDef.altModes ?? [droneDef.alt]; return bands.reduce((sum, [lo, hi]) => sum + (lo + hi) / 2, 0) / bands.length; };
-export const antennaHeight = (def) => def.mount ?? (def.fire === 'beam' ? 4 : 0);
+export const antennaHeight = (def) => def.mount ?? (def.fire === 'beam' ? 4 : flies(def) && usesPath(def) ? muzzleHeight(def) : 0); // a gun or beam-rider sights along its muzzle, where its round leaves
 
 // How far this sensor reaches for this type of drone in an open field, before terrain and clutter. 0 means it can never detect it.
-export function reachFor(def, droneDef) {
+export function reachFor(def, droneDef, band = def.senses === 'rf' ? heardBand(def, droneDef) : null) { // band: the one a detector hears it on, where the caller knows
   const kind = def.kind || def.id;
-  if (def.senses === 'rf' && !heardBand(def, droneDef)) return 0; // silent, or on no band it covers (rf-model.js)
+  if (def.senses === 'rf' && !band) return 0; // silent, on no band it covers, or drowned on every one by your own jamming (rf-model.js)
   if (kind === 'radar') return def.range * Math.pow((droneDef.rcs ?? SENSING.refRcs) / SENSING.refRcs, 0.25);
   if (kind === 'camera') return def.range * ((droneDef.size ?? SENSING.refSize) / SENSING.refSize);
-  if (kind === 'rf') return def.range * Math.sqrt(droneDef.rfPower ?? 1);
+  if (kind === 'rf') return def.range * Math.sqrt(droneDef.rfPower ?? 1) * bandReach(band, droneDef); // a louder link, or one on a band that carries further
   if (kind === 'acoustic') return def.range * (droneDef.sound ?? 1);
   return def.range;
 }
