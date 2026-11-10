@@ -431,6 +431,10 @@ The check had a cost. It switched `propagation.js`, `rf-model.js` and the refere
 
 Alex asked for easier ways to get round the map. The camera already followed the mouse, touch, the minimap and a few fly-to buttons, but took no keys, gave no sense of north once turned, and could not frame what had been built. Held W, A, S and D now move it, Q and E turn it and + and - zoom it, by key position so any layout works. H frames every system, group of people and the area defended. N, or a new compass on the map rail, turns north up. F flies to the selected system, and a double-click with no tool picked glides there and closes in by half. The camera's glide now runs in spherical terms, so it can turn the short way round as well as move. The keys also fill the accessibility review's gap that a keyboard user could not move the camera at all.
 
+## London, 10 November 2026
+
+Alex asked to keep only real places with downloaded data, so Tapa was rebuilt at 70 km and Savernake and Hunstanton were deleted. Alex then asked for London, from Whitehall, with as much data as possible and the real buildings. The first build was lost when its session closed, and the next three stopped for reasons found one at a time: the security limits added that morning refused London's building layer, then its roads, and in between the Environment Agency's lidar service started hanging on a third of requests, which with a 120 s wait meant 88 s a square. The builder now waits 10 s and fetches 8 squares at once, and keeps the buildings and roads nearest the middle when a city has more than the game draws. A trial build without lidar was run alongside the last one, to find any further limit before the 80-minute lidar reached it; it found none. The pack is 207.7 MB, the game's reader accepts it, and buildings and roads are drawn to about 18.5 km from Whitehall, while line of sight has every building. The frame rate with 500,000 buildings is not measured yet.
+
 ## Numbers at the end of Phase 8
 
 | | Before | After |
