@@ -229,7 +229,12 @@ Everything lives under `~/site-guard-maps`, or the folder named by `SITE_GUARD_M
 | `estonia/` | The national files, `copernicus/` and `geonames/` |
 | `packs/` | Finished `.sgmap` files, which the server lists |
 
-Downloads are kept, so later builds in the same area fetch only lidar, map tiles and satellite. Lidar, basic map tiles and satellite scenes are never kept outside the pack. Files are never refreshed once present, and nothing in the app deletes downloads or packs. The only free-space check is for Estonia: the builder refuses to start fetching missing national files with less than 8 GB free ([`estonia_files.py:25`](../tools/mapbuild/mapbuild/estonia_files.py#L25)).
+Downloads are kept, so later builds in the same area fetch only lidar, map tiles and satellite. British lidar is kept too, as each 1 km square's 20 m results in `os/lidar_cache`, so a stopped build carries on where it was and an overlapping pack reuses the squares ([`terrain.py`](../tools/mapbuild/mapbuild/terrain.py)). Basic map tiles and satellite scenes are never kept outside the pack.
+
+**When the lidar service refuses.** The Environment Agency rate-limits the web service: in November 2026 it answered `429 Too Many Requests` for hours after builds fetched eight squares at once. The builder now stops at the first refusal rather than retrying. Two ways on from there:
+
+- `--saved-lidar-only` builds now from the squares already kept, asking for nothing; the rest of the ground gets Terrain 50.
+- LiDAR tile files from the [Survey Data Catalogue](https://environment.data.gov.uk/survey) (the 1 m Composite DTM and First Return DSM, 5 km GeoTIFF tiles, both for each tile) go in `os/lidar_tiles`, as zips or `.tif` files. The next build takes every square they cover from them ([`lidar_tiles.py`](../tools/mapbuild/mapbuild/lidar_tiles.py)). For a large area the catalogue asks for a request through its support desk, with the order details file it gives, and sends the tiles. Files are never refreshed once present, and nothing in the app deletes downloads or packs. The only free-space check is for Estonia: the builder refuses to start fetching missing national files with less than 8 GB free ([`estonia_files.py:25`](../tools/mapbuild/mapbuild/estonia_files.py#L25)).
 
 ## Installing, importing and exporting packs
 

@@ -627,3 +627,58 @@ def test_saved_lidar_only_uses_the_kept_squares_and_asks_the_service_for_nothing
     assert calls == []
     assert np.isnan(grids["ground"][0, 0]) and np.isclose(grids["ground"][-1, -1], 5)  # the missing square is left to Terrain 50
     assert any("3 of 4" in s for s in said)
+
+
+def write_tile(path, west, north, size, value):
+    """A 1 m GeoTIFF tile on the national grid, `size` metres square, every pixel `value`."""
+    import rasterio as rio
+    from rasterio.transform import from_origin as origin
+
+    with rio.open(path, "w", driver="GTiff", width=size, height=size, count=1, dtype="float32", crs="EPSG:27700",
+                  transform=origin(west, north, 1, 1), nodata=-9999, tiled=True, blockxsize=256, blockysize=256) as tif:
+        tif.write(np.full((size, size), value, "float32"), 1)
+
+
+def test_lidar_tiles_from_the_catalogue_fill_the_squares_and_nothing_is_fetched(tmp_path, monkeypatch):
+    import zipfile as zf
+
+    monkeypatch.setattr(terrain, "fetch_square", lambda *_a: pytest.fail("a square was fetched"))
+    tiles, cache = tmp_path / "lidar_tiles", tmp_path / "cache"
+    tiles.mkdir()
+    write_tile(tmp_path / "su0910_DTM_1m.tif", 9000, 21000, 2000, 5.0)
+    with zf.ZipFile(tiles / "LIDAR-DTM-1m-2022-SU0910.zip", "w") as archive:
+        archive.write(tmp_path / "su0910_DTM_1m.tif", "su0910_DTM_1m.tif")
+    write_tile(tiles / "su0910_FZ_DSM_1m.tif", 9000, 21000, 2000, 8.0)
+    said = []
+    grids = terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), said.append, str(cache), fetch=False, tiles=str(tiles))
+    assert len(list(cache.glob("*.npz"))) == 4
+    assert np.allclose(grids["ground"], 5) and np.allclose(grids["tall"], 3)
+    assert any("4 new square(s) taken from 1 tile(s)" in s for s in said)
+
+
+def test_a_lidar_tile_without_its_pair_or_off_the_grid_is_left_out(tmp_path):
+    from mapbuild import lidar_tiles
+
+    write_tile(tmp_path / "su0910_DTM_1m.tif", 9000, 21000, 1000, 5.0)  # no DSM beside it
+    write_tile(tmp_path / "su0910_DSM_1m.tif", 9500, 21000, 1000, 8.0)  # half a kilometre off the grid
+    (tmp_path / "notes_DSM.tif").write_bytes(b"<VRTDataset/>")  # not a GeoTIFF
+    said = []
+    kept = lidar_tiles.import_tiles(str(tmp_path), str(tmp_path / "cache"), {(9000, 20000)}, lambda *_a: pytest.fail("reduced"), said.append)
+    assert kept == 0
+    assert any("2 file(s)" in s for s in said) and any("only one of the DTM and the DSM" in s for s in said)
+    assert lidar_tiles.kind_of("LIDAR-FZ_DSM-1m-2022-SU45ne.zip") == "dsm" and lidar_tiles.kind_of("x_DTM_DSM.tif") is None
+
+
+def test_a_rate_limited_lidar_request_stops_at_once(monkeypatch):
+    import urllib.error
+
+    calls = []
+
+    def refuse(*_a, **_k):
+        calls.append(1)
+        raise urllib.error.HTTPError("u", 429, "Too Many Requests", {}, None)
+
+    monkeypatch.setattr(terrain.urllib.request, "urlopen", refuse)
+    with pytest.raises(SystemExit, match="refusing lidar requests"):
+        terrain.fetch_square(terrain.SERVICES["dtm"], 1000, 1000)
+    assert calls == [1]

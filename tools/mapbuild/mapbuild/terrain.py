@@ -33,6 +33,7 @@ ANSWER_S = 10  # good answers start within 2 s; in November 2026 about a third o
 GIVE_UP_S = 900  # per request: an outage this long stops the build
 SQUARES_AT_ONCE = 8  # requests in flight, which hides the hung ones
 POSTS_PER_SQUARE = SQUARE_M // CELL + 1
+REFUSED = {403, 429}  # the service's answers when it is rate-limiting a machine ("You are making too many requests")
 TALL_M = 5  # cover at least this tall counts as trees
 MIN_BUILDING_SHARE = 0.1  # of a cell, before a footprint makes the cell solid
 
@@ -112,6 +113,11 @@ def fetch_square(service: tuple[str, str], east: int, north: int) -> np.ndarray:
             with urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(query)}", timeout=ANSWER_S) as reply:
                 return read_square(read_capped(reply, MAX_WCS_BYTES, "lidar answer"), east, north)  # damaged answers are fetched again
         except (OSError, ValueError, urllib.error.URLError, Exception) as problem:  # noqa: B014 - rasterio raises its own errors
+            if getattr(problem, "code", None) in REFUSED:
+                # asking again only prolongs it: in November 2026 a build that retried through these got this machine blocked for hours
+                raise SystemExit(f"the Environment Agency is refusing lidar requests from this machine (HTTP {problem.code}). Stop asking for a "
+                                 "while, or build with --saved-lidar-only, or put LiDAR tiles from its Survey Data Catalogue in lidar_tiles "
+                                 "(see mapbuild/lidar_tiles.py)") from problem
             failures += 1
             if failures >= 3 and getattr(problem, "code", None) == 500:
                 return np.full((SQUARE_M, SQUARE_M), np.nan, "float32")  # some all-sea squares always fail
@@ -170,29 +176,35 @@ def keep_square(folder: str, east: int, north: int, reduced: dict[str, np.ndarra
     os.replace(part, _cache_path(folder, east, north))
 
 
+def reduce_with_buildings(east: int, north: int, dtm: np.ndarray, dsm: np.ndarray, tree: STRtree, buildings) -> dict[str, np.ndarray]:
+    """A 1 km square's 1 m heights to its 20 m results, with the OS buildings in it marking which tall cover is a building."""
+    near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
+    houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
+    if len(near):
+        rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
+    return reduce_square(dtm, dsm, houses.astype(bool))
+
+
 def lidar_square(east: int, north: int, tree: STRtree, buildings, cache: str | None = None) -> dict[str, np.ndarray]:
     saved = cached_square(cache, east, north) if cache else None
     if saved:
         return saved
     dtm, dsm = (fetch_square(SERVICES[name], east, north) for name in ("dtm", "dsm"))
-    near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
-    houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
-    if len(near):
-        rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
-    reduced = reduce_square(dtm, dsm, houses.astype(bool))
+    reduced = reduce_with_buildings(east, north, dtm, dsm, tree, buildings)
     # a square the service gave up on (all sea, or a fault that outlasted the retries) is not kept, so it is asked for again next time
     if cache and not (np.isnan(dtm).all() or np.isnan(dsm).all()):
         keep_square(cache, east, north, reduced)
     return reduced
 
 
-def lidar(window: Window, half: int, buildings, say, cache: str | None = None, fetch: bool = True) -> dict[str, np.ndarray]:
+def lidar(window: Window, half: int, buildings, say, cache: str | None = None, fetch: bool = True, tiles: str | None = None) -> dict[str, np.ndarray]:
     """20 m results across the window's posts, for the central part reaching `half` metres from the middle. NaN elsewhere.
 
     With `cache`, a folder, each finished square is kept there, so a build that stops carries on where it was, and a later pack that
     overlaps this one does not fetch the shared squares again. A kept square holds its building heights, so clear the folder if the
     OS building data changes. With `fetch` off, only the kept squares are used and nothing is asked of the service: the rest stay NaN,
-    so they get Terrain 50 and assumed heights, as ground outside the lidar does."""
+    so they get Terrain 50 and assumed heights, as ground outside the lidar does. With `tiles`, a folder of LiDAR tile files from the
+    Environment Agency's Survey Data Catalogue, any square they cover is taken from them first (lidar_tiles.py), and kept in `cache`."""
     grids = {k: np.full((window.side, window.side), np.nan, "float32") for k in CACHE_KEYS}
     tree = STRtree(buildings)
     west, top = window.east - half, window.north + half
@@ -200,6 +212,9 @@ def lidar(window: Window, half: int, buildings, say, cache: str | None = None, f
     corners = [(west + col * SQUARE_M, top - (row + 1) * SQUARE_M) for row in range(count) for col in range(count)]
     if cache:
         os.makedirs(cache, exist_ok=True)
+        if tiles and os.path.isdir(tiles):
+            from .lidar_tiles import import_tiles  # here, as it needs rasterio's file reader only when there are tiles
+            import_tiles(tiles, cache, set(corners), lambda e, n, dtm, dsm: reduce_with_buildings(e, n, dtm, dsm, tree, buildings), say)
         here = sum(os.path.exists(_cache_path(cache, east, north)) for east, north in corners)
         if here or not fetch:
             say(f"lidar: {here} of {len(corners)} squares are already here from an earlier build")

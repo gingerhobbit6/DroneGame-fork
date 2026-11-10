@@ -33,7 +33,7 @@ def british(data_root: str, window: Window, lidar_km: int, say, fetch_lidar: boo
     roads, road_fields = source.read("Road", ["CLASSIFICA"])
     names, name_fields = source.read("NamedPlace", ["DISTNAME", "CLASSIFICA", "FONTHEIGHT"])
     say(f"OpenMap Local: {len(houses)} buildings, {len(wood)} woods, {len(roads)} roads, {len(names)} names")
-    grids = terrain.lidar(window, lidar_km * 500, houses, say, os.path.join(data_root, "lidar_cache"), fetch_lidar) if lidar_km else None
+    grids = terrain.lidar(window, lidar_km * 500, houses, say, os.path.join(data_root, "lidar_cache"), fetch_lidar, os.path.join(data_root, "lidar_tiles")) if lidar_km else None
     return Inputs(t50, no_tile, wood, houses, power, np.concatenate([surface, tidal]), roads, road_fields, names, name_fields, grids)
 
 
