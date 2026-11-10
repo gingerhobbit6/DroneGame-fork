@@ -251,13 +251,13 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   });
 
   const debug = { frozen: false }; // scripted browser runs drive the simulation themselves
-  const frameClock = new THREE.Clock();
+  const frameClock = new THREE.Timer(); // three.js 0.186 deprecates Clock
   // Panels refresh on the timer only while what they show can change: the run moving, a replay, or the player's hand on the mouse or
   // keys (the cursor read-outs, a dragged panel). Paused, idle or on the start screen, nothing re-renders.
   let lastBump = 0, stirred = true, covered = false;
   const stir = () => { stirred = true; };
   function frame() {
-    const real = Math.min(frameClock.getDelta(), 0.05);
+    const real = Math.min(frameClock.update().getDelta(), 0.05);
     let n = 0;
     if (!debug.frozen && state.started && !state.over && clock.speed > 0) {
       // fixed-size steps: the same seed and laydown give the same run at any frame rate or speed
