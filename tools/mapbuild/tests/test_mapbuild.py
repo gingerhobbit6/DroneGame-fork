@@ -614,3 +614,16 @@ def test_a_pack_may_be_as_small_as_one_world_and_no_smaller():
     assert size_problem(WORLD_KM, WORLD_KM) is None and size_problem(70, 54) is None and size_problem(80, 0) is None
     for size, lidar_km in [(WORLD_KM - 2, 0), (82, 0), (55, 0), (70, 53), (54, 56)]:
         assert size_problem(size, lidar_km), (size, lidar_km)
+
+
+def test_saved_lidar_only_uses_the_kept_squares_and_asks_the_service_for_nothing(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(terrain, "fetch_square", flat_fetch(calls))
+    terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), lambda _: None, str(tmp_path))
+    (tmp_path / "9000_20000.npz").unlink()  # one of the four squares was never fetched
+    calls.clear()
+    said = []
+    grids = terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), said.append, str(tmp_path), fetch=False)
+    assert calls == []
+    assert np.isnan(grids["ground"][0, 0]) and np.isclose(grids["ground"][-1, -1], 5)  # the missing square is left to Terrain 50
+    assert any("3 of 4" in s for s in said)

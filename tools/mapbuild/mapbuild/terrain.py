@@ -186,12 +186,13 @@ def lidar_square(east: int, north: int, tree: STRtree, buildings, cache: str | N
     return reduced
 
 
-def lidar(window: Window, half: int, buildings, say, cache: str | None = None) -> dict[str, np.ndarray]:
+def lidar(window: Window, half: int, buildings, say, cache: str | None = None, fetch: bool = True) -> dict[str, np.ndarray]:
     """20 m results across the window's posts, for the central part reaching `half` metres from the middle. NaN elsewhere.
 
     With `cache`, a folder, each finished square is kept there, so a build that stops carries on where it was, and a later pack that
     overlaps this one does not fetch the shared squares again. A kept square holds its building heights, so clear the folder if the
-    OS building data changes."""
+    OS building data changes. With `fetch` off, only the kept squares are used and nothing is asked of the service: the rest stay NaN,
+    so they get Terrain 50 and assumed heights, as ground outside the lidar does."""
     grids = {k: np.full((window.side, window.side), np.nan, "float32") for k in CACHE_KEYS}
     tree = STRtree(buildings)
     west, top = window.east - half, window.north + half
@@ -200,8 +201,18 @@ def lidar(window: Window, half: int, buildings, say, cache: str | None = None) -
     if cache:
         os.makedirs(cache, exist_ok=True)
         here = sum(os.path.exists(_cache_path(cache, east, north)) for east, north in corners)
-        if here:
+        if here or not fetch:
             say(f"lidar: {here} of {len(corners)} squares are already here from an earlier build")
+    if not fetch:
+        for east, north in corners:
+            saved = cached_square(cache, east, north) if cache else None
+            if saved:
+                r0, c0 = (window.top - (north + SQUARE_M)) // CELL, (east - window.west) // CELL
+                for name, values in saved.items():
+                    target = grids[name][r0:r0 + POSTS_PER_SQUARE, c0:c0 + POSTS_PER_SQUARE]
+                    target[np.isnan(target)] = values[np.isnan(target)]
+        say("lidar: only the squares already here are used; the rest of the ground has Terrain 50 heights")
+        return grids
     began = time.time()
     with ThreadPoolExecutor(SQUARES_AT_ONCE) as pool:
         squares = pool.map(lambda corner: lidar_square(*corner, tree, buildings, cache), corners)  # answers come back in order; a failure cancels the rest

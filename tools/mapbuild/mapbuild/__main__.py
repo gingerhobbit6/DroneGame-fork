@@ -21,7 +21,7 @@ SOURCES = {
 }
 
 
-def british(data_root: str, window: Window, lidar_km: int, say) -> Inputs:
+def british(data_root: str, window: Window, lidar_km: int, say, fetch_lidar: bool = True) -> Inputs:
     t50, no_tile = terrain.terrain50(data_root, window)
     say(f"Terrain 50: {window.side} x {window.side} posts, {t50.min():.1f} to {t50.max():.1f} m, {no_tile.mean():.1%} with no tile")
     source = features.OpenMap(data_root, window)
@@ -33,7 +33,7 @@ def british(data_root: str, window: Window, lidar_km: int, say) -> Inputs:
     roads, road_fields = source.read("Road", ["CLASSIFICA"])
     names, name_fields = source.read("NamedPlace", ["DISTNAME", "CLASSIFICA", "FONTHEIGHT"])
     say(f"OpenMap Local: {len(houses)} buildings, {len(wood)} woods, {len(roads)} roads, {len(names)} names")
-    grids = terrain.lidar(window, lidar_km * 500, houses, say, os.path.join(data_root, "lidar_cache")) if lidar_km else None
+    grids = terrain.lidar(window, lidar_km * 500, houses, say, os.path.join(data_root, "lidar_cache"), fetch_lidar) if lidar_km else None
     return Inputs(t50, no_tile, wood, houses, power, np.concatenate([surface, tidal]), roads, road_fields, names, name_fields, grids)
 
 
@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lidar-km", type=int, default=54, help="the width of the middle part with lidar heights, in km. 0 for none. In Great Britain, England only.")
     parser.add_argument("--fetch", action="store_true", help="download any files that are missing from --data")
     parser.add_argument("--no-satellite", action="store_true", help="leave out the satellite picture")
+    parser.add_argument("--saved-lidar-only", action="store_true", help="in Great Britain, use only the lidar squares an earlier build kept, and fetch none: the rest gets Terrain 50 heights")
     args = parser.parse_args(argv)
     if size_problem(args.size, args.lidar_km):
         parser.error(size_problem(args.size, args.lidar_km))
@@ -71,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             download.ensure(args.data, window.squares(), say)
 
-    source = estonia.gather(args.data, window, args.lidar_km, say, args.fetch) if estonian else british(args.data, window, args.lidar_km, say)
+    source = estonia.gather(args.data, window, args.lidar_km, say, args.fetch) if estonian else british(args.data, window, args.lidar_km, say, not args.saved_lidar_only)
     cover = features.cover_grid(window, source.wood, source.houses, source.power, source.water, source.no_data)
     ground, canopy, bldg, cover = terrain.combine(window, source.base, source.lidar, cover, cover == 1, cover == 2)
     grids = packfile.Grids(ground, canopy, bldg, cover)
