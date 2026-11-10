@@ -32,4 +32,7 @@ if __name__ == "__main__":
         sys.exit(f"Could not listen on {', '.join(BIND_HOSTS)} port {PORT}: {problem}. Is the address this machine's, and is another copy already running?")
     for host in BIND_HOSTS:
         print(f"Site Guard: open http://{'localhost' if host == '127.0.0.1' else host}:{PORT}")
-    uvicorn.Server(uvicorn.Config("app.main:app")).run(sockets=sockets)
+    try:
+        uvicorn.Server(uvicorn.Config("app.main:app")).run(sockets=sockets)
+    except KeyboardInterrupt:
+        pass  # Ctrl+C is how the server is stopped: it has already shut down cleanly, so there is nothing to report
