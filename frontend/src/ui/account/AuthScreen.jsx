@@ -87,7 +87,7 @@ function Register({ api, onRegistered }) {
   };
   return (
     <form className="acct-form" onSubmit={submit} aria-label="Create an account">
-      <TextField label="Your name" hint="As it shows on your profile, such as Sgt A. Smith" value={name} onChange={setName} autoComplete="name" required maxLength={60} autoFocus />
+      <TextField label="Your name" hint="As it shows on your profile" value={name} onChange={setName} autoComplete="name" required maxLength={60} autoFocus />
       <TextField label="Username" hint="What you sign in with" value={username} onChange={setUsername} autoComplete="username" required maxLength={32} aria-invalid={badName || undefined} />
       {pw.fields}
       {error && <p className="acct-error" role="alert">{error}</p>}

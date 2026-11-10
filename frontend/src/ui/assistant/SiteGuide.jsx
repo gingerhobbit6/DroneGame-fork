@@ -18,7 +18,7 @@ export function SiteGuide({ site, wanted, packName, onClose }) {
   return (
     <section id="site-guide" aria-label="Guide: choosing where to defend">
       <Spotlight selector={spot} />
-      <div className="wz-head"><span>GUIDE: BEFORE YOU DEPLOY</span><button aria-label="Close the guide" title="Close" onClick={onClose}>×</button></div>
+      <div className="wz-head"><span>GUIDE</span><button aria-label="Close the guide" title="Close" onClick={onClose}>×</button></div>
       <h3 aria-live="polite">{title}</h3>
       <p>{text}</p>
     </section>
