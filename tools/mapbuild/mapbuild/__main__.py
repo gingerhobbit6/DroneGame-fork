@@ -33,8 +33,15 @@ def british(data_root: str, window: Window, lidar_km: int, say) -> Inputs:
     roads, road_fields = source.read("Road", ["CLASSIFICA"])
     names, name_fields = source.read("NamedPlace", ["DISTNAME", "CLASSIFICA", "FONTHEIGHT"])
     say(f"OpenMap Local: {len(houses)} buildings, {len(wood)} woods, {len(roads)} roads, {len(names)} names")
-    grids = terrain.lidar(window, lidar_km * 500, houses, say) if lidar_km else None
+    grids = terrain.lidar(window, lidar_km * 500, houses, say, os.path.join(data_root, "lidar_cache")) if lidar_km else None
     return Inputs(t50, no_tile, wood, houses, power, np.concatenate([surface, tidal]), roads, road_fields, names, name_fields, grids)
+
+
+def size_problem(size: int, lidar_km: int) -> str | None:
+    """Why these widths cannot be built, or None. A pack as wide as a world is the least the game takes: the site cannot then be moved."""
+    if size % 2 or lidar_km % 2 or not WORLD_KM <= size <= 80 or lidar_km > size:
+        return f"--size must be even, from {WORLD_KM} to 80, and --lidar-km must be even and no bigger than --size"
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,13 +50,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", required=True, help="the name shown in the game")
     parser.add_argument("--data", required=True, help="the folder of downloads: terrain50, openmap_su, vmd_su and so on, or the national files for Estonia")
     parser.add_argument("--out", required=True, help="the .sgmap file to write")
-    parser.add_argument("--size", type=int, default=70, help="the width of the pack in km (default 70: a 54 km world, with 8 km of room to move it each way)")
+    parser.add_argument("--size", type=int, default=70, help="the width of the pack in km (default 70: a 54 km world, with 8 km of room to move it each way). 54 is the least: exactly one world, with the site fixed at the middle")
     parser.add_argument("--lidar-km", type=int, default=54, help="the width of the middle part with lidar heights, in km. 0 for none. In Great Britain, England only.")
     parser.add_argument("--fetch", action="store_true", help="download any files that are missing from --data")
     parser.add_argument("--no-satellite", action="store_true", help="leave out the satellite picture")
     args = parser.parse_args(argv)
-    if args.size % 2 or args.lidar_km % 2 or not WORLD_KM + 2 <= args.size <= 80 or args.lidar_km > args.size:
-        parser.error(f"--size must be even, from {WORLD_KM + 2} to 80, and --lidar-km must be even and no bigger than --size")
+    if size_problem(args.size, args.lidar_km):
+        parser.error(size_problem(args.size, args.lidar_km))
 
     began = time.time()
     say = lambda text: print(f"[{time.time() - began:5.0f}s] {text}", flush=True)
@@ -93,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         "tier": "lidar" if args.lidar_km else "terrain50", "lidarHalf": args.lidar_km * 500, "built": date.today().isoformat(), "credits": credits,
         **position,
     }
-    written = packfile.write_pack(args.out, header, grids, feature_lists, map_pictures + sat_pictures)
+    written = packfile.write_pack(args.out, header, grids, feature_lists, map_pictures + sat_pictures, say)
     say(f"wrote {args.out}: {os.path.getsize(args.out) / 1e6:.1f} MB, hash {written['gridsSha256'][:16]}, fit error {written['fitErrorM']} m")
     return 0
 

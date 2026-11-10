@@ -13,3 +13,6 @@ backend/data/
 
 # map packs can hold a real site, and are built locally
 *.sgmap
+
+# results of tools/lab runs
+frontend/lab-results/

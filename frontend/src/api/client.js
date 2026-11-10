@@ -49,6 +49,7 @@ export const createApi = () => ({
   laydowns: { ...resource('/laydowns'), replace: (id, body) => request('PUT', `/laydowns/${id}`, body) },
   figureSets: resource('/figure-sets'),
   packs: { list: () => request('GET', '/packs'), downloads: () => request('GET', '/packs/downloads'), buildStatus: () => request('GET', '/packs/build'), build: (body) => request('POST', '/packs/build', body) },
+  lab: { list: () => request('GET', '/lab'), get: (file) => request('GET', `/lab/laydowns/${encodeURIComponent(file)}`) },
   runs: { ...resource('/runs'), page: (limit, offset) => request('GET', `/runs?limit=${limit}&offset=${offset}`) },
   units: { ...resource('/units'), replace: (id, body) => request('PUT', `/units/${id}`, body) },
   auth: {

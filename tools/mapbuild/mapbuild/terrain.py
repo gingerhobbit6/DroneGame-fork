@@ -135,30 +135,77 @@ def reduce_square(dtm: np.ndarray, dsm: np.ndarray, houses: np.ndarray) -> dict[
     return out
 
 
-def lidar(window: Window, half: int, buildings, say) -> dict[str, np.ndarray]:
-    """20 m results across the window's posts, for the central part reaching `half` metres from the middle. NaN elsewhere."""
-    grids = {k: np.full((window.side, window.side), np.nan, "float32") for k in ("ground", "tall", "houses")}
+SQUARES_AT_ONCE = 4  # a square is two requests (ground and surface), so twice this many are out at once
+BATCH = 32           # squares handed to the pool together, so heights waiting their turn stay a few hundred MB at most
+CACHE_KEYS = ("ground", "tall", "houses")
+
+
+def _cache_path(folder: str, east: int, north: int) -> str:
+    return os.path.join(folder, f"{east}_{north}.npz")
+
+
+def cached_square(folder: str, east: int, north: int) -> dict[str, np.ndarray] | None:
+    """A square's 20 m results kept from an earlier build, or None. Anything not the right shape is ignored and fetched again."""
+    try:
+        with np.load(_cache_path(folder, east, north)) as saved:
+            found = {k: saved[k] for k in CACHE_KEYS}
+    except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
+        return None
+    shape = (POSTS_PER_SQUARE, POSTS_PER_SQUARE)
+    return found if all(v.shape == shape and v.dtype == np.float32 for v in found.values()) else None
+
+
+def keep_square(folder: str, east: int, north: int, reduced: dict[str, np.ndarray]) -> None:
+    """Written whole or not at all, so a build stopped part way never leaves half a square behind."""
+    part = _cache_path(folder, east, north) + ".part"
+    with open(part, "wb") as out:
+        np.savez_compressed(out, **reduced)
+    os.replace(part, _cache_path(folder, east, north))
+
+
+def lidar(window: Window, half: int, buildings, say, cache: str | None = None) -> dict[str, np.ndarray]:
+    """20 m results across the window's posts, for the central part reaching `half` metres from the middle. NaN elsewhere.
+
+    Several squares are fetched at once, as one takes the Environment Agency's service many seconds. With `cache`, a folder, each
+    finished square is kept there, so a build that stops carries on where it was, and a later pack that overlaps this one does not
+    fetch the shared squares again. A kept square holds its building heights, so clear the folder if the OS building data changes."""
+    grids = {k: np.full((window.side, window.side), np.nan, "float32") for k in CACHE_KEYS}
     tree = STRtree(buildings)
     west, top = window.east - half, window.north + half
     count = 2 * half // SQUARE_M
-    began, done = time.time(), 0
-    with ThreadPoolExecutor(2) as pool:
-        for row in range(count):
-            for col in range(count):
-                east, north = west + col * SQUARE_M, top - (row + 1) * SQUARE_M
-                dtm, dsm = pool.map(lambda s: fetch_square(SERVICES[s], east, north), SERVICES)
-                near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
-                houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
-                if len(near):
-                    rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
-                reduced = reduce_square(dtm, dsm, houses.astype(bool))
+    squares = [(west + col * SQUARE_M, top - (row + 1) * SQUARE_M) for row in range(count) for col in range(count)]
+    if cache:
+        os.makedirs(cache, exist_ok=True)
+    began, done, reused = time.time(), 0, 0
+
+    def reduced_from(east: int, north: int, dtm: np.ndarray, dsm: np.ndarray) -> dict[str, np.ndarray]:
+        near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
+        houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
+        if len(near):
+            rasterize(((mapping(s), 1) for s in near), out=houses, transform=from_origin(east, north + SQUARE_M, 1, 1))
+        reduced = reduce_square(dtm, dsm, houses.astype(bool))
+        # a square the service gave up on (all sea, or a fault that outlasted the retries) is not kept, so it is asked for again next time
+        if cache and not (np.isnan(dtm).all() or np.isnan(dsm).all()):
+            keep_square(cache, east, north, reduced)
+        return reduced
+
+    with ThreadPoolExecutor(2 * SQUARES_AT_ONCE) as pool:
+        for start in range(0, len(squares), BATCH):
+            batch = squares[start:start + BATCH]
+            kept = [cached_square(cache, east, north) if cache else None for east, north in batch]
+            waiting = [None if saved else [pool.submit(fetch_square, SERVICES[s], east, north) for s in SERVICES] for (east, north), saved in zip(batch, kept)]
+            # only the fetching is shared out: each square is worked out and placed here, in order, so the result is the same every time
+            for (east, north), saved, fetches in zip(batch, kept, waiting):
+                reduced = saved or reduced_from(east, north, *(f.result() for f in fetches))
+                reused += saved is not None
                 r0, c0 = (window.top - (north + SQUARE_M)) // CELL, (east - window.west) // CELL
                 for name, values in reduced.items():
                     target = grids[name][r0:r0 + POSTS_PER_SQUARE, c0:c0 + POSTS_PER_SQUARE]
                     target[np.isnan(target)] = values[np.isnan(target)]  # the first square to reach a shared edge post keeps it
                 done += 1
                 if done % 20 == 0:
-                    say(f"lidar {done}/{count * count} squares, {(time.time() - began) / done:.1f} s each")
+                    fetched = done - reused
+                    say(f"lidar {done}/{len(squares)} squares" + (f", {reused} already here" if reused else "") + (f", {(time.time() - began) / fetched:.1f} s each fetched" if fetched else ""))
     return grids
 
 

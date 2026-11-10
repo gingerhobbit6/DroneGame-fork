@@ -5,6 +5,7 @@ import { GAME_VERSION } from '../../sim/config/index.js';
 import { zoneFromSpec } from '../../zone.js';
 import { parseWorldId, worldLabel } from '../../sim/world-pack.js';
 import { attemptWith, useArmed, useGame, useLoad } from '../hooks.js';
+import { openLaydown } from './open-laydown.js';
 
 const when = (iso) => new Date(iso).toLocaleString();
 
@@ -35,9 +36,20 @@ export function SavedTab({ active }) {
     return saved.game_version === GAME_VERSION ? `Loaded "${saved.name}".` : `Loaded "${saved.name}". It was saved by version ${saved.game_version}, so it may not play the same.`;
   }, (message) => message);
 
+  // Open a laydown file (one saved by tools/lab, or a spec copied out of the game) without saving it to the account first.
+  const importFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try { setNote(await openLaydown(game, JSON.parse(await file.text()), file.name)); } catch (err) { setNote(err.message); }
+  };
+
   return (
     <>
       <div className="sys note">Save your laydown and wiring by name. Loading one replaces the current run, and switches to the ground it was made for.</div>
+      <label className="saved-import" title="Open a laydown file from disk, such as one written by tools/lab. Replaces the current run.">
+        Open a laydown file: <input id="import-laydown" type="file" accept=".json,application/json" onChange={importFile} />
+      </label>
       <form className="saved-form" onSubmit={save}>
         <input id="save-name" type="text" maxLength={100} placeholder="Name this laydown" value={name} onChange={(e) => setName(e.target.value)} />
         <button id="save-laydown" className="primary" type="submit" disabled={!name.trim()}>Save {count} system{count === 1 ? '' : 's'}</button>

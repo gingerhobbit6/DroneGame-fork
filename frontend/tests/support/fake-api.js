@@ -29,7 +29,17 @@ export function createFakeApi() {
       page: async (limit, offset) => { guard(); const all = [...rows.values()].map(summary).reverse(); return { items: all.slice(offset, offset + limit), total: all.length }; },
     };
   };
-  return { state, laydowns: table('laydowns'), figureSets: table('figureSets'), runs: table('runs'), units: table('units') };
+  // what tools/lab wrote: `files` maps a file name to the laydown it holds, `report` says whether a report page exists
+  const lab = {
+    files: new Map(), report: false,
+    list: async () => {
+      guard(); state.calls.push('lab.list');
+      const laydowns = [...lab.files].map(([file, l]) => ({ file, name: l.name, world: l.world, systems: l.spec.structures.length, lab: l.lab ?? null }));
+      return { laydowns, report: lab.report };
+    },
+    get: async (file) => { guard(); if (!lab.files.has(file)) throw new ApiError('That no longer exists.', false); return structuredClone(lab.files.get(file)); },
+  };
+  return { state, laydowns: table('laydowns'), figureSets: table('figureSets'), runs: table('runs'), units: table('units'), lab };
 }
 
 export function createFakeStorage() {

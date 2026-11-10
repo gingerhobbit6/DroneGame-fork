@@ -523,3 +523,68 @@ def test_an_os_download_comes_only_from_os_and_never_runs_past_its_size(tmp_path
     with pytest.raises(SystemExit, match="did not download"):
         download._fetch(good, str(tmp_path), lambda _: None)
     assert list(tmp_path.iterdir()) == []  # nothing half-written is left
+
+
+def lidar_window():
+    return Window(10000, 20000, 1000)  # 2 km across: four 1 km lidar squares
+
+
+def flat_fetch(calls, sea=()):
+    """Stands in for the Environment Agency: ground at 5 m, surface 3 m above it, and nothing at all for the squares in `sea`."""
+    def fetch(service, east, north):
+        calls.append((service[1][-6:], east, north))
+        if (east, north) in sea:
+            return np.full((terrain.SQUARE_M, terrain.SQUARE_M), np.nan, "float32")
+        return np.full((terrain.SQUARE_M, terrain.SQUARE_M), 8.0 if "DSM" in service[1] else 5.0, "float32")
+    return fetch
+
+
+def test_british_lidar_fetches_every_square_once_and_places_it(monkeypatch):
+    calls = []
+    monkeypatch.setattr(terrain, "fetch_square", flat_fetch(calls))
+    grids = terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), lambda _: None)
+    assert len(calls) == 8 and len(set(calls)) == 8  # ground and surface for each of four squares
+    assert np.allclose(grids["ground"], 5) and np.allclose(grids["tall"], 3) and np.isnan(grids["houses"]).all()
+
+
+def test_british_lidar_squares_are_kept_and_not_fetched_again(tmp_path, monkeypatch):
+    calls, said = [], []
+    monkeypatch.setattr(terrain, "fetch_square", flat_fetch(calls))
+    first = terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), said.append, str(tmp_path / "cache"))
+    assert len(calls) == 8 and len(list((tmp_path / "cache").glob("*.npz"))) == 4 and not list((tmp_path / "cache").glob("*.part"))
+    calls.clear()
+    again = terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), said.append, str(tmp_path / "cache"))
+    assert calls == []
+    for name in first:
+        assert np.array_equal(first[name], again[name], equal_nan=True)
+
+
+def test_a_british_lidar_square_the_service_gave_up_on_is_asked_for_again(tmp_path, monkeypatch):
+    calls = []
+    sea = {(9000, 20000)}
+    monkeypatch.setattr(terrain, "fetch_square", flat_fetch(calls, sea))
+    grids = terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), lambda _: None, str(tmp_path))
+    assert len(list(tmp_path.glob("*.npz"))) == 3 and np.isnan(grids["ground"][0, 0])
+    calls.clear()
+    terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), lambda _: None, str(tmp_path))
+    assert sorted(set((e, n) for _, e, n in calls)) == [(9000, 20000)]
+
+
+def test_a_damaged_kept_lidar_square_is_fetched_again(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(terrain, "fetch_square", flat_fetch(calls))
+    terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), lambda _: None, str(tmp_path))
+    (tmp_path / "9000_20000.npz").write_bytes(b"not a square")
+    np.savez_compressed(tmp_path / "10000_20000.npz", ground=np.zeros((2, 2), "float32"), tall=np.zeros((2, 2), "float32"), houses=np.zeros((2, 2), "float32"))
+    calls.clear()
+    grids = terrain.lidar(lidar_window(), 1000, np.array([], dtype=object), lambda _: None, str(tmp_path))
+    assert sorted(set((e, n) for _, e, n in calls)) == [(9000, 20000), (10000, 20000)]
+    assert np.allclose(grids["ground"], 5)
+
+
+def test_a_pack_may_be_as_small_as_one_world_and_no_smaller():
+    from mapbuild.__main__ import WORLD_KM, size_problem
+
+    assert size_problem(WORLD_KM, WORLD_KM) is None and size_problem(70, 54) is None and size_problem(80, 0) is None
+    for size, lidar_km in [(WORLD_KM - 2, 0), (82, 0), (55, 0), (70, 53), (54, 56)]:
+        assert size_problem(size, lidar_km), (size, lidar_km)

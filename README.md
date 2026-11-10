@@ -248,6 +248,7 @@ Everything is under `/api/v1`, with the schema at `/api/v1/openapi.json`.
 | `/runs` | `GET`, `POST`, and `GET`, `DELETE` by ID |
 | `/figure-sets` | `GET`, `POST`, and `GET`, `DELETE` by ID |
 | `/packs` | `GET` the list, `GET` a pack file by name, `GET` `/packs/downloads` for the OS data already here, and `GET`, `POST` `/packs/build` |
+| `/lab` | Read-only, for what `tools/lab` writes in `frontend/lab-results/` (or `SITE_GUARD_LAB`): `GET` the laydowns it saved, `GET` `/laydowns/<file>.json`, and `GET` `/report`, the report page. The report is the one page allowed to run its own inline script |
 
 Every route except `/health`, `/auth` and the schema needs a signed-in session. The service binds to this machine only, and refuses other hosts and cross-site writes. See the [security notes](docs/SECURITY_NOTES.md), which also say what would be needed before hosting it.
 

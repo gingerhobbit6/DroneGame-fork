@@ -9,9 +9,19 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 # Only this machine by default. To reach it through a proxy such as `tailscale serve`, list the extra hostname(s) in
 # SITEGUARD_EXTRA_HOSTS (comma separated). The server itself stays bound to 127.0.0.1.
-EXTRA_HOSTS = [h.strip() for h in os.environ.get("SITEGUARD_EXTRA_HOSTS", "").split(",") if h.strip()]
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", *EXTRA_HOSTS]
+def listed(value: str) -> list[str]:
+    return [h.strip() for h in value.split(",") if h.strip()]
+
+
+EXTRA_HOSTS = listed(os.environ.get("SITEGUARD_EXTRA_HOSTS", ""))
+# The addresses the server listens on (see __main__.py). A request sent to one of them by number is for this server, so it is let in.
+BIND_HOSTS = listed(os.environ.get("SITEGUARD_HOST", "")) or ["127.0.0.1"]
+ALLOWED_HOSTS = list(dict.fromkeys(["localhost", "127.0.0.1", *BIND_HOSTS, *EXTRA_HOSTS]))
 MAX_BODY_BYTES = 1024 * 1024
+# The lab report is one self-contained page with its own script and style, written by tools/lab from its own results. It may run
+# those and nothing else: no network, no frames, no forms. It is the only page given this, and only to a signed-in player.
+REPORT_PATH = "/api/v1/lab/report"
+REPORT_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 HEADERS = {
     "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org https://tiles.maps.eox.at; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",
@@ -78,6 +88,8 @@ class SecurityHeaders:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 headers.update(HEADERS)
+                if scope["path"] == REPORT_PATH:
+                    headers["Content-Security-Policy"] = REPORT_CSP
                 if scope["path"].startswith("/api/"):
                     headers["Cache-Control"] = "no-store"  # profiles and saves must not linger in a browser cache after signing out
                 elif headers.get("content-type", "").startswith("text/html"):

@@ -260,3 +260,22 @@ def test_the_names_the_api_accepts_match_the_game():
     vehicles = patrol.split("export const PATROL_VEHICLES")[1].split("};")[0]
     assert set(PatrolVehicle.__args__) == set(re.findall(r"^  (\w+): \{ name: ", vehicles, re.M))
     assert f"MAX_ESCORTS = {MAX_ESCORTS};" in patrol and f"MAX_ESCORT_GAP = {MAX_ESCORT_GAP};" in patrol
+
+
+def test_the_addresses_the_server_listens_on_are_let_in_by_number(monkeypatch):
+    import importlib
+
+    from app import security
+
+    assert security.listed(" 127.0.0.1, 100.64.0.5 ,,") == ["127.0.0.1", "100.64.0.5"]
+    monkeypatch.setenv("SITEGUARD_HOST", "127.0.0.1,100.64.0.5")
+    monkeypatch.setenv("SITEGUARD_EXTRA_HOSTS", "box.example.ts.net")
+    try:
+        importlib.reload(security)
+        assert security.BIND_HOSTS == ["127.0.0.1", "100.64.0.5"]
+        assert security.ALLOWED_HOSTS == ["localhost", "127.0.0.1", "100.64.0.5", "box.example.ts.net"]
+    finally:
+        monkeypatch.delenv("SITEGUARD_HOST")
+        monkeypatch.delenv("SITEGUARD_EXTRA_HOSTS")
+        importlib.reload(security)
+    assert security.BIND_HOSTS == ["127.0.0.1"] and security.ALLOWED_HOSTS == ["localhost", "127.0.0.1"]

@@ -15,6 +15,7 @@ from app.db.connection import open_database
 from app.routes.api import router
 from app.routes.auth import router as auth_router
 from app.routes.auth import signed_in
+from app.routes.lab import router as lab_router
 from app.routes.packs import router as packs_router
 from app.routes.units import router as units_router
 from app.security import ALLOWED_HOSTS, RequestGuard, SecurityHeaders
@@ -45,6 +46,7 @@ def create_app(db_path: Path | None = None, game: Path = DEFAULT_GAME) -> FastAP
     app.include_router(auth_router)
     app.include_router(router, dependencies=[Depends(signed_in)])
     app.include_router(packs_router, dependencies=[Depends(signed_in)])
+    app.include_router(lab_router, dependencies=[Depends(signed_in)])
     app.include_router(units_router)
 
     @app.exception_handler(NotFound)

@@ -10,6 +10,7 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "balance": "node tools/balance.js",
+    "lab": "node tools/lab/lab.mjs",
     "models": "node tools/export-drone-models.js"
   },
   "dependencies": {

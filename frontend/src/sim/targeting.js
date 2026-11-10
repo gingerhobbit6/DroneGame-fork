@@ -97,7 +97,11 @@ export function hitStructure(w, d, s) {
   const { state, ledger, net } = w;
   w.emit('explosion', { pos: d.pos, r: u(60), color: 0xff5252 });
   blastOnGround(w, d, s.pos.x, s.pos.z);
-  if (!state.sandbox) s.health -= (d.def.damage * (1 + spotterBonus(w))) / armourOf(s.def); // the sandbox protects the laydown too
+  // Systems carried on one vehicle (s.platform, set only by tools/lab) share the strike and go down together; with no platform this is just s.
+  const crew = s.platform != null ? w.structures.filter((o) => o.platform === s.platform) : [s];
+  if (!state.sandbox) for (const o of crew) o.health -= (d.def.damage * (1 + spotterBonus(w))) / armourOf(o.def); // the sandbox protects the laydown too
+  if (crew.some((o) => o.health <= 0)) for (const o of crew) o.health = Math.min(o.health, 0);
+  for (const o of crew) if (o !== s && o.health <= 0) { tally(ledger.lost, o.def.id); ledger.lostValue += o.def.cost; w.rec.event('lost', `${o.name} destroyed with its vehicle`); removeStructure(w, o); }
   state.hits++;
   logEnd(w, d, 'struck');
   removeDrone(w, d);

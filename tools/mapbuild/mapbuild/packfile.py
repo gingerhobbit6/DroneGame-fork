@@ -48,8 +48,33 @@ def grids_hash(grids: Grids) -> str:
     return digest.hexdigest()
 
 
-def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: list[dict]) -> dict:
-    """pictures: { layer, west, top, width, height (metres), type, data }. Returns the header written."""
+def encode_features(features: dict) -> bytes:
+    return json.dumps(features, separators=(",", ":")).encode()
+
+
+def thin_buildings(features: dict, limit: int) -> dict:
+    """The features, drawing fewer buildings if they would be over `limit` bytes. A dense town can have more than the game reads.
+
+    The buildings nearest the middle are kept, as with the count cap in features.py. Line of sight is unaffected: it reads the
+    building grid, which has every building. If the buildings are not what makes it too big, the features come back unchanged."""
+    rows = features.get("buildings")
+    total = len(encode_features(features))
+    if total <= limit or not rows:
+        return features
+    bare = len(encode_features({**features, "buildings": []}))
+    if bare > limit:
+        return features
+    rows = sorted(rows, key=lambda r: r[0] ** 2 + r[1] ** 2)
+    keep = int((limit - bare) / ((total - bare) / len(rows)) * 0.97)  # each building costs about the same; a little to spare
+    while True:
+        thinned = {**features, "buildings": rows[:keep]}
+        if len(encode_features(thinned)) <= limit:
+            return thinned
+        keep = int(keep * 0.95)
+
+
+def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: list[dict], say=None) -> dict:
+    """pictures: { layer, west, top, width, height (metres), type, data }. Returns the header written. `say` is told of any thinning."""
     check(grids)
     sections, blobs, offset = [], [], 0
 
@@ -61,7 +86,13 @@ def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: 
 
     for name, data in grids.raw():
         add(name, gzip.compress(data, 6, mtime=0), len(data))
-    text = json.dumps(features, separators=(",", ":")).encode()
+    text = encode_features(features)
+    if len(text) > MAX_FEATURES:
+        thinned = thin_buildings(features, MAX_FEATURES)
+        if say and thinned is not features:
+            say(f"buildings: the buildings, roads and names came to {len(text) / 1e6:.0f} MB, over the {MAX_FEATURES / 1e6:.0f} MB the game reads, "
+                f"so the {len(thinned['buildings'])} buildings nearest the middle are drawn, of {len(features['buildings'])}. Line of sight still has them all")
+        features, text = thinned, encode_features(thinned)
     if len(text) > MAX_FEATURES:
         raise ValueError(f"the buildings, roads and names come to {len(text) / 1e6:.0f} MB, more than the game reads: build a smaller pack")
     add("features", gzip.compress(text, 6, mtime=0), len(text))

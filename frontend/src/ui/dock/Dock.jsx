@@ -11,6 +11,7 @@ import { CostTab } from './CostTab.jsx';
 import { SourcesTab } from './SourcesTab.jsx';
 import { SavedTab } from './SavedTab.jsx';
 import { RunsTab } from './RunsTab.jsx';
+import { LabTab } from './LabTab.jsx';
 import { StatsTab } from '../RunStats.jsx';
 import { Movable } from '../Movable.jsx';
 
@@ -32,6 +33,7 @@ const GROUPS = [
   ['Records', [
     { id: 'saved', label: 'Saved', Tab: SavedTab, hint: 'Save and load laydowns' },
     { id: 'runs', label: 'Runs', Tab: RunsTab, hint: 'Results of past runs' },
+    { id: 'lab', label: 'Lab', Tab: LabTab, hint: 'Laydowns found by the overnight lab search, with how well each held out' },
   ]],
   ['Reference', [
     { id: 'systems', label: 'Sources', Tab: SourcesTab, paneId: 'systems', hint: 'Every figure and where it comes from. You can edit them here' },

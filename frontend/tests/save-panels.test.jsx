@@ -8,6 +8,7 @@ import { ADAPT, GAME_VERSION, STRUCTURES, resetAllFigures } from '../src/sim/con
 import { GameContext } from '../src/ui/hooks.js';
 import { SavedTab } from '../src/ui/dock/SavedTab.jsx';
 import { RunsTab } from '../src/ui/dock/RunsTab.jsx';
+import { LabTab } from '../src/ui/dock/LabTab.jsx';
 import { FigureSets } from '../src/ui/dock/FigureSets.jsx';
 import { MIXED, setUp } from './support/scenarios.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
@@ -271,5 +272,91 @@ describe('saved figure sets', () => {
     fireEvent.click(screen.getByText('Try again'));
     await settle();
     expect($('#figset-error')).toBeNull();
+  });
+});
+
+describe('lab tab', () => {
+  const put = (file, over = {}) => api.lab.files.set(file, { name: file, world: '1', game_version: GAME_VERSION, spec: JSON.parse(JSON.stringify(game.sim.currentLaydown())), ...over });
+
+  it('says so when the lab has written nothing', async () => {
+    show(<LabTab active />);
+    await settle();
+    expect(text('.muted')).toContain('No lab laydowns yet');
+    expect($('#lab-report')).toBeNull();
+  });
+
+  it('lists the lab laydowns with their results and links the report', async () => {
+    armed();
+    api.lab.report = true;
+    put('lab-1.json', { name: 'lab 1 7 sites', lab: { sites: 7, waves: 27, ci: 0, capex: 5112678, perPoundShots: 0.04, perPound: 0.31, what: '7 vehicles at 350 m' } });
+    put('plain.json', { name: 'starting layout' });
+    show(<LabTab active />);
+    await settle();
+    const rows = [...document.querySelectorAll('#lab-list tbody tr')].map((r) => r.textContent);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain('lab 1 7 sites');
+    expect(rows[0]).toContain('27');
+    expect(rows[0]).toContain('£3.83M'); // the game shows its dollar prices in pounds
+    expect(rows[0]).toContain('£0.04 / £0.31');
+    expect($('#lab-report').getAttribute('href')).toBe('/api/v1/lab/report');
+  });
+
+  it('loads one into the run after a second click, without saving it', async () => {
+    armed();
+    put('lab-1.json', { name: 'lab 1 7 sites' });
+    game.sim.commands.reset('clear');
+    expect(game.sim.structures.length).toBe(0);
+    show(<LabTab active />);
+    await settle();
+    const button = $('#lab-list .saved-actions button');
+    fireEvent.click(button);
+    expect(button.textContent).toBe('Replace run?');
+    expect(game.sim.structures.length).toBe(0);
+    fireEvent.click(button);
+    await settle();
+    expect(game.sim.structures.length).toBe(MIXED.length);
+    expect(text('#lab-note')).toContain('lab 1 7 sites');
+    expect(api.laydowns.rows.size).toBe(0);
+  });
+
+  it('shows the reason when the server is down, and can try again', async () => {
+    api.state.down = true;
+    show(<LabTab active />);
+    await settle();
+    expect(text('#lab-error')).toContain('not running');
+    api.state.down = false;
+    fireEvent.click($('#lab-error button'));
+    await settle();
+    expect($('#lab-error')).toBeNull();
+  });
+});
+
+describe('opening a laydown file', () => {
+  const open = async (content, name = 'lab.json') => {
+    show(<SavedTab active />);
+    await settle();
+    const file = new File([typeof content === 'string' ? content : JSON.stringify(content)], name, { type: 'application/json' });
+    await act(async () => { fireEvent.change($('#import-laydown'), { target: { files: [file] } }); await new Promise((r) => setTimeout(r, 20)); });
+  };
+
+  it('loads a saved laydown file into the run without saving it', async () => {
+    armed();
+    const spec = JSON.parse(JSON.stringify(game.sim.currentLaydown()));
+    game.sim.commands.reset('clear');
+    expect(game.sim.structures.length).toBe(0);
+    await open({ name: 'From disk', world: '1', game_version: GAME_VERSION, spec });
+    expect(game.sim.structures.length).toBe(MIXED.length);
+    expect(text('#saved-note')).toContain('From disk');
+    expect(api.laydowns.rows.size).toBe(0);
+  });
+
+  it('refuses a file that is not a laydown, and leaves the run alone', async () => {
+    armed();
+    await open({ spec: { structures: [{ id: 'not_a_system', x: 0, z: 0 }], fusionUplinks: [] } });
+    expect(text('#saved-note')).toMatch(/not a laydown/);
+    expect(game.sim.structures.length).toBe(MIXED.length);
+    await open('this is not json');
+    expect(text('#saved-note')).toBeTruthy();
+    expect(game.sim.structures.length).toBe(MIXED.length);
   });
 });
