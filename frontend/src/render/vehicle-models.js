@@ -27,8 +27,8 @@ export function hilux(k) {
   return { roof: 0.48, z: -0.75 };
 }
 
-// A mule UGV in the Milrem THeMIS class: 2.5 m long, 2.0 m wide and 1.2 m tall, two track units with a payload deck between them.
-export function mule(k) {
+// Milrem THeMIS: 2.47 m long, 2.04 m wide and 1.17 m tall, two track units with a payload deck between them.
+export function themis(k) {
   for (const x of [-0.37, 0.37]) {
     k.box('dark', 0.2, 0.36, 1.12, x, 0.2, 0);
     k.box('drab', 0.22, 0.12, 1.0, x, 0.42, 0); // track unit cover
@@ -38,4 +38,4 @@ export function mule(k) {
   return { roof: 0.5, z: 0 };
 }
 
-export const VEHICLES = { patria, hilux, mule };
+export const VEHICLES = { patria, hilux, themis };

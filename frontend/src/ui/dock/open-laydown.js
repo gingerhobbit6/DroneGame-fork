@@ -4,12 +4,13 @@
 import { STRUCTURES } from '../../sim/config/index.js';
 import { zoneFromSpec } from '../../zone.js';
 
-export async function openLaydown(game, saved, fallbackName) {
+// here: lay it out round the site on the ground in play now, instead of switching to the ground it was made for.
+export async function openLaydown(game, saved, fallbackName, here = false) {
   const spec = saved?.spec || saved, world = typeof saved?.world === 'string' ? saved.world : game.sim.state.terrainSeed;
   const okSystem = (l) => l && Object.hasOwn(STRUCTURES, l.id) && Number.isFinite(l.x) && Number.isFinite(l.z);
   if (!Array.isArray(spec?.structures) || !spec.structures.every(okSystem) || !Array.isArray(spec.fusionUplinks)) throw new Error('That file is not a laydown this game can read.');
-  const problem = (await game.ensureWorld(world)) || game.commands.loadLaydown(spec, world);
+  const problem = here ? game.commands.loadLaydownHere(spec) : (await game.ensureWorld(world)) || game.commands.loadLaydown(spec, world);
   if (problem) throw new Error(problem);
   game.setViewOption('zone', zoneFromSpec(spec));
-  return `Opened ${spec.structures.length} systems from "${saved.name || fallbackName}". It is not saved: use Save to keep it.`;
+  return `Opened ${spec.structures.length} systems from "${saved.name || fallbackName}"${here ? ' round this site' : ''}. It is not saved: use Save to keep it.`;
 }

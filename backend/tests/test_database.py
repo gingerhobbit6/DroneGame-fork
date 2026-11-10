@@ -25,8 +25,8 @@ def write(folder, name, sql):
 
 
 def test_from_empty_builds_every_table(conn):
-    assert migrate(conn) == 3
-    assert version(conn) == 3
+    assert migrate(conn) == 4
+    assert version(conn) == 4
     assert {"laydowns", "runs", "figure_sets", "users", "sessions", "units", "account_sequence"} <= tables(conn)
 
 
@@ -34,7 +34,7 @@ def test_running_again_changes_nothing(conn):
     migrate(conn)
     conn.execute("INSERT INTO figure_sets (name, figures, game_version, created_at) VALUES ('a', '{}', '1', 'now')")
     conn.commit()
-    assert migrate(conn) == 3
+    assert migrate(conn) == 4
     assert conn.execute("SELECT COUNT(*) FROM figure_sets").fetchone()[0] == 1
 
 
@@ -85,7 +85,7 @@ def test_open_database_creates_the_folder(tmp_path):
     open_database(path)
     open_database(path)
     conn = connect(path)
-    assert version(conn) == 3
+    assert version(conn) == 4
     conn.close()
 
 
@@ -169,3 +169,23 @@ def test_stores_cover_the_same_interface_as_the_fake():
     for store in [SqliteLaydownStore, SqliteRunStore, SqliteFigureSetStore]:
         for method in ["add", "get", "delete", "list"]:
             assert callable(getattr(store, method))
+
+
+def test_the_themis_migration_rewrites_saved_vehicle_ids(tmp_path):
+    """Migration 0004: laydowns, runs and packs saved with the old id for the THeMIS read it as "themis"."""
+    import sqlite3
+
+    from app.db.connection import MIGRATIONS
+
+    db = sqlite3.connect(":memory:")
+    db.executescript("""
+        CREATE TABLE laydowns (spec TEXT); CREATE TABLE runs (spec TEXT, commands TEXT); CREATE TABLE units (assets TEXT);
+        INSERT INTO laydowns VALUES ('{"structures": [{"id": "jammer", "vehicle": "mule"}], "name": "a mule track"}');
+        INSERT INTO runs VALUES ('{"patrolColumn": [{"vehicle": "mule"}]}', '[{"name": "place", "args": ["rf", 1, 2, null, "mule"]}]');
+        INSERT INTO units VALUES ('{"vehicles": [{"id": "mule", "count": 2}]}');
+    """)
+    db.executescript((MIGRATIONS / "0004_themis.sql").read_text(encoding="utf-8"))
+    assert db.execute("SELECT spec FROM laydowns").fetchone()[0] == '{"structures": [{"id": "jammer", "vehicle": "themis"}], "name": "a mule track"}'
+    assert '"themis"' in db.execute("SELECT spec FROM runs").fetchone()[0] and '"themis"' in db.execute("SELECT commands FROM runs").fetchone()[0]
+    assert db.execute("SELECT assets FROM units").fetchone()[0] == '{"vehicles": [{"id": "themis", "count": 2}]}'
+

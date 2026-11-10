@@ -3,13 +3,14 @@
 import re
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, StringConstraints
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, JsonValue, StringConstraints
 
 # Names the game uses. A test compares these with the frontend's config, so they cannot drift apart.
 SystemId = Literal[
     "radar", "radar_s", "radar_a400", "radar_a800", "radar_giraffe", "radar_l", "rf", "rf_s", "rf_elysion", "rf_airfence", "rf_l", "camera", "camera_s", "camera_l", "acoustic", "acoustic_s", "acoustic_l",
     "jammer", "jammer_s", "jammer_l", "jammer_auds", "jammer_neo", "jammer_jupiter", "jammer_sf", "jammer_mk4", "jammer_skywiper", "jammer_kvertus", "jammer_dgmk3", "jammer_dgtac", "interceptor", "interceptor_s", "interceptor_l", "interceptor_p1",
     "missile", "missile_s", "missile_l", "missile_rr", "missile_hvm", "missile_paladin", "missile_skysabre", "gun_hmg", "gun_s", "gun_50", "gun_l", "gun_skyranger", "gun_gepard",
+    "gun_shotgun", "gun_droneround", "rf_rfpatrol", "rf_chuyka", "camera_podview", "radar_xenta", "jammer_vepr",
     "laser", "laser_s", "laser_l", "laser_rfdew",
 ]
 Uplink = Literal["starlink", "cellular"]
@@ -19,7 +20,11 @@ JamBand = Literal["control900", "control24", "video58", "gnss"]
 DroneTypeId = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,31}$")]
 MAX_ATTACK_TYPES = 64
 Protection = Literal["open", "building", "bunker"]
-PatrolVehicle = Literal["patria", "hilux", "mule"]  # PATROL_VEHICLES in frontend/src/sim/config/patrol.js
+VehicleName = Literal["patria", "hilux", "themis"]  # PATROL_VEHICLES in frontend/src/sim/config/patrol.js
+# A laydown file or an offline run written before the THeMIS got its own id still loads (RENAMED_VEHICLES in patrol.js)
+_renamed = BeforeValidator(lambda v: {"mule": "themis"}.get(v, v) if isinstance(v, str) else v)
+PatrolVehicle = Annotated[VehicleName, _renamed]
+EscortCarrier = Annotated[Literal["patria", "hilux", "themis", "foot"], _renamed]  # ESCORT_CARRIERS in frontend/src/sim/config/patrol.js: the vehicles, and a soldier on foot
 MAX_ESCORTS = 6
 MAX_ESCORT_GAP = 200  # metres along the route, ahead of the people or (negative) behind
 MAX_ESCORT_SIDE = 100  # metres to the right of the people or (negative) to the left
@@ -94,8 +99,9 @@ class PlacedPeople(Strict):
 class Escort(Strict):
     """One vehicle in a patrol's column: what it is, the system it carries, and its place in the formation."""
 
-    vehicle: PatrolVehicle
+    vehicle: EscortCarrier
     system: SystemId
+    also: list[SystemId] | None = Field(default=None, min_length=1, max_length=2, exclude_if=lambda also: also is None)  # up to 2 more on the same vehicle (MAX_ON_VEHICLE)
     gap: Annotated[float, Field(ge=-MAX_ESCORT_GAP, le=MAX_ESCORT_GAP)]
     side: Annotated[float, Field(ge=-MAX_ESCORT_SIDE, le=MAX_ESCORT_SIDE)] | None = Field(default=None, exclude_if=lambda side: side is None)  # older columns have none
 

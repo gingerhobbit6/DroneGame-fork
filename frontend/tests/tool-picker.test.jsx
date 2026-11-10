@@ -63,7 +63,7 @@ describe('the list', () => {
     expect(game.catalogue()).toBe('radar');
     const text = $('#tool-picker').textContent;
     for (const name of ['Echodyne EchoGuard', 'Robin Radar IRIS', 'Blighter A800', 'Hensoldt Spexer']) expect(text).toContain(name);
-    expect(document.querySelectorAll('[data-pick]').length).toBe(6);
+    expect(document.querySelectorAll('[data-pick]').length).toBe(7);
     expect(document.querySelectorAll('[aria-pressed="true"]').length).toBe(0);
     expect(text).toContain('3.1 km small drone');
     expect($('#pick-hint').textContent).toMatch(/Drag a system onto the map/);
@@ -104,7 +104,7 @@ describe('the list', () => {
   it('has no small, medium and large buttons on the rows', () => {
     show();
     expect(document.querySelector('.tool-sizes')).toBeNull();
-    expect($('.tool-row .k').textContent).toBe('[1] 6 real systems');
+    expect($('.tool-row .k').textContent).toBe('[1] 7 real systems');
     act(() => game.setTool('radar_a800'));
     expect($('.tool-row .k').textContent).toBe('[1] Blighter A800');
   });

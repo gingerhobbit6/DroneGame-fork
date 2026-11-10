@@ -314,7 +314,7 @@ From [`schemas.py`](../backend/app/schemas.py) and [`account_schemas.py`](../bac
 | `JamBand` | `control900`, `control24`, `video58`, `gnss` | [`schemas.py:17`](../backend/app/schemas.py#L17) |
 | `DroneTypeId` | `^[a-z][a-z0-9_]{0,31}$`. Shape only: the game keeps only ids it knows | [`schemas.py:19`](../backend/app/schemas.py#L19) |
 | `Protection` | `open`, `building`, `bunker` | [`schemas.py:21`](../backend/app/schemas.py#L21) |
-| `PatrolVehicle` | `patria`, `hilux`, `mule` | [`schemas.py:22`](../backend/app/schemas.py#L22) |
+| `PatrolVehicle` | `patria`, `hilux`, `themis` | [`schemas.py:22`](../backend/app/schemas.py#L22) |
 | `Callsign` | `^[A-Za-z0-9][A-Za-z0-9 -]{0,11}$` | [`schemas.py:63`](../backend/app/schemas.py#L63) |
 | `Settings` | Up to 16 entries `{ FigureKey: value }`, where a value is a number from -150 to 10^12, a choice `^[a-z]{1,16}$`, up to 3 arcs `[from, to]` of whole degrees 0 to 359, or 1 to 4 `JamBand`. Shape and coarse bounds only: the game clamps each to the system's own limits on load | [`schemas.py:79`](../backend/app/schemas.py#L79) |
 

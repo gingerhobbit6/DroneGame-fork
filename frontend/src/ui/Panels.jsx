@@ -42,6 +42,10 @@ export function Legend() {
   );
 }
 
+// How long a message stays, in ms. With the Area to defend panel open, a refused route or column says why at length, and the player is
+// reading the panel too, so it stays longer.
+const TOAST_MS = 2600, TOAST_PANEL_MS = 8000;
+
 export function Toast() {
   const game = useGame();
   const [{ text, show }, setToast] = useState({ text: '', show: false });
@@ -49,7 +53,7 @@ export function Toast() {
   useEffect(() => game.onToast((msg) => {
     setToast({ text: msg, show: true });
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), 2600);
+    timer.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), document.getElementById('zone-panel') ? TOAST_PANEL_MS : TOAST_MS);
   }), [game]);
   return <div id="toast" className={show ? 'show' : ''}>{text}</div>;
 }

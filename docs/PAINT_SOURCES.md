@@ -59,6 +59,13 @@ A system's map colour (`def.color`) is kept for its label, its rings and a thin 
 | gun_s, gun_50 | L7A2 GPMG, L111A1 HMG | dark steel `#2a2b2a` | medium | https://en.wikipedia.org/wiki/FN_MAG | not checked against photos |
 | (vehicles) | Patria 6x6, trucks, trailers, THeMIS | NATO green `#4d5a3c` | high | https://milremrobotics.com/milrem-robotics-showcases-themis-combat-cargo-ugv-at-defense-security-2025/ | Patria's 3-colour camouflage not drawn |
 | (vehicles) | Toyota Hilux, military | olive `#4d5a3c` | medium | https://www.opex360.com/2026/06/27/exit-le-land-rover-les-forces-speciales-de-la-british-army-vont-recevoir-270-vehicules-de-type-pick-up-toyota-hilux/ | also tan and UN white |
+| gun_shotgun | 12-gauge shotgun | black `#1f2021` | medium | https://armadainternational.com/?p=23813 | |
+| gun_droneround | 5.56 mm rifle | coyote and black `#4b4a3f` | low | https://dronerounddefense.com/ | the rifle, not the round |
+| rf_rfpatrol | DroneShield RfPatrol Mk2 | black case `#2b2c2e` | medium | https://www.droneshield.com/rfpatrol-mk2 | |
+| rf_chuyka | BlueBird Chuyka 3.0 | black case `#26282a` | medium | https://www.blue-bird.tech/en/products/chuyka-3-0/ | |
+| camera_podview | Overview PodView2600 | grey `#8f9496` | low | https://overview.co.uk/product/podview-family/ | marine-grade finish; colour not stated |
+| radar_xenta | Weibel XENTA-M5 | army green `#56603f` | low | https://www.weibelradars.com/wp-content/uploads/2026/01/XENTA-M-Brochure.pdf | inferred from military fits |
+| jammer_vepr | Kvertus AD VEPR M100 | olive `#4f5640` | low | https://flasharmy.com.ua/en/kvertus-ad-vepr-m100 | |
 
 ## Drones
 

@@ -113,7 +113,7 @@ class TestLaydowns:
         assert client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]["patrol"] == route
 
     def test_a_system_parked_on_a_vehicle_is_kept_with_the_laydown(self, client):
-        parked = {"id": "jammer", "x": 5.0, "z": 5.0, "uplink": None, "cellBand": "B8", "jam": None, "vehicle": "mule"}
+        parked = {"id": "jammer", "x": 5.0, "z": 5.0, "uplink": None, "cellBand": "B8", "jam": None, "vehicle": "themis"}
         made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "structures": [parked]}))
         assert made.status_code == 201
         assert client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]["structures"] == [parked]
@@ -121,10 +121,26 @@ class TestLaydowns:
         assert client.post(f"{API}/laydowns", json=tank).status_code == 422
 
     def test_a_patrol_column_is_kept_with_the_laydown(self, client):
-        column = [{"vehicle": "hilux", "system": "gun_hmg", "gap": 40}, {"vehicle": "mule", "system": "jammer_s", "gap": -25.5}]
+        column = [{"vehicle": "hilux", "system": "gun_hmg", "gap": 40}, {"vehicle": "themis", "system": "jammer_s", "gap": -25.5}]
         made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": column}))
         assert made.status_code == 201
         assert client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]["patrolColumn"] == column
+
+    def test_a_vehicle_carries_up_to_three_systems_in_a_column(self, client):
+        column = [{"vehicle": "patria", "system": "radar_a800", "also": ["gun_hmg", "jammer_s"], "gap": 40}]
+        made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": column}))
+        assert made.status_code == 201
+        assert client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]["patrolColumn"] == column
+        four = [{**column[0], "also": ["gun_hmg", "jammer_s", "rf"]}]
+        assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": four})).status_code == 422
+
+    def test_a_laydown_written_before_the_themis_had_its_own_id_still_loads(self, client):
+        old = {"id": "jammer", "x": 5.0, "z": 5.0, "uplink": None, "cellBand": "B8", "jam": None, "vehicle": "mule"}
+        column = [{"vehicle": "mule", "system": "jammer_s", "gap": -25.5}]
+        made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "structures": [old], "patrol": [[10, 10], [30, 10]], "patrolColumn": column}))
+        assert made.status_code == 201
+        spec = client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]
+        assert spec["structures"][0]["vehicle"] == "themis" and spec["patrolColumn"][0]["vehicle"] == "themis"
 
     @pytest.mark.parametrize("column", [
         [],

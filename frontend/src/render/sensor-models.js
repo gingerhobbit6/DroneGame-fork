@@ -41,6 +41,13 @@ export function radar(b, h, def, r) {
 }
 
 export function rf(b, h, def, r) {
+  if (def.handheld) { // a pocket receiver held by a soldier, its whip antenna up and its screen showing the drone's video
+    const m = 1 / SYSTEM_UNIT_M;
+    h.geo('figure', soldierFigure().scale(m, m, m));
+    h.box('body', 0.16 * m, 0.1 * m, 0.05 * m, 0.2 * m, 1.15 * m, 0.25 * m);
+    h.post('dark', 0.006, 0.25 * m, 0.25 * m, 1.32 * m, 0.25 * m);
+    return { headY: 0 };
+  }
   const at = stand(b, r, def);
   switch (def.id) {
     case 'rf_s': // MyDefence Wingman: a small receiver with two short whips

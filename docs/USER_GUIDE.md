@@ -71,6 +71,10 @@ Rounds can miss. The Unit panel gives each weapon's chance against each drone, c
 
 The attack is built from four generic drone types: first-person-view (FPV) strike drones, fibre-optic strike drones that fly low and emit no radio, fixed-wing strike drones, and fixed-wing spotters that make strikes hit harder. They get harder to hit and jam each wave. Press **Attack** in the top right to choose what the waves send: tick any mix of the generic types and the real Russian, Iranian, Chinese and commercial drones, which take turns in the place of their type. The choice saves with the laydown and locks when the first wave starts. Every drone and its figures are in [DRONES.md](DRONES.md).
 
+
+To move a system, click it and press **Move** in its panel, then click where it should go: it keeps its settings, wiring and name, and costs nothing. A vehicle moves with everything on it. The **Sell** tool, or **Remove** in a system's panel, takes a system away; the Sell tool also takes away a group of people you click, as does the × beside each group in the People list. Until the first wave starts, all of this can be changed.
+
+A vehicle parked from a deployment pack can carry up to three systems: place another system beside it and it goes on board, if the vehicle can carry it, one heavy system at most. A camera placed beside a radar goes on the radar's mast, as on Roke's CORTEXA GUARDIAN.
 ## 2. Network it
 
 Every system is a SAPIENT node, and an unwired one cannot report or be tasked. Open **SAPIENT > Network > Auto-wire**, or wire each one to Starlink or cellular by hand. Links depend on the sky, the terrain, cell towers and your own jammers. Click a system or a wire to see its link and the packets on it, or step through the simulation one packet at a time. See [SAPIENT.md](SAPIENT.md).
@@ -119,7 +123,7 @@ The **Cost** tab compares what you spent with what the attack cost the enemy, br
 
 ![The Cost tab showing the budget, cost exchange and shots fired per effector](screenshots/cost.jpg)
 
-When the site falls, the run is saved to your history in the **Runs** tab. You can retry the same laydown or start a new one, and laydowns are kept in the **Saved** tab.
+When the site falls, the run is saved to your history in the **Runs** tab. You can retry the same laydown or start a new one, and laydowns are kept in the **Saved** tab. A laydown made on other ground, generated or a different real map, has **Load here** beside **Load**: it lays the laydown out round the site you are on now, keeping each system's distance and bearing from it, and leaves out any that would stand in water, on a building, on steep ground or off the map. The **Lab** tab has the same button for the lab's laydowns.
 
 ![The Site Lost card after 12 full waves](screenshots/gameover.jpg)
 
@@ -133,7 +137,7 @@ The **Sources** tab shows the evidence and confidence behind each figure, labell
 
 ## Deployment packs
 
-A deployment pack is a military unit, from a fireteam to a battalion, with a callsign and the real sensors, effectors, vehicles and groups of people assigned to it. Build packs in your profile. Press **Deploy** on a pack and the game lists its kit in a tray at the top of the toolbar, with how many of each are left to place. Drag each onto the map. A pack's systems come out of the same budget as any other. A vehicle is placed with one of the pack's systems on board, chosen in the tray, and stands it at the vehicle's mast height. With a pack deployed, a patrol's column takes only the pack's vehicles. Packs belong to your account; laydowns, runs and figure sets are shared by every account on this computer.
+A deployment pack is a military unit, from a fireteam to a battalion, with a callsign and the real sensors, effectors, vehicles and groups of people assigned to it. Build packs in your profile. Press **Deploy** on a pack and the game lists its kit in a tray at the top of the toolbar, with how many of each are left to place. Drag each onto the map. A pack's systems come out of the same budget as any other. A vehicle is placed with one of the pack's systems on board, chosen in the tray, and stands it at the vehicle's mast height. With a pack deployed, a patrol's column takes only the pack's vehicles. To go back to buying systems one by one, choose **No pack** in your profile, or **None** in the start screen's pack list. Packs belong to your account; laydowns, runs and figure sets are shared by every account on this computer.
 
 ## Simulated people
 

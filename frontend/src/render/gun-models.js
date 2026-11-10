@@ -25,7 +25,17 @@ function pintle(b, h, heavy) {
   return { headY: roof, headZ: z };
 }
 
+// A shotgun held by a soldier, who turns to aim it: its stock at the shoulder and the barrel and tube magazine forward.
+function shotgun(h) {
+  h.geo('figure', soldierFigure().scale(M, M, M));
+  h.box('dark', 0.05 * M, 0.08 * M, 0.35 * M, 0.08 * M, 1.4 * M, 0.2 * M); // receiver and stock
+  barrel(h, 0.012 * M, 0.55 * M, 1.43 * M, 0.38 * M, 0.05, 0.08 * M);
+  barrel(h, 0.013 * M, 0.45 * M, 1.39 * M, 0.38 * M, 0.05, 0.08 * M); // the tube magazine under it
+  return { headY: 0 };
+}
+
 export function gun(b, h, def) {
+  if (def.handheld) return shotgun(h);
   switch (def.id) {
     case 'gun_s': return pintle(b, h, false); // L7A2 GPMG
     case 'gun_50': return pintle(b, h, true); // L111A1 .50 cal

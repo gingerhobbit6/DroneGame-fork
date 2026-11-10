@@ -87,7 +87,7 @@ export function PackEditor({ api, pack, onSaved, onCancel }) {
     <form className="acct-box" onSubmit={save} aria-label="Deployment pack">
       <h3>{draft.id ? 'Edit deployment pack' : 'New deployment pack'}<button type="button" className="acct-ghost" onClick={onCancel}>Cancel</button></h3>
       <div className="acct-three">
-        <TextField label="Unit name" hint="Such as 2 Troop, 12 Regiment RA" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} required maxLength={100} autoFocus />
+        <TextField label="Pack name" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} required maxLength={100} autoFocus />
         <label className="acct-field">Size
           <select value={draft.echelon} onChange={(e) => setDraft({ ...draft, echelon: e.target.value })}>
             {Object.entries(ECHELONS).map(([id, e]) => <option key={id} value={id}>{e.name}</option>)}

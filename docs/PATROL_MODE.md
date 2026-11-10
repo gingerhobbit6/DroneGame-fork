@@ -20,9 +20,13 @@ Every member follows the route at its own place along it, offset to the side of 
 
 ## Mobile and static systems
 
-Mobile systems ride in the column on a Patria 6x6, a Toyota Hilux or a Mule UGV, as before. Static systems are placed from the toolbar, inside the corridor, and stay where they are: an overwatch radar on high ground, or a jammer at a choke point. Both come from the same systems and budget.
+Mobile systems ride in the column on a Patria 6x6, a Toyota Hilux or a Milrem THeMIS uncrewed ground vehicle, up to three systems on each and one heavy at most ([`patrol.js`](../frontend/src/sim/config/patrol.js), `MAX_ON_VEHICLE`, an assumption). The systems on one vehicle share a strike and are lost together. Static systems are placed from the toolbar, inside the corridor, and stay where they are: an overwatch radar on high ground, or a jammer at a choke point. Both come from the same systems and budget.
 
 Sensors work on the move. Weapons fire from the halt: while any weapon in the column has an engagement task, the whole patrol stops, and it walks on once the task ends. A jammer works on the move. Making this a per-system choice was considered and left out: the only systems that need it today are jammers, and the rule already exempts them.
+
+## Soldiers on foot
+
+A place in the column can be a soldier on foot instead of a vehicle ([`patrol.js`](../frontend/src/sim/config/patrol.js), `ON_FOOT`). A soldier carries a hand-held system at 1.5 m: DroneShield's RfPatrol, the Chuyka FPV video detector, a shotgun, or a rifle firing Drone Round. Soldiers are not a deployment pack's vehicles, so a pack never runs out of them. The guns are only carried on foot; the detectors can also ride on any vehicle. The detectors report to the fusion node over the soldier's radio, an assumption.
 
 ## Out and back
 

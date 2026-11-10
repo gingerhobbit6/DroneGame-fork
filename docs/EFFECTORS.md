@@ -15,6 +15,7 @@ This is the inventory of every effector the defender can buy: RF jammers, interc
 - [Guns](#guns)
 - [Lasers and the RF weapon](#lasers-and-the-rf-weapon)
 - [Crewed systems off the network](#crewed-systems-off-the-network)
+- [A soldier's shotgun and rifle, and the VEPR dome](#a-soldiers-shotgun-and-rifle-and-the-vepr-dome)
 - [Limits and simplifications](#limits-and-simplifications)
 - [Where this lives in the code](#where-this-lives-in-the-code)
 
@@ -327,9 +328,21 @@ Seconds of beam to destroy each type, close in / at its limit, at wave 1. Add th
 
 ## Crewed systems off the network
 
-Seven systems are worked by hand by a crew and cannot be wired to the fusion node (`networked: false`, [`crew.js:1`](../frontend/src/sim/config/crew.js#L1)): the GPMG and the .50 cal on a vehicle pintle, and the DroneGun Mk4, MkIII and Tactical, SkyWiper and Kvertus handheld jammers. Nothing tasks them and they need no network terminal.
+Nine systems are worked by hand by a crew and cannot be wired to the fusion node (`networked: false`, [`crew.js:1`](../frontend/src/sim/config/crew.js#L1)): the GPMG and the .50 cal on a vehicle pintle, the DroneGun Mk4, MkIII and Tactical, SkyWiper and Kvertus handheld jammers, the shotgun and the rifle with Drone Round. Nothing tasks them and they need no network terminal.
 
 The crew picks its own target ([`crew.js:38`](../frontend/src/sim/crew.js#L38)): every 0.5 s it looks for the nearest drone in reach that it can see by eye, and keeps it while it can. A jammer crew may also take one it is warned of. It fires or jams 3 s after first seeing the drone, or at once if it was warned 3 s or more before. It is warned by its wearable detector, which hears a drone with a radio link within 400 m, or by ear. A handheld jammer jams through a 30° beam pointed at its target ([`jamming.js:17`](../frontend/src/sim/jamming.js#L17)). How far a crew sees and hears each drone type is tabled in [VEHICLES.md](VEHICLES.md#crews), and the crews as people in [PEOPLE.md](PEOPLE.md).
+
+## A soldier's shotgun and rifle, and the VEPR dome
+
+Added in November 2026 ([`field-systems.js`](../frontend/src/sim/config/field-systems.js)). Prices are game prices in dollars; the game shows them in pounds at 0.75.
+
+| id | Product | Range | Hit chance at close range / at its limit | Damage | Shot cost | Basis |
+|---|---|---|---|---|---|---|
+| `gun_shotgun` | 12-gauge shotgun, birdshot | 40 m | 25% / 6% | 25 | $1 | 30 to 50 m reported against small aerial targets, 30 to 45 m against FPV drones in Ukraine. Hit chance assumed |
+| `gun_droneround` | 5.56 mm rifle firing Drone Round L Variant | 100 m | 15% / 4% a round | 30 | $3 | Drone Round: 5 projectiles, 2,200 ft/s, 100 m (the K Variant, 8 projectiles, 50 m); bought by the US Marine Corps. Hit chance and price assumed |
+| `jammer_vepr` | Kvertus AD VEPR M100 dome | 3 km | jams | | $0 | Retailer: 420 to 5,900 MHz, 4 x 100 W, up to 3 km. Networking it is an assumption |
+
+Both are carried by a soldier and fired by hand, off the network, like the crewed machine guns below. The shotgun holds 8 cartridges, carries 40 and takes 8 s to reload; the rifle a 30-round magazine, 7 carried, 4 s to change, as a rifleman's standard load. A soldier can carry either in a patrol's column ([PATROL_MODE.md](PATROL_MODE.md#soldiers-on-foot)), but no vehicle takes one: they are fired on foot.
 
 ## Limits and simplifications
 

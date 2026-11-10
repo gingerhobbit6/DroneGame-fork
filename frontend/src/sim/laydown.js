@@ -2,7 +2,8 @@
 // once the first wave starts, so runs are comparable.
 
 import { Vector3 } from 'three';
-import { WORLD, BUILD, COMMS, ECONOMY, PATROL, PATROL_VEHICLES, STRUCTURES, carries } from './config/index.js';
+import { WORLD, BUILD, COMMS, ECONOMY, PATROL, PATROL_VEHICLES, STRUCTURES, carries, vehicleId } from './config/index.js';
+import { MAST_SIDE, RIDER_STEP, hostFor, nextPlatform, platformOf, regroupVehicles } from './sharing.js';
 import { terrainState } from './terrain.js';
 import { SITE_POS, u, hdist, hereU } from './units.js';
 import { cleanZone, reachProblem, siteIsFree, zoneCentre } from './attack-area.js';
@@ -10,7 +11,7 @@ import { outwardFrom } from './sensor-model.js';
 import { cleanMix, hasStrike, isDefaultMix } from './attack-mix.js';
 import { ENV, cleanConditions } from './conditions.js';
 import { buyTerminal, money } from './economy.js';
-import { capturePeople, clearPeople, restorePeople } from './people.js';
+import { capturePeople, clearPeople, removePeople, restorePeople } from './people.js';
 import { fillMagazine } from './magazine.js';
 import { LAYDOWN_LOCKED, designLocked } from './lock.js';
 import { DEFAULT_PLAN, planOf, setPatrol } from './patrol.js';
@@ -21,6 +22,7 @@ import { cleanCallsign, cleanName, cleanSettings, fieldsFor, setSetting, unitCos
 export function addStructure(w, id, x, z, saved = {}, reserved) {
   const def = unitDef(id, cleanSettings(id, saved.settings));
   if (carries(saved.vehicle, id)) def.vehicle = saved.vehicle; // parked on a vehicle from a pack, and drawn on it
+  if (def.vehicle && saved.rider) def.rider = true; // a second or third system on that vehicle, which is drawn once
   const y = hereU(x, z);
   const s = { def, health: def.health || 30, pos: new Vector3(x, y, z), cd: 0, aim: 0, beamTarget: null };
   // unless it is told otherwise, it faces away from what is defended, so it follows a drawn area or a walking patrol
@@ -39,7 +41,14 @@ export function removeStructure(w, s) {
   w.structures.splice(w.structures.indexOf(s), 1);
 }
 
-// Why a structure can't go here, or null if it can.
+// Why a system can't stand here on this ground, or null: off the map, in water, on a building or on ground too steep. A laydown made
+// for other ground leaves out what fails this.
+function groundProblem(w, x, z) {
+  const xm = x * WORLD.metresPerUnit, zm = z * WORLD.metresPerUnit;
+  return reachProblem(w, x, z) || (terrainState.data.onBuilding(xm, zm) && 'There is a building here')
+    || (terrainState.data.coverAt(xm, zm) === 4 && 'You cannot build in water') || (terrainState.data.slope(xm, zm) > 0.4 && 'The ground is too steep') || null;
+}
+
 export function placementProblem(w, x, z, def, cost = def.cost) {
   if (!Number.isFinite(x) || !Number.isFinite(z)) return 'Choose a spot on the map';
   const r = Math.hypot(x, z);
@@ -53,7 +62,7 @@ export function placementProblem(w, x, z, def, cost = def.cost) {
   if (terrainState.data.onBuilding(xm, zm)) return 'There is a building here';
   if (terrainState.data.coverAt(xm, zm) === 4) return 'You cannot build in water';
   if (terrainState.data.slope(xm, zm) > 0.4) return 'The ground is too steep';
-  if (w.structures.some((s) => hdist(s.pos, { x, z }) < u(BUILD.spacing))) return 'Too close to another structure';
+  if (w.structures.some((s) => hdist(s.pos, { x, z }) < u(BUILD.spacing)) && !hostFor(w, x, z, def)) return 'Too close to another structure';
   const kit = w.state.kit;
   if (kit) {
     const held = kit[def.id] ?? 0, placed = w.structures.filter((s) => s.def.id === def.id).length;
@@ -76,40 +85,96 @@ export function setPacked(w, kit) {
 export const onVehicle = (id, settings, vehicle) => (vehicle && STRUCTURES[id].mount != null ? { ...settings, mount: PATROL_VEHICLES[vehicle].mast } : settings);
 
 // Returns the reason it can't be placed, or null if it was. With a vehicle, the system is parked on it.
+// Placed beside a vehicle parked from a pack, a system goes onto it if it has room; beside a radar, a camera goes on its mast.
 export function place(w, id, x, z, settings, vehicle) {
   if (vehicle != null && !carries(vehicle, id)) return `A ${PATROL_VEHICLES[vehicle]?.name ?? 'vehicle'} cannot carry the ${STRUCTURES[id].name}`;
+  const crowded = w.structures.some((s) => hdist(s.pos, { x, z }) < u(BUILD.spacing));
+  if (vehicle != null && crowded) return 'Too close to another structure'; // a vehicle of its own needs its own ground
+  const host = vehicle == null && crowded ? hostFor(w, x, z, STRUCTURES[id]) : null;
+  let rider = null;
+  if (host?.mast) { // on the other system's mast, at its height
+    ({ x, z } = { x: host.mast.pos.x + u(MAST_SIDE), z: host.mast.pos.z });
+    if (STRUCTURES[id].mount != null) settings = { ...settings, mount: host.mast.def.mount };
+  } else if (host?.vehicle) { // onto the vehicle: a second system ahead of its first, a third behind
+    rider = host.vehicle;
+    vehicle = rider.def.vehicle;
+    ({ x, z } = { x: rider.pos.x, z: rider.pos.z + u(RIDER_STEP) * (host.crew.length === 1 ? 1 : -1) });
+  }
   settings = onVehicle(id, settings, vehicle);
   const cost = unitCost(id, cleanSettings(id, settings));
   const problem = placementProblem(w, x, z, STRUCTURES[id], cost);
   if (problem) return problem;
   w.state.budget -= cost; w.ledger.capex += cost;
-  addStructure(w, id, x, z, { settings, vehicle });
+  const s = addStructure(w, id, x, z, { settings, vehicle, rider: !!rider });
+  if (rider) { rider.platform ??= nextPlatform(w); s.platform = rider.platform; }
   return null;
 }
 
-// Sell the nearest system to this point, if one is close enough.
+// What a save keeps of one system, and putting it back. Charging is left to the caller.
+function captureOne(s) {
+  return {
+    id: s.def.id, x: s.pos.x, z: s.pos.z, uplink: s.uplink || null, cellBand: s.cellBand, jam: s.jamBands ? [...s.jamBands] : null,
+    ...(s.jamOn && s.def.trigger === 'manual' ? { on: true } : {}), // switched on by hand
+    ...(Object.keys(s.def.settings).length ? { settings: { ...s.def.settings } } : {}),
+    ...(s.def.vehicle ? { vehicle: s.def.vehicle } : {}),
+    ...(s.custom?.name ? { name: s.custom.name } : {}),
+    ...(s.custom?.callsign ? { callsign: s.custom.callsign } : {}),
+  };
+}
+function restoreOne(w, l, reserved) {
+  const s = addStructure(w, l.id, l.x, l.z, l.vehicle ? { ...l, vehicle: vehicleId(l.vehicle) } : l, reserved);
+  if (l.uplink) { s.uplink = l.uplink; w.ledger.terminals[l.uplink]++; }
+  s.cellBand = l.cellBand;
+  if (l.jam && s.jamBands) s.jamBands = new Set(l.jam.filter((b) => s.def.fitted.includes(b)));
+  if (l.on === true && s.jamBands) s.jamOn = true;
+  return s;
+}
+
+// Move a placed system, with its settings, wiring and name, before the first wave. A vehicle moves with every system on it. Returns why
+// it can't, or null; if it can't, the system stays where it was. Nothing is bought or refunded.
+export function move(w, s, x, z) {
+  if (designLocked(w)) return LAYDOWN_LOCKED;
+  if (!w.structures.includes(s)) return 'That system is no longer on the map';
+  if (s.escort) return 'A patrol\u2019s systems move with the patrol: change its column instead';
+  if (s.def.rider) return 'It rides on a vehicle: move the vehicle';
+  const crew = platformOf(w, s), platform = s.platform;
+  const kept = crew.map((o) => ({
+    l: { ...captureOne(o), rider: !!o.def.rider, name: o.custom?.name || o.autoName, callsign: o.custom?.callsign || o.autoShort }, // it keeps its name
+    dx: o.pos.x - s.pos.x, dz: o.pos.z - s.pos.z,
+  }));
+  const from = { x: s.pos.x, z: s.pos.z };
+  for (const o of crew) { if (o.uplink) w.ledger.terminals[o.uplink]--; removeStructure(w, o); } // judged as if it were not there
+  const problem = placementProblem(w, x, z, s.def, 0); // nothing is bought, so the budget is not asked
+  const at = problem ? from : { x, z };
+  const moved = kept.map(({ l, dx, dz }) => restoreOne(w, { ...l, x: at.x + dx, z: at.z + dz }));
+  if (platform != null) for (const o of moved) o.platform = platform;
+  w.emit('moved', moved[0]);
+  return problem;
+}
+
+// Sell the nearest system to this point, if one is close enough, or remove the nearest group of people if they are nearer. Selling a
+// vehicle's first system sells the vehicle with everything on it.
+const PEOPLE_PICK = 60; // metres: a group is drawn small, so a click this close means it
 export function sell(w, x, z) {
   if (designLocked(w)) { w.emit('toast', LAYDOWN_LOCKED); return; }
   let best = null, bd = u(150);
   for (const s of w.structures) { const d = hdist(s.pos, { x, z }); if (d < bd && !s.escort) { bd = d; best = s; } } // the escort goes with its patrol
+  let group = null, gd = Math.min(bd, u(PEOPLE_PICK));
+  for (const g of w.people) { const d = Math.hypot(g.x - x, g.z - z); if (d < gd && !g.patrol) { gd = d; group = g; } }
+  if (group) { removePeople(w, group.id); return; }
   if (!best) return;
-  const refund = Math.round(best.def.cost * BUILD.sellRefund);
-  w.state.budget += refund; w.ledger.capex -= refund;
-  if (best.uplink) buyTerminal(w, best.uplink, null); // its terminal is refunded too
-  removeStructure(w, best);
+  for (const s of best.def.rider ? [best] : platformOf(w, best)) {
+    const refund = Math.round(s.def.cost * BUILD.sellRefund);
+    w.state.budget += refund; w.ledger.capex -= refund;
+    if (s.uplink) buyTerminal(w, s.uplink, null); // its terminal is refunded too
+    removeStructure(w, s);
+  }
 }
 
 export function captureLaydown(w) {
   return {
     // sorted, so the order systems were placed in cannot change the run
-    structures: w.structures.filter((s) => !s.escort).map((s) => ({ // the patrol's escort is rebuilt from its route
-      id: s.def.id, x: s.pos.x, z: s.pos.z, uplink: s.uplink || null, cellBand: s.cellBand, jam: s.jamBands ? [...s.jamBands] : null,
-      ...(s.jamOn && s.def.trigger === 'manual' ? { on: true } : {}), // switched on by hand
-      ...(Object.keys(s.def.settings).length ? { settings: { ...s.def.settings } } : {}),
-      ...(s.def.vehicle ? { vehicle: s.def.vehicle } : {}),
-      ...(s.custom?.name ? { name: s.custom.name } : {}),
-      ...(s.custom?.callsign ? { callsign: s.custom.callsign } : {}),
-    }))
+    structures: w.structures.filter((s) => !s.escort).map(captureOne) // the patrol's escort is rebuilt from its route
       .sort((a, b) => a.id.localeCompare(b.id) || a.x - b.x || a.z - b.z),
     fusionUplinks: [...w.net.fusion.uplinks], fusionCell: w.net.fusion.cellBand,
     ...capturePeople(w),
@@ -128,17 +193,19 @@ export function costProblem(spec) {
 }
 
 // Rebuild the systems and their wiring, charging the budget as if they had just been bought.
-export function restoreLaydown(w, spec) {
+// here: the laydown was made for other ground, so it is laid out round this site and any system that cannot stand on this ground is
+// left out. Returns how many were.
+export function restoreLaydown(w, spec, here = false) {
   const charge = (v) => { w.state.budget -= v; w.ledger.capex += v; };
   const reserved = new Set(spec.structures.map((l) => cleanCallsign(l.callsign)).filter(Boolean));
+  let left = 0;
   for (const l of spec.structures) {
-    const s = addStructure(w, l.id, l.x, l.z, l, reserved);
+    if (here && groundProblem(w, l.x, l.z)) { left++; continue; }
+    const s = restoreOne(w, l, reserved);
     charge(s.def.cost);
-    if (l.uplink) { s.uplink = l.uplink; w.ledger.terminals[l.uplink]++; charge(COMMS[l.uplink].cost); }
-    s.cellBand = l.cellBand;
-    if (l.jam && s.jamBands) s.jamBands = new Set(l.jam.filter((b) => s.def.fitted.includes(b)));
-    if (l.on === true && s.jamBands) s.jamOn = true;
+    if (l.uplink) charge(COMMS[l.uplink].cost);
   }
+  regroupVehicles(w);
   for (const k of spec.fusionUplinks) { w.net.fusion.uplinks.add(k); w.ledger.terminals[k]++; charge(COMMS[k].cost); }
   w.net.fusion.cellBand = spec.fusionCell;
   clearPeople(w);
@@ -146,8 +213,9 @@ export function restoreLaydown(w, spec) {
   applyZone(w, cleanZone(spec.zone));
   w.state.attack = cleanMix(spec.attack);
   applyConditions(w, spec.conditions);
-  const refused = spec.patrol && setPatrol(w, spec.patrol, spec.patrolColumn ?? PATROL.foot.column, spec.patrolPlan ?? DEFAULT_PLAN); // a saved route comes from outside the game, so it is checked again
+  const refused = spec.patrol && setPatrol(w, spec.patrol, spec.patrolColumn?.map((e) => ({ ...e, vehicle: vehicleId(e.vehicle) })) ?? PATROL.foot.column, spec.patrolPlan ?? DEFAULT_PLAN); // a saved route comes from outside the game, so it is checked again
   if (refused) w.emit('toast', `The saved patrol was left out: ${refused}`);
+  return left;
 }
 
 // Which drone types the waves send. Like the laydown, it is locked once the first wave starts. Returns why not, or null.

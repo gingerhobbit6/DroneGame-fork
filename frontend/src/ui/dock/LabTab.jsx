@@ -12,10 +12,10 @@ export function LabTab({ active }) {
   const game = useGame();
   const [note, setNote] = useState('');
   const { data, error, reload } = useLoad(() => game.api.lab.list(), active);
-  const load = useArmed();
+  const load = useArmed(), loadHere = useArmed();
   const attempt = attemptWith(setNote, reload);
 
-  const loadRow = (row) => attempt(async () => openLaydown(game, await game.api.lab.get(row.file), row.name), (message) => message);
+  const loadRow = (row, here = false) => attempt(async () => openLaydown(game, await game.api.lab.get(row.file), row.name, here), (message) => message);
 
   return (
     <>
@@ -38,7 +38,10 @@ export function LabTab({ active }) {
                 <td>{row.lab ? `${row.lab.waves}${row.lab.ci ? ` ±${row.lab.ci}` : ''}` : ''}</td>
                 <td>{row.lab?.capex ? money(row.lab.capex) : ''}</td>
                 <td>{row.lab?.perPound != null ? `${pound(row.lab.perPoundShots)} / ${pound(row.lab.perPound)}` : ''}</td>
-                <td className="saved-actions"><button className="mini" onClick={load.confirm(row.file, () => loadRow(row))}>{load.armed === row.file ? 'Replace run?' : 'Load'}</button></td>
+                <td className="saved-actions">
+                  <button className="mini" onClick={load.confirm(row.file, () => loadRow(row))}>{load.armed === row.file ? 'Replace run?' : 'Load'}</button>
+                  {row.world !== game.sim.state.terrainSeed && <button className="mini load-here" title="Lay it out round this site, on the ground in play now. Systems that cannot stand here are left out." onClick={loadHere.confirm(row.file, () => loadRow(row, true))}>{loadHere.armed === row.file ? 'Replace run?' : 'Load here'}</button>}
+                </td>
               </tr>
             ))}
           </tbody>

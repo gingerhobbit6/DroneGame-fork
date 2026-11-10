@@ -275,6 +275,27 @@ describe('saved figure sets', () => {
   });
 });
 
+describe('loading a laydown here', () => {
+  it('lays one made on other ground out round this site, on the ground in play, after a second click', async () => {
+    armed();
+    const spec = JSON.parse(JSON.stringify(game.sim.currentLaydown()));
+    await api.laydowns.create({ name: 'Made elsewhere', world: '7', spec, game_version: GAME_VERSION });
+    await api.laydowns.create({ name: 'Made here', world: '1', spec, game_version: GAME_VERSION });
+    game.sim.commands.reset('clear');
+    show(<SavedTab active />);
+    await settle();
+    const here = [...document.querySelectorAll('#saved-list .load-here')];
+    expect(here).toHaveLength(1); // only for the one made on other ground
+    fireEvent.click(here[0]);
+    expect(here[0].textContent).toBe('Replace run?');
+    fireEvent.click(here[0]);
+    await settle();
+    expect(game.sim.structures.length).toBe(MIXED.length);
+    expect(game.sim.state.terrainSeed).toBe('1');
+    expect(text('#saved-note')).toContain('round this site');
+  });
+});
+
 describe('lab tab', () => {
   const put = (file, over = {}) => api.lab.files.set(file, { name: file, world: '1', game_version: GAME_VERSION, spec: JSON.parse(JSON.stringify(game.sim.currentLaydown())), ...over });
 

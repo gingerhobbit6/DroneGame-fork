@@ -11,11 +11,11 @@ import { JAM_BANDS, LIBRARIES, covers, parseBands } from './rf-model.js';
 const each = (ids, limits) => Object.fromEntries(ids.map((id) => [id, limits]));
 const ofKind = (kind) => TOOLBAR.find((row) => row.kind === kind).classes; // every system of a kind, as the purchase bar lists them
 const RADARS = ofKind('radar'), RFS = ofKind('rf'), CAMERAS = ofKind('camera'), JAMMERS = ofKind('jammer'), ACOUSTICS = ofKind('acoustic');
-const PANELLED = { radar_s: [1, 3], radar_l: [1, 3], radar_a800: [1, 4], radar_a400: [1, 4] }; // fixed-panel radars: up to all round
+const PANELLED = { radar_s: [1, 4], radar_l: [1, 3], radar_a800: [1, 4], radar_a400: [1, 4] }; // fixed-panel radars: up to all round
 const MEDIUM_UP = RADARS.filter((id) => STRUCTURES[id].size !== 'S'); // 2D is offered on Medium and Large radars
 const TOP_EDGE = Object.fromEntries(RADARS.filter((id) => STRUCTURES[id].elevation + lowestEdge > 15).map((id) => [id, [15, STRUCTURES[id].elevation + lowestEdge]])); // a narrow beam keeps its top
 const FLAT_PRICE = 0.3, MICRO_DOPPLER_PRICE = 0.15; // share of the system's price saved by 2D, and added by a micro-Doppler classifier: assumptions
-const ZOOMS = { camera: [2.5, 10], camera_l: [0.5, 7.1] }; // what each zoom lens can do, wide and narrow, in degrees
+const ZOOMS = { camera: [2.5, 10], camera_l: [0.5, 7.1], camera_podview: [1.2, 10] }; // what each zoom lens can do, wide and narrow, in degrees
 const RES_PRICE = 0.3, LENS_PRICE = 0.1, SLEW_PRICE = 0.1; // share of a camera's price per doubling of pixels, per doubling of light, and per extra slew rate
 const RANGEFINDER_PRICE = 20000, RANGEFINDER_ERROR = 5; // dollars, and metres: assumptions
 const SENSITIVITY_PRICE = 0.5, DF_PRICE = 0.5; // share of a detector's price per doubling of reach, and for angle of arrival over a sector
@@ -44,7 +44,7 @@ const wattLimits = (id) => [Math.max(wattStep(id), Math.round(watts(id) / 10 / w
 export const UNIT_FIELDS = [
   {
     key: 'mount', label: 'Mast height', unit: 'm', step: 0.5, base: (c) => c.mount, direct: 'mount',
-    limits: { radar_s: [5, 25], radar: [5, 35], radar_a800: [5, 35], radar_a400: [5, 35], radar_giraffe: [2, 20], radar_l: [10, 40], rf_s: [1, 10], rf: [2, 15], rf_elysion: [2, 15], rf_l: [2, 20], camera_s: [5, 20], camera: [5, 25], camera_l: [5, 30], ...each(JAMMERS, [1, 20]), acoustic_s: [2, 6], acoustic: [2, 6], acoustic_l: [2, 10] },
+    limits: { radar_s: [5, 25], radar: [5, 35], radar_a800: [5, 35], radar_a400: [5, 35], radar_giraffe: [2, 20], radar_l: [10, 40], rf_s: [1, 10], rf: [2, 15], rf_elysion: [2, 15], rf_l: [2, 20], camera_s: [5, 20], camera: [5, 25], camera_l: [5, 30], camera_podview: [2, 15], radar_xenta: [3, 20], rf_chuyka: [1, 3], rf_rfpatrol: [1, 3], ...each(JAMMERS, [1, 20]), acoustic_s: [2, 6], acoustic: [2, 6], acoustic_l: [2, 10] },
     price: (v, c) => (v - c.mount) * MAST_PRICE * c.cost,
     help: 'Higher sees over more trees and terrain, at a price.',
   },
@@ -213,7 +213,7 @@ export const UNIT_FIELDS = [
     help: 'Faster comes round sooner, but once it turns more than its view between looks it leaves gaps.',
   },
   {
-    key: 'slew', label: 'Slew rate', unit: '°/s', step: 10, base: (c) => c.slewRate, direct: 'slewRate', limits: each(CAMERAS, [30, 180]),
+    key: 'slew', label: 'Slew rate', unit: '°/s', step: 10, base: (c) => c.slewRate, direct: 'slewRate', limits: { ...each(CAMERAS, [30, 180]), camera_podview: [90, 720] },
     price: (v, c) => (v / c.slewRate - 1) * SLEW_PRICE * c.cost,
     help: 'How fast it turns to a cue. Faster gets to the next track sooner, at a price.',
   },
@@ -222,7 +222,7 @@ export const UNIT_FIELDS = [
     help: 'Longer holds a track for more looks, and leaves other tracks waiting.',
   },
   {
-    key: 'reload', label: 'Time between shots', unit: 's', step: 0.5, base: (c) => c.cooldown, direct: 'cooldown', limits: { interceptor_s: [2, 8], interceptor: [1.5, 6], interceptor_p1: [1.5, 6], interceptor_l: [1.5, 6], missile_rr: [2, 8], missile_hvm: [2, 8], missile_paladin: [0.5, 3], gun_hmg: [0.5, 4], gun_s: [0.5, 4], gun_50: [0.5, 4], gun_l: [0.5, 3], gun_skyranger: [0.5, 3], gun_gepard: [0.5, 3], missile_skysabre: [3, 10], missile_s: [1, 4], missile: [2, 8], missile_l: [3, 10] },
+    key: 'reload', label: 'Time between shots', unit: 's', step: 0.5, base: (c) => c.cooldown, direct: 'cooldown', limits: { interceptor_s: [2, 8], interceptor: [1.5, 6], interceptor_p1: [1.5, 6], interceptor_l: [1.5, 6], missile_rr: [2, 8], missile_hvm: [2, 8], missile_paladin: [0.5, 3], gun_hmg: [0.5, 4], gun_s: [0.5, 4], gun_50: [0.5, 4], gun_l: [0.5, 3], gun_skyranger: [0.5, 3], gun_gepard: [0.5, 3], missile_skysabre: [3, 10], missile_s: [1, 4], missile: [2, 8], missile_l: [3, 10], gun_shotgun: [0.3, 2], gun_droneround: [0.1, 1] },
     price: (v, c) => (c.cooldown - v) * RELOAD_PRICE * c.cost,
     help: 'Faster launchers cost more.',
   },

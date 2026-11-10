@@ -2,10 +2,11 @@
 // vehicles that keep their places in the formation. Strike drones attack the patrol in place of the station. Nothing here draws a
 // random number, so a patrol walks the same way on every run, and a laydown without one runs none of this. See docs/PATROL_MODE.md.
 
-import { COMMS, MAX_ESCORTS, MAX_ESCORT_GAP, MAX_ESCORT_SIDE, MOUNTS, PATROL, PATROL_VEHICLES, STRUCTURES } from './config/index.js';
+import { COMMS, ESCORT_CARRIERS, MAX_ESCORTS, MAX_ESCORT_GAP, MAX_ESCORT_SIDE, MAX_ON_VEHICLE, MOUNTS, ON_FOOT, PATROL, STRUCTURES, escortCarries } from './config/index.js';
 import { SITE_POS, hereU, u } from './units.js';
 import { buyTerminal, money } from './economy.js';
 import { addStructure, removeStructure, wireFusion, wireNode } from './laydown.js';
+import { RIDER_STEP } from './sharing.js';
 import { designLocked } from './lock.js';
 import { addGroup, cleanCount } from './people.js';
 import { FORMATIONS, placeIn, soldierSpot } from './formation.js';
@@ -20,10 +21,15 @@ export const DEFAULT_PLAN = { width: 200, formation: 'file' };
 export function columnProblem(column) {
   if (!Array.isArray(column) || column.length < 1 || column.length > MAX_ESCORTS) return `A patrol needs 1 to ${MAX_ESCORTS} vehicles`;
   for (const e of column) {
-    if (!Object.hasOwn(PATROL_VEHICLES, e?.vehicle)) return 'Choose a vehicle for each place in the column';
-    const v = PATROL_VEHICLES[e.vehicle], sys = STRUCTURES[e.system];
+    if (!Object.hasOwn(ESCORT_CARRIERS, e?.vehicle)) return 'Choose a vehicle for each place in the column';
+    const v = ESCORT_CARRIERS[e.vehicle], sys = STRUCTURES[e.system];
     if (!Object.hasOwn(MOUNTS, e.system) || !sys) return 'That system cannot ride in a patrol';
-    if (MOUNTS[e.system] > v.carries) return `A ${v.name} cannot carry the ${sys.name}`;
+    if (!escortCarries(e.vehicle, e.system)) return `A ${v.name} cannot carry the ${sys.name}`;
+    const also = e.also ?? [];
+    if (!Array.isArray(also) || also.length > MAX_ON_VEHICLE - 1) return `A vehicle carries ${MAX_ON_VEHICLE} systems at most`;
+    if (also.length && Object.hasOwn(ON_FOOT, e.vehicle)) return 'A soldier on foot carries one system';
+    for (const id of also) if (!Object.hasOwn(MOUNTS, id) || !escortCarries(e.vehicle, id)) return `A ${v.name} cannot carry the ${STRUCTURES[id]?.name ?? 'system'}`;
+    if ([e.system, ...also].filter((id) => MOUNTS[id] === 3).length > 1) return `A ${v.name} carries one heavy system at most`;
     if (!Number.isFinite(e.gap) || Math.abs(e.gap) > MAX_ESCORT_GAP) return `Keep each vehicle within ${MAX_ESCORT_GAP} m of the people`;
     if (e.side != null && !(Number.isFinite(e.side) && Math.abs(e.side) <= MAX_ESCORT_SIDE)) return `Keep each vehicle within ${MAX_ESCORT_SIDE} m to the side`;
   }
@@ -48,17 +54,25 @@ function placeAll(w) {
 
 // Every system in the column and its terminal, and a terminal for the fusion node if it has none. The vehicles themselves are
 // not priced: the budget is for counter-drone systems.
-const escortCost = (w, column) => column.reduce((sum, e) => sum + STRUCTURES[e.system].cost, 0)
-  + COMMS.starlink.cost * (column.filter((e) => STRUCTURES[e.system].networked !== false).length + (w.net.fusion.uplinks.has('starlink') ? 0 : 1));
+const carried = (e) => [e.system, ...(e.also ?? [])];
+const escortCost = (w, column) => column.flatMap(carried).reduce((sum, id) => sum + STRUCTURES[id].cost, 0)
+  + COMMS.starlink.cost * (column.flatMap(carried).filter((id) => STRUCTURES[id].networked !== false).length + (w.net.fusion.uplinks.has('starlink') ? 0 : 1));
 
 function startPatrol(w, route, column, plan) {
   const [x, z] = route[0];
-  const escorts = column.map(({ vehicle, system, gap, side }) => {
-    const s = addStructure(w, system, x, z, { settings: STRUCTURES[system].mount == null ? {} : { mount: PATROL_VEHICLES[vehicle].mast } }); // its mast on the vehicle
-    s.escort = true; s.def.vehicle = vehicle; // the unit's own definition, so the drawing puts it on the vehicle
-    w.state.budget -= s.def.cost; w.ledger.capex += s.def.cost;
-    if (s.def.networked !== false) wireNode(w, s, 'starlink'); // shortcut: assumes a terminal that works on the move. Model cellular or a mesh radio if escorts need a choice.
-    return { s, gap, side };
+  let platforms = 0;
+  // each vehicle's systems: its first carries it and is drawn on it; a second rides a little ahead and a third a little behind
+  const escorts = column.flatMap((e) => {
+    const { vehicle, gap, side } = e, ids = carried(e), platform = ids.length > 1 ? `patrol-${++platforms}` : null;
+    return ids.map((system, k) => {
+      const s = addStructure(w, system, x, z, { settings: STRUCTURES[system].mount == null ? {} : { mount: ESCORT_CARRIERS[vehicle].mast } }); // its mast on the vehicle
+      s.escort = true; s.def.vehicle = vehicle; // the unit's own definition, so the drawing puts it on the vehicle
+      if (k > 0) s.def.rider = true;
+      if (platform) s.platform = platform; // they share a strike (targeting.js)
+      w.state.budget -= s.def.cost; w.ledger.capex += s.def.cost;
+      if (s.def.networked !== false) wireNode(w, s, 'starlink'); // shortcut: assumes a terminal that works on the move. Model cellular or a mesh radio if escorts need a choice.
+      return { s, gap: gap + [0, RIDER_STEP, -RIDER_STEP][k], side };
+    });
   });
   wireFusion(w, 'starlink', true);
   const group = addGroup(w, x, z, cleanCount(FOOT.groupSize), 'open', 'military'); // a figure, so it gets the same cap as any group
@@ -88,7 +102,7 @@ export function clearPatrol(w) {
 }
 
 export const planOf = (p) => ({ width: p.width, formation: p.formation });
-const cleanColumn = (column) => column.map(({ vehicle, system, gap, side }) => ({ vehicle, system, gap, side: side ?? 0 }));
+const cleanColumn = (column) => column.map(({ vehicle, system, also, gap, side }) => ({ vehicle, system, ...(also?.length ? { also: [...also] } : {}), gap, side: side ?? 0 }));
 
 // Set, replace or (with null) clear the patrol, keeping its column and plan (corridor width and formation) unless given others.
 // Returns why not, or null.

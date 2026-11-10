@@ -11,6 +11,7 @@ This is the inventory of every sensor the defender can buy: radars, RF detectors
 - [RF detectors](#rf-detectors)
 - [EO/IR cameras](#eoir-cameras)
 - [Acoustic sensors](#acoustic-sensors)
+- [Added in November 2026](#added-in-november-2026)
 - [The perimeter sensor](#the-perimeter-sensor)
 - [Limits and simplifications](#limits-and-simplifications)
 - [Where this lives in the code](#where-this-lives-in-the-code)
@@ -210,6 +211,19 @@ Where each range comes from:
 | [`acoustic`](../frontend/src/sim/config/sensors.js#L289) | A US Air Force minimum of 500 m against Group 1 drones | A buyer’s requirement and a competitor’s overview, not a measured figure | ASSUMPTION: tune this yourself | [US Air Force notice: Discovair G2+](https://app.govly.com/public/opportunities/16844233); [Robin Radar: acoustic sensors](https://www.robinradar.com/blog/acoustic-sensors-drone-detection) |
 | [`acoustic_l`](../frontend/src/sim/config/sensors.js#L307) | Assumed against a small FPV drone; the press figure names no drone | A press report of the maker’s claims | Press report of a manufacturing cost | [The Telegraph, reprinted: acoustic sensors](https://www.lucorg.com/?p=17063) |
 
+## Added in November 2026
+
+From [`field-systems.js`](../frontend/src/sim/config/field-systems.js), each with its sources in the Sources tab.
+
+| id | Product | Kind | Range | What is published, and what is assumed |
+|---|---|---|---|---|
+| `rf_rfpatrol` | DroneShield RfPatrol Mk2 | Wearable passive RF detector | 2 km | Passive, body-worn, alerts by sound, vibration and light, 1.2 kg; up to 1 km urban and 4 km rural. Its bands, library and reporting over the soldier's radio are assumed |
+| `rf_chuyka` | BlueBird Chuyka 3.0 | Handheld FPV video receiver | 5.3 km quoted; 4 km on 5.8 GHz video | Analogue video at 1.2, 3.3 and 5.8 GHz, a 4 to 8 s scan, up to 4 km, about $584. It hears video only, so a drone's control link gives it nothing, and it gives only a rough bearing (±30°). Reporting over the soldier's radio is assumed |
+| `camera_podview` | Overview PodView2600 | EO/IR pod with edge AI | 1.9 km | 4K 50x camera, LWIR, laser rangefinder, 720°/s pan and tilt, SAPIENT. Range by the cameras' own rule for 3,840 pixels across 10°; views, mast and price assumed |
+| `radar_xenta` | Weibel XENTA-M5 | Doppler air defence radar | 10 km | 75 km instrumented, 240 W GaN, 60° elevation. No drone range is published for the M5: 10 km is its civil sister's high-power figure |
+
+**CORTEXA GUARDIAN.** Roke's CORTEXA GUARDIAN puts a PodView with four Echodyne EchoGuard radars on one mast, fused by its RapidEO software. The EchoGuard is `radar_s`, which now takes up to four panels, so CORTEXA is `radar_s` with four panels beside `camera_podview`. Systems are kept 60 m apart, but a camera may share a radar's mast: place the PodView within 60 m of the EchoGuard and it goes on the EchoGuard's mast, at its height, 1.5 m to the side ([`laydown.js`](../frontend/src/sim/laydown.js), `mastHost`). One camera and one radar to a mast.
+
 ## The perimeter sensor
 
 The site has its own close-in sensor, which is not bought and cannot be moved: a SAPIENT proximity node at the station with a 150 m range on a 3 m mast ([`world.js:110`](../frontend/src/sim/config/world.js#L110), [`index.js:89`](../frontend/src/sim/network/index.js#L89)). It detects a drone within 150 m horizontally on 98% of its scans, whatever the terrain ([`sensors.js:67`](../frontend/src/sim/network/sensors.js#L67)). Its figures are an assumption, labelled so in config. It stays at the station even when you draw an area to defend elsewhere.
@@ -227,6 +241,7 @@ The site has its own close-in sensor, which is not bought and cannot be moved: a
 
 - [`config/sensors.js`](../frontend/src/sim/config/sensors.js): the S, M and L entries of each sensor kind and the Dedrone, Elysion and A800 variants.
 - [`config/uk-systems.js`](../frontend/src/sim/config/uk-systems.js) and [`config/eu-systems.js`](../frontend/src/sim/config/eu-systems.js): the Blighter A400, Giraffe 1X and Airfence.
+- [`config/field-systems.js`](../frontend/src/sim/config/field-systems.js): the Chuyka, PodView and XENTA-M5, with the shotguns and the VEPR dome.
 - [`config/systems.js`](../frontend/src/sim/config/systems.js): `STRUCTURES`, the purchase bar (`TOOLBAR`) and the range scale.
 - [`config/tx-power.js`](../frontend/src/sim/config/tx-power.js): rated transmit power of radars and jammers.
 - [`site-range.js`](../frontend/src/sim/site-range.js): reach against each drone and along a real path, clutter and error growth.

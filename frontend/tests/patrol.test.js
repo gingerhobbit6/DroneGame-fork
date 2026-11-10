@@ -47,12 +47,12 @@ describe('the route', () => {
 });
 
 describe('the column', () => {
-  const COLUMN = [{ vehicle: 'mule', system: 'gun_hmg', gap: 25, side: 0 }, { vehicle: 'hilux', system: 'rf', gap: -30, side: -20 }, { vehicle: 'patria', system: 'missile_paladin', gap: -60, side: 15 }];
+  const COLUMN = [{ vehicle: 'themis', system: 'gun_hmg', gap: 25, side: 0 }, { vehicle: 'hilux', system: 'rf', gap: -30, side: -20 }, { vehicle: 'patria', system: 'missile_paladin', gap: -60, side: 15 }];
 
   it('brings each vehicle with its system, at its place in the formation and on the vehicle mast', () => {
     expect(sim.commands.setPatrol(ROUTE, COLUMN)).toBeNull();
     const p = sim.getPatrol();
-    expect(p.escorts.map(({ s }) => [s.def.id, s.def.vehicle])).toEqual([['gun_hmg', 'mule'], ['rf', 'hilux'], ['missile_paladin', 'patria']]);
+    expect(p.escorts.map(({ s }) => [s.def.id, s.def.vehicle])).toEqual([['gun_hmg', 'themis'], ['rf', 'hilux'], ['missile_paladin', 'patria']]);
     for (const { s, gap, side } of p.escorts) { const q = placeIn(p, gap, side); expect([s.pos.x, s.pos.z]).toEqual([q.x, q.z]); }
     expect(p.escorts[1].s.def.mount).toBe(PATROL_VEHICLES.hilux.mast);
   });
@@ -68,14 +68,14 @@ describe('the column', () => {
   });
 
   it('refuses what a vehicle cannot carry, too many vehicles, and a vehicle too far out', () => {
-    expect(columnProblem([{ vehicle: 'mule', system: 'missile_paladin', gap: 0 }])).toMatch(/cannot carry/);
+    expect(columnProblem([{ vehicle: 'themis', system: 'missile_paladin', gap: 0 }])).toMatch(/cannot carry/);
     expect(columnProblem([{ vehicle: 'hilux', system: 'missile_skysabre', gap: 0 }])).toMatch(/cannot ride/);
     expect(columnProblem([{ vehicle: 'toString', system: 'rf', gap: 0 }])).toMatch(/Choose a vehicle/);
     expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 250 }])).toMatch(/within 200 m/);
     expect(columnProblem(Array(7).fill(COLUMN[0]))).toMatch(/1 to 6/);
     expect(columnProblem([])).toMatch(/1 to 6/);
     expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 0, side: 120 }])).toMatch(/100 m to the side/);
-    expect(sim.commands.setPatrol(ROUTE, [{ vehicle: 'mule', system: 'missile_paladin', gap: 0 }])).toMatch(/cannot carry/);
+    expect(sim.commands.setPatrol(ROUTE, [{ vehicle: 'themis', system: 'missile_paladin', gap: 0 }])).toMatch(/cannot carry/);
     expect(sim.getPatrol()).toBeNull();
   });
 });

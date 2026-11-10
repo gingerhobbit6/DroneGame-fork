@@ -58,7 +58,7 @@ export function remaining(assets, sim) {
     return { ...g, left: at < 0 ? 1 : 0 };
   });
   const onVehicles = {};
-  for (const s of sim.structures) if (s.def.vehicle) onVehicles[s.def.vehicle] = (onVehicles[s.def.vehicle] ?? 0) + 1;
+  for (const s of sim.structures) if (s.def.vehicle && !s.def.rider) onVehicles[s.def.vehicle] = (onVehicles[s.def.vehicle] ?? 0) + 1; // a vehicle, not each system on it
   const vehicles = assets.vehicles.map((l) => ({ ...l, left: l.count - Math.min(onVehicles[l.id] ?? 0, l.count) }));
   return { systems, people, vehicles };
 }

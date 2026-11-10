@@ -20,7 +20,7 @@ export function buildModel(def) {
   const own = carrier ? [kit(), kit()] : [base, riser]; // a mounted system's own stand is not drawn
   let { headY = 0, headZ = 0, spin = false, rise } = SYSTEM_SHAPES[def.kind](own[0], head, def, own[1]);
   if (carrier) {
-    ({ roof: headY, z: headZ } = carrier(base));
+    ({ roof: headY, z: headZ } = carrier(def.rider ? kit() : base)); // a second or third system on a vehicle stands on the one already drawn
     if (rise) { riser.cyl('metal', 0.08, 1, 0, 0.5, 0, { r2: 0.06 }); rise = { y0: headY, height: def.mount / SYSTEM_UNIT_M - headY, min: 0.3 }; }
   }
   const g = base.finish(mats), h = head.finish(mats), r = riser.finish(mats);

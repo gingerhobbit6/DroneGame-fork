@@ -27,7 +27,7 @@ export const PATROL = {
 export const PATROL_VEHICLES = {
   patria: { name: 'Patria 6x6', carries: 3, mast: 3.5, armour: 2, desc: 'Armoured six-wheeler, 7.5 by 2.9 m, over 100 km/h on roads. Carries anything that rides in a patrol.' },
   hilux: { name: 'Toyota Hilux', carries: 2, mast: 3, desc: 'Double-cab pickup, 5.3 by 1.9 m, its system on the load bed. Carries light and medium systems.' },
-  mule: { name: 'Mule UGV', carries: 1, mast: 2, desc: 'A tracked uncrewed carrier in the Milrem THeMIS class, 2.5 by 2.0 m, 20 km/h, up to 1,200 kg. Carries light systems.' },
+  themis: { name: 'Milrem THeMIS', carries: 1, mast: 2, desc: 'Milrem Robotics’ tracked uncrewed ground vehicle, 2.47 by 2.04 m and 1.17 m high, 1,650 kg, 20 km/h, 750 kg rated payload (1,200 kg at most). Carries light systems.' },
 };
 
 // The systems that can ride in a patrol, and what it takes to carry each: 1 light (any vehicle), 2 medium (a Hilux or a Patria),
@@ -37,7 +37,24 @@ export const MOUNTS = {
   radar_s: 2, radar_a400: 2, radar_a800: 2, camera: 2, jammer_jupiter: 2, jammer_sf: 2, missile_rr: 2,
   gun_s: 2, gun_50: 2, // a gunner stands in the back, so not on an uncrewed Mule
   radar_giraffe: 3, missile_paladin: 3, gun_skyranger: 3,
+  rf_chuyka: 1, rf_rfpatrol: 1, camera_podview: 1, jammer_vepr: 1, gun_shotgun: 2, gun_droneround: 2, radar_xenta: 3, // field-systems.js
 };
+// A soldier on foot can take a place in a patrol's column with a hand-held system, walking with the others. Not a vehicle, so it is
+// not part of a deployment pack's vehicles: a unit always has soldiers. `takes` lists what one can carry.
+export const ON_FOOT = {
+  foot: { name: 'Soldier on foot', takes: ['rf_rfpatrol', 'rf_chuyka', 'gun_shotgun', 'gun_droneround'], mast: 1.5, desc: 'A soldier in the patrol carrying a hand-held system: a wearable RF detector, an FPV video detector, a shotgun or a rifle with Drone Round.' },
+};
+// What can take a place in a patrol's column, and whether it can carry this system.
+export const ESCORT_CARRIERS = { ...PATROL_VEHICLES, ...ON_FOOT };
+export function escortCarries(carrier, id) {
+  const c = ESCORT_CARRIERS[carrier];
+  return !!c && Object.hasOwn(MOUNTS, id) && (c.takes ? c.takes.includes(id) : MOUNTS[id] <= c.carries && !ON_FOOT_ONLY.has(id));
+}
+const ON_FOOT_ONLY = new Set(['gun_shotgun', 'gun_droneround']); // a soldier's own gun is fired on foot, not from a vehicle
+// Vehicle ids that older saves and laydown files use, and what each is now. The database is rewritten (migration 0004).
+export const RENAMED_VEHICLES = { mule: 'themis' };
+export const vehicleId = (id) => RENAMED_VEHICLES[id] ?? id;
+export const MAX_ON_VEHICLE = 3; // systems one vehicle carries at most, in a patrol or parked
 export const MAX_ESCORTS = 6; // MAX_ESCORTS in backend/app/schemas.py
 export const MAX_ESCORT_GAP = 200; // metres
 export const MAX_ESCORT_SIDE = 100; // metres: MAX_ESCORT_SIDE in backend/app/schemas.py

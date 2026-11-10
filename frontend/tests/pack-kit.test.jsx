@@ -204,7 +204,7 @@ describe('editing a pack', { timeout: 30000 }, () => {
     const made = await api.units.create(PACK);
     hub();
     await settle();
-    fireEvent.click(within($('[data-pack]')).getByRole('button', { name: 'Edit' })); // the profile has an Edit too
+    fireEvent.click(within($('[data-pack]:not([data-pack="none"])')).getByRole('button', { name: 'Edit' })); // the profile has an Edit too
     fireEvent.click(screen.getByText(/Settings for each Blighter A800/));
     fireEvent.change($('#pack-radar_a800-mount'), { target: { value: '20' } });
     fireEvent.blur($('#pack-radar_a800-mount'));
@@ -219,7 +219,7 @@ describe('editing a pack', { timeout: 30000 }, () => {
     const doneEditing = vi.fn();
     hub({ activeUnit: PACK, editActive: true, doneEditing });
     await settle();
-    expect(screen.getByLabelText(/Unit name/).value).toBe('1 Troop');
+    expect(screen.getByLabelText(/Pack name/).value).toBe('1 Troop');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(doneEditing).toHaveBeenCalled();
   });

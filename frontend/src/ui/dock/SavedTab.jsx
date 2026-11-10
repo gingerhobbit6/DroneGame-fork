@@ -15,7 +15,7 @@ export function SavedTab({ active }) {
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
   const { data, error, reload } = useLoad(() => api.laydowns.list(), active);
-  const load = useArmed(), remove = useArmed(), replace = useArmed();
+  const load = useArmed(), loadHere = useArmed(), remove = useArmed(), replace = useArmed();
   const count = sim.currentLaydown().structures.length;
 
   const attempt = attemptWith(setNote, reload);
@@ -34,6 +34,15 @@ export function SavedTab({ active }) {
     // a real world's site never goes in a URL, as URLs end up in history and logs
     history.replaceState(null, '', parseWorldId(saved.world) ? `?seed=${encodeURIComponent(sim.state.seed)}` : `?seed=${encodeURIComponent(sim.state.seed)}&terrain=${encodeURIComponent(saved.world)}`);
     return saved.game_version === GAME_VERSION ? `Loaded "${saved.name}".` : `Loaded "${saved.name}". It was saved by version ${saved.game_version}, so it may not play the same.`;
+  }, (message) => message);
+
+  // A laydown made on other ground, laid out round the site on the ground in play now: a real map, say, for one made on generated ground.
+  const loadRowHere = (row) => attempt(async () => {
+    const saved = await api.laydowns.get(row.id);
+    const problem = commands.loadLaydownHere(saved.spec);
+    if (problem) return problem;
+    game.setViewOption('zone', zoneFromSpec(saved.spec));
+    return `Laid "${saved.name}" out round this site, on this ground.`;
   }, (message) => message);
 
   // Open a laydown file (one saved by tools/lab, or a spec copied out of the game) without saving it to the account first.
@@ -68,6 +77,7 @@ export function SavedTab({ active }) {
                 <td>{when(row.updated_at)}</td>
                 <td className="saved-actions">
                   <button className="mini" onClick={load.confirm(row.id, () => loadRow(row))}>{load.armed === row.id ? 'Replace run?' : 'Load'}</button>
+                  {row.world !== sim.state.terrainSeed && <button className="mini load-here" title={`Lay it out round this site, on the ground in play now, instead of on ${worldLabel(row.world)}. Systems that cannot stand here are left out.`} onClick={loadHere.confirm(row.id, () => loadRowHere(row))}>{loadHere.armed === row.id ? 'Replace run?' : 'Load here'}</button>}
                   <button className="mini" onClick={replace.confirm(row.id, () => attempt(() => api.laydowns.replace(row.id, body(row.name)), `Updated "${row.name}".`))}>{replace.armed === row.id ? 'Overwrite?' : 'Update'}</button>
                   <button className="mini" onClick={remove.confirm(row.id, () => attempt(() => api.laydowns.remove(row.id), `Deleted "${row.name}".`))}>{remove.armed === row.id ? 'Sure?' : 'Delete'}</button>
                 </td>

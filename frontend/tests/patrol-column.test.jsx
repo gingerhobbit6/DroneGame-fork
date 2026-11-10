@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 // Choosing the patrol's vehicles and what they carry in the Area panel.
 
-import { cleanup, fireEvent, render } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
 import { MOUNTS, PATROL, PATROL_VEHICLES, resetAllFigures } from '../src/sim/config/index.js';
 import { GameContext } from '../src/ui/hooks.js';
@@ -27,9 +27,9 @@ describe('the patrol column', () => {
   it('lists the default column and swaps a vehicle, keeping to what it can carry', () => {
     show();
     expect(column()).toEqual(PATROL.foot.column);
-    fireEvent.change($('[aria-label="Vehicle 2"]'), { target: { value: 'mule' } }); // the Rapid Ranger is too heavy for a Mule
-    expect(column()[1].vehicle).toBe('mule');
-    expect(MOUNTS[column()[1].system]).toBeLessThanOrEqual(PATROL_VEHICLES.mule.carries);
+    fireEvent.change($('[aria-label="Vehicle 2"]'), { target: { value: 'themis' } }); // the Rapid Ranger is too heavy for a THeMIS
+    expect(column()[1].vehicle).toBe('themis');
+    expect(MOUNTS[column()[1].system]).toBeLessThanOrEqual(PATROL_VEHICLES.themis.carries);
   });
 
   it('changes what a vehicle carries, adds a vehicle and removes one', () => {
@@ -38,7 +38,7 @@ describe('the patrol column', () => {
     expect(column()[0].system).toBe('jammer_jupiter');
     fireEvent.click($('#escort-add'));
     expect(column()).toHaveLength(3);
-    expect(column()[2]).toMatchObject({ vehicle: 'mule', system: 'gun_hmg' });
+    expect(column()[2]).toMatchObject({ vehicle: 'themis', system: 'gun_hmg' });
     fireEvent.click($('[aria-label="Remove vehicle 1"]'));
     expect(column().map((e) => e.system)).toEqual(['missile_rr', 'gun_hmg']);
     expect(game.sim.structures.map((s) => s.def.id).sort()).toEqual(['gun_hmg', 'missile_rr']);
@@ -63,12 +63,12 @@ describe('the patrol column with a deployment pack', () => {
   it("takes only the pack's vehicles, as many as it has", () => {
     const pack = [{ id: 'hilux', count: 1 }, { id: 'patria', count: 1 }]; // the default column uses both
     withPack(pack);
-    expect(options('Vehicle 1')).toEqual(['Toyota Hilux']);
+    expect(options('Vehicle 1')).toEqual(['Toyota Hilux', 'Soldier on foot']); // a unit always has soldiers
     expect($('#escort-add')).toBeNull();
     expect(document.body.textContent).toContain('Every vehicle in your pack is in use.');
     fireEvent.click($('[aria-label="Remove vehicle 2"]'));
     cleanup(); withPack(pack); // the game's tick redraws the panel
-    expect(options('Vehicle 1')).toEqual(['Patria 6x6', 'Toyota Hilux']);
+    expect(options('Vehicle 1')).toEqual(['Patria 6x6', 'Toyota Hilux', 'Soldier on foot']);
     fireEvent.click($('#escort-add'));
     expect(column().map((e) => e.vehicle)).toEqual(['hilux', 'patria']);
   });
@@ -76,7 +76,22 @@ describe('the patrol column with a deployment pack', () => {
   it('counts vehicles parked on the map, and marks one beyond the pack', () => {
     expect(game.commands.place('jammer', 20, 13, undefined, 'hilux')).toBeNull();
     withPack([{ id: 'hilux', count: 1 }, { id: 'patria', count: 2 }]);
-    expect(options('Vehicle 1')).toEqual(['Patria 6x6', 'Toyota Hilux (beyond your pack)']);
+    expect(options('Vehicle 1')).toEqual(['Patria 6x6', 'Toyota Hilux (beyond your pack)', 'Soldier on foot']);
     expect(document.body.textContent).toContain("The column takes your pack's vehicles: 1 Toyota Hilux, 2 Patria 6x6, less any parked on the map.");
+  });
+});
+
+describe('messages with the Area to defend panel open', () => {
+  it('stay on screen for 8 s, not the usual 2.6 s', async () => {
+    const { Toast } = await import('../src/ui/Panels.jsx');
+    vi.useFakeTimers();
+    try {
+      render(<GameContext.Provider value={game}><Toast /><ZonePanel onClose={() => {}} /></GameContext.Provider>);
+      act(() => game.toast('That route crosses water'));
+      act(() => vi.advanceTimersByTime(3000));
+      expect($('#toast').className).toBe('show');
+      act(() => vi.advanceTimersByTime(5500));
+      expect($('#toast').className).toBe('');
+    } finally { vi.useRealTimers(); }
   });
 });

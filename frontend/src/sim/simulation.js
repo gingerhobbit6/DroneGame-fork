@@ -151,6 +151,17 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     laydown.restoreLaydown(w, spec);
     return null;
   }
+  // Lay a saved laydown out round this site instead, on whatever ground the run is on now: a real map, say, for a laydown made on
+  // generated ground. Positions keep their offsets from the site. Any system that cannot stand on this ground is left out, with a note.
+  function loadLaydownHere(spec) {
+    const problem = state.packed ? null : laydown.costProblem(spec);
+    if (problem) return problem;
+    endRun();
+    resetRun('load');
+    const left = laydown.restoreLaydown(w, spec, true);
+    if (left) emit('toast', `${left} system${left === 1 ? ' was' : 's were'} left out: in water, on a building, on steep ground or off this map`);
+    return null;
+  }
   function setWorld(terrainSeed) {
     if (terrainSeed === state.terrainSeed) return;
     state.terrainSeed = terrainSeed;
@@ -196,6 +207,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     setAttack: (ids) => laydown.setAttack(w, ids),
     setConditions: (name) => laydown.setConditions(w, name),
     place: (id, x, z, settings, vehicle) => laydown.place(w, id, x, z, settings, vehicle),
+    move: (s, x, z) => laydown.move(w, s, x, z),
     sell: (x, z) => laydown.sell(w, x, z),
     placePeople: (x, z, count, protection, role) => people.placePeople(w, x, z, count, protection, role),
     removePeople: (id) => people.removePeople(w, id),
@@ -226,6 +238,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     launchSandboxAttack: (attack) => launchSandboxAttack(w, attack),
     clearSandboxDrones: () => clearSandboxDrones(w),
     loadLaydown,
+    loadLaydownHere,
     // figures change results, so changing them is logged like any other input
     setFigure: (kind, id, key, value) => setFigure(kind, id, key, value),
     resetFigure: (kind, id, key) => resetFigure(kind, id, key),

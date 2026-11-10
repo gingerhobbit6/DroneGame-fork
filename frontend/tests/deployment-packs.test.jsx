@@ -83,7 +83,7 @@ describe('the profile hub', { timeout: 30000 }, () => {
     await settle();
     expect(screen.getByText('No deployment packs yet.')).not.toBeNull();
     press('New pack');
-    fireEvent.change(screen.getByLabelText(/Unit name/), { target: { value: ' 1 Troop ' } });
+    fireEvent.change(screen.getByLabelText(/Pack name/), { target: { value: ' 1 Troop ' } });
     fireEvent.change(screen.getByLabelText('Size'), { target: { value: 'troop' } });
     fireEvent.change(screen.getByLabelText(/Callsign/), { target: { value: 'Hawk 1' } });
     press('One more Blighter A800'); press('One more Blighter A800');
@@ -98,14 +98,14 @@ describe('the profile hub', { timeout: 30000 }, () => {
     await settle();
     const saved = [...api.units.rows.values()][0];
     expect(saved).toMatchObject({ name: '1 Troop', echelon: 'troop', callsign: 'Hawk 1', assets: { systems: [{ id: 'radar_a800', count: 2 }], vehicles: [{ id: 'patria', count: 1 }], people: [{ count: 12, protection: 'open' }] } });
-    expect($('[data-pack]').textContent).toContain('2 sensors · 1 vehicle · 12 people');
+    expect($('[data-pack]:not([data-pack="none"])').textContent).toContain('2 sensors · 1 vehicle · 12 people');
   });
 
   it('refuses a bad callsign before saving', async () => {
     hub();
     await settle();
     press('New pack');
-    fireEvent.change(screen.getByLabelText(/Unit name/), { target: { value: 'A' } });
+    fireEvent.change(screen.getByLabelText(/Pack name/), { target: { value: 'A' } });
     fireEvent.change(screen.getByLabelText(/Callsign/), { target: { value: '<b>' } });
     press('Save pack');
     expect(screen.getByRole('alert').textContent).toMatch(/callsign/);
@@ -116,19 +116,30 @@ describe('the profile hub', { timeout: 30000 }, () => {
     await api.units.create(PACK);
     const { account, onEnter } = hub();
     await settle();
-    const card = within($('[data-pack]'));
+    const card = within($('[data-pack]:not([data-pack="none"])'));
     press('Deploy', card);
     expect(account.deploy).toHaveBeenCalledWith(expect.objectContaining({ name: '1 Troop' }));
     expect(onEnter).toHaveBeenCalled();
     press('Edit', card);
-    expect(screen.getByLabelText(/Unit name/).value).toBe('1 Troop');
+    expect(screen.getByLabelText(/Pack name/).value).toBe('1 Troop');
     press('Cancel');
     await settle();
-    press('Delete', within($('[data-pack]')));
+    press('Delete', within($('[data-pack]:not([data-pack="none"])')));
     expect(api.units.rows.size).toBe(1);
-    press('Sure?', within($('[data-pack]')));
+    press('Sure?', within($('[data-pack]:not([data-pack="none"])')));
     await settle();
     expect(api.units.rows.size).toBe(0);
+  });
+
+  it('offers no pack as well, which stands a deployed pack down', async () => {
+    await api.units.create(PACK);
+    const { account, onEnter } = hub({ activeUnit: { id: 99, name: 'Another pack' } });
+    await settle();
+    const none = within($('[data-pack="none"]'));
+    expect($('[data-pack="none"]').textContent).toContain('Buy any system');
+    press('Deploy with no pack', none);
+    expect(account.deploy).toHaveBeenCalledWith(null);
+    expect(onEnter).toHaveBeenCalled();
   });
 
   it('shows when the packs cannot load', async () => {
@@ -266,10 +277,10 @@ describe('the pack tray in the game', { timeout: 30000 }, () => {
   });
 
   it('says when nothing in the pack fits on a vehicle', () => {
-    page({ id: 2, ...PACK, assets: { systems: [{ id: 'radar_giraffe', count: 1 }], vehicles: [{ id: 'mule', count: 1 }], people: [] } });
-    expect($('#tool-picker').textContent).toContain('Nothing in this pack fits on a Mule UGV.');
-    expect($('[data-tray-vehicle="mule"]').getAttribute('aria-disabled')).toBe('true');
-    expect($('[data-tray-vehicle="mule"]').getAttribute('draggable')).toBe('false');
+    page({ id: 2, ...PACK, assets: { systems: [{ id: 'radar_giraffe', count: 1 }], vehicles: [{ id: 'themis', count: 1 }], people: [] } });
+    expect($('#tool-picker').textContent).toContain('Nothing in this pack fits on a Milrem THeMIS.');
+    expect($('[data-tray-vehicle="themis"]').getAttribute('aria-disabled')).toBe('true');
+    expect($('[data-tray-vehicle="themis"]').getAttribute('draggable')).toBe('false');
   });
 });
 
@@ -277,15 +288,15 @@ describe('a system parked on a vehicle', () => {
   beforeEach(() => { game.sim.state.started = true; });
 
   it('is refused on a vehicle too small for it', () => {
-    expect(game.commands.place('radar_giraffe', 30, 0, undefined, 'mule')).toBe('A Mule UGV cannot carry the Giraffe 1X'); // in the patrol's words
+    expect(game.commands.place('radar_giraffe', 30, 0, undefined, 'themis')).toBe('A Milrem THeMIS cannot carry the Giraffe 1X'); // in the patrol's words
     expect(game.sim.structures).toHaveLength(0);
   });
 
   it('comes back on its vehicle from a saved laydown, and a vehicle that cannot carry it is dropped', () => {
-    const spec = { structures: [{ id: 'jammer', x: 30, z: 0, uplink: null, cellBand: 'B8', jam: null, vehicle: 'hilux' }, { id: 'radar_giraffe', x: -30, z: 0, uplink: null, cellBand: 'B8', jam: null, vehicle: 'mule' }], fusionUplinks: [], fusionCell: 'B8' };
+    const spec = { structures: [{ id: 'jammer', x: 30, z: 0, uplink: null, cellBand: 'B8', jam: null, vehicle: 'hilux' }, { id: 'radar_giraffe', x: -30, z: 0, uplink: null, cellBand: 'B8', jam: null, vehicle: 'themis' }], fusionUplinks: [], fusionCell: 'B8' };
     expect(game.commands.loadLaydown(spec, game.sim.state.terrainSeed)).toBeNull();
     expect(game.sim.structures.map((s) => s.def.vehicle ?? null)).toEqual(['hilux', null]);
-    expect(readDrop(JSON.stringify({ system: 'radar_giraffe', vehicle: 'mule' }))).toBeNull(); // nor can a drag ask for it
+    expect(readDrop(JSON.stringify({ system: 'radar_giraffe', vehicle: 'themis' }))).toBeNull(); // nor can a drag ask for it
   });
 });
 

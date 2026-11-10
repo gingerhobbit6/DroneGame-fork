@@ -155,7 +155,7 @@ export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = 
 
   function update() {
     const tool = getTool();
-    if (ghostRing || tool === 'sell' || tool === 'people') {
+    if (ghostRing || tool === 'sell' || tool === 'people' || tool === 'move') {
       ghost.visible = mouseOnGround && !!tool && sim.state.started;
       ghost.position.set(mouseGround.x, mouseGround.y + 0.1, mouseGround.z);
       ghostMarker.scale.setScalar(tool === 'people' ? camera.position.distanceTo(ghost.position) * PEOPLE_MARKER : drawnUnit()); // people are tiny, so it must not hide them up close
@@ -170,8 +170,8 @@ export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = 
         ghostRing.update(mouseGround.x, mouseGround.z); // re-drape the ring over the ground under the cursor
         if (!ghostRadii || predicting) ghostAt = { x: mouseGround.x, z: mouseGround.z }; // a spot skipped to throttle is predicted once the cursor rests
       }
-      const ok = tool === 'sell' || (tool === 'people' ? sim.canPlacePeople(mouseGround.x, mouseGround.z, view.people.protection) : sim.canPlace(mouseGround.x, mouseGround.z, STRUCTURES[tool]));
-      ghostMat.color.set(tool === 'sell' ? 0xff9800 : ok ? 0x66ff66 : 0xff5252);
+      const ok = tool === 'sell' || tool === 'move' || (tool === 'people' ? sim.canPlacePeople(mouseGround.x, mouseGround.z, view.people.protection) : sim.canPlace(mouseGround.x, mouseGround.z, STRUCTURES[tool]));
+      ghostMat.color.set(tool === 'sell' ? 0xff9800 : tool === 'move' ? 0x40c4ff : ok ? 0x66ff66 : 0xff5252);
     } else ghost.visible = false;
   }
 

@@ -1,6 +1,7 @@
 """Everything the API must refuse, and what protects it from pages on other sites."""
 
 import json
+from typing import get_args
 import re
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from conftest import SPEC, figure_set, laydown, run, sign_up
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.schemas import MAX_COMMANDS, MAX_ESCORT_GAP, MAX_ESCORTS, MAX_PEOPLE_GROUPS, MAX_PEOPLE_PER_GROUP, MAX_SYSTEMS, CellBand, DroneTypeId, JamBand, PatrolVehicle, Protection, SystemId, Uplink
+from app.schemas import EscortCarrier, MAX_COMMANDS, MAX_ESCORT_GAP, MAX_ESCORTS, MAX_PEOPLE_GROUPS, MAX_PEOPLE_PER_GROUP, MAX_SYSTEMS, CellBand, DroneTypeId, JamBand, PatrolVehicle, Protection, SystemId, Uplink
 from app.security import MAX_BODY_BYTES
 
 API = "/api/v1"
@@ -244,7 +245,7 @@ def test_every_drone_the_waves_can_send_fits_the_shape_a_save_allows():
 def test_the_names_the_api_accepts_match_the_game():
     """The backend does not import the frontend, so check its config directly: this fails if a system or band is added on one side only."""
     config = Path(__file__).parent.parent.parent / "frontend" / "src" / "sim" / "config"
-    systems = "".join((config / name).read_text(encoding="utf-8") for name in ("sensors.js", "effectors.js", "uk-systems.js", "eu-systems.js", "crew.js"))
+    systems = "".join((config / name).read_text(encoding="utf-8") for name in ("sensors.js", "effectors.js", "uk-systems.js", "eu-systems.js", "crew.js", "field-systems.js"))
     comms = (config / "comms.js").read_text(encoding="utf-8")
     assert set(re.findall(r"^  (\w+): \{$", systems, re.M)) == set(SystemId.__args__)
     assert set(Uplink.__args__) <= set(re.findall(r"^  (\w+): \{$", comms, re.M))
@@ -258,7 +259,10 @@ def test_the_names_the_api_accepts_match_the_game():
     assert f"maxSystems: {MAX_SYSTEMS} }}" in (config / "world.js").read_text(encoding="utf-8")  # the game stops placing before a save would be refused
     patrol = (config / "patrol.js").read_text(encoding="utf-8")
     vehicles = patrol.split("export const PATROL_VEHICLES")[1].split("};")[0]
-    assert set(PatrolVehicle.__args__) == set(re.findall(r"^  (\w+): \{ name: ", vehicles, re.M))
+    names = lambda t: set(get_args(get_args(t)[0]))  # noqa: E731 - each is Annotated[Literal[...], rename]
+    assert names(PatrolVehicle) == set(re.findall(r"^  (\w+): \{ name: ", vehicles, re.M))
+    on_foot = patrol.split("export const ON_FOOT")[1].split("};")[0]
+    assert names(EscortCarrier) == names(PatrolVehicle) | set(re.findall(r"^  (\w+): \{ name: ", on_foot, re.M))
     assert f"MAX_ESCORTS = {MAX_ESCORTS};" in patrol and f"MAX_ESCORT_GAP = {MAX_ESCORT_GAP};" in patrol
 
 

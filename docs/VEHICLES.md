@@ -98,7 +98,7 @@ Three vehicles can carry a system, in a patrol's column or parked from a deploym
 |---|---|---|---|---|
 | Patria 6x6 | heavy | 3.5 | 2 | Armoured six-wheeler, 7.5 by 2.9 m, over 100 km/h on roads. Carries anything that rides in a patrol. |
 | Toyota Hilux | medium | 3 | 1 | Double-cab pickup, 5.3 by 1.9 m, its system on the load bed. Carries light and medium systems. |
-| Mule UGV | light | 2 | 1 | A tracked uncrewed carrier in the Milrem THeMIS class, 2.5 by 2.0 m, 20 km/h, up to 1,200 kg. Carries light systems. |
+| Milrem THeMIS (`themis`) | light | 2 | 1 | Milrem Robotics' tracked uncrewed ground vehicle: 2.47 by 2.04 m, 1.17 m high, 1,650 kg, 20 km/h, 750 kg rated payload (1,200 kg at most), from [Milrem](https://milremrobotics.com/product/themis-transport). Carries light systems. |
 
 Each system that can ride is given a class by weight and how it is shown mounted, an assumption (`MOUNTS`, [`patrol.js:35`](../frontend/src/sim/config/patrol.js#L35)): light rides on any vehicle, medium on a Hilux or a Patria, heavy only on a Patria. The two crewed machine guns are medium because the gunner stands in the back, so they cannot go on the uncrewed Mule. Systems drawn on their own vehicles but missing from `MOUNTS` (the Gepard, the LOCUST and the RapidDestroyer) cannot join a patrol.
 
@@ -106,7 +106,7 @@ Each system that can ride is given a class by weight and how it is shown mounted
 - **Armour.** A system on a Patria takes half the damage of a strike, the same as a system with armour of its own; the higher of the two counts ([`targeting.js:95`](../frontend/src/sim/targeting.js#L95)).
 - **Mast on a vehicle.** A system with a mast is set to the vehicle's mast height ([`laydown.js:76`](../frontend/src/sim/laydown.js#L76)). That value then passes through the unit's mast limits and mast price like any other setting ([`unit-config.js:239`](../frontend/src/sim/unit-config.js#L239)). So a radar or camera whose lowest allowed mast is 5 m stands at 5 m on any vehicle, not at the vehicle's 2 to 3.5 m, and it costs less because its mast is lower than standard. The table shows what each system ends up with on each vehicle, worked out by the game's own functions:
 
-| System | Class | Standard mast and price | Patria 6x6 | Toyota Hilux | Mule UGV |
+| System | Class | Standard mast and price | Patria 6x6 | Toyota Hilux | Milrem THeMIS |
 |---|---|---|---|---|---|
 | [`rf_s`](../frontend/src/sim/config/sensors.js#L137) | light | 1.5 m, £7,500 | 3.5 m, £7,725 | 3 m, £7,669 | 2 m, £7,556 |
 | [`rf`](../frontend/src/sim/config/sensors.js#L110) | light | 9 m, £30,000 | 3.5 m, £27,525 | 3 m, £27,300 | 2 m, £26,850 |

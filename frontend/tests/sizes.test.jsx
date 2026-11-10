@@ -133,6 +133,8 @@ describe('the hotkeys', () => {
     press('1');
     expect(game.getTool()).toBe('radar_l');
     press('1');
+    expect(game.getTool()).toBe('radar_xenta');
+    press('1');
     expect(game.getTool()).toBe('radar_s');
     press('1');
     expect(game.getTool()).toBe('radar_a400');

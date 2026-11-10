@@ -106,6 +106,19 @@ function PackCard({ pack, active, onDeploy, onEdit, onDelete }) {
   );
 }
 
+// Deploying with no pack: any system can be bought, one by one, out of the run's budget. It stands a deployed pack down.
+function NoPackCard({ active, onDeploy }) {
+  return (
+    <article className="acct-pack" data-pack="none">
+      <header><b>No pack</b></header>
+      <span className="acct-muted">Buy any system in the catalogue, one by one, out of the run&apos;s budget.</span>
+      <div className="acct-actions">
+        <button className="acct-go" id="deploy-no-pack" onClick={onDeploy}>{active ? 'In use: open the game' : 'Deploy with no pack'}</button>
+      </div>
+    </article>
+  );
+}
+
 function Packs({ api, account, onEnter }) {
   const [packs, setPacks] = useState(null);
   const [editing, setEditing] = useState(() => (account.editActive ? account.activeUnit : null)); // opened from the game's pack tray
@@ -125,6 +138,7 @@ function Packs({ api, account, onEnter }) {
         <div className="acct-empty"><p>No deployment packs yet.</p><button className="acct-go" onClick={() => setEditing(blankPack())}>Build your first pack</button></div>
       ) : (
         <div className="acct-packs">
+          <NoPackCard active={!account.activeUnit} onDeploy={() => { account.deploy(null); onEnter(); }} />
           {packs.map((p) => <PackCard key={p.id} pack={p} active={account.activeUnit?.id === p.id} onEdit={() => setEditing(p)} onDelete={() => remove(p.id)} onDeploy={() => { account.deploy(p); onEnter(); }} />)}
         </div>
       )}
