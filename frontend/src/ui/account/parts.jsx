@@ -1,18 +1,20 @@
 // Pieces the login page and the profile hub share: the logo, password fields, the strength meter, the recovery code and a clock.
 
 import { useEffect, useId, useState } from 'react';
+import { GAME_VERSION, PRODUCT } from '../../sim/config/index.js';
+import mascot from '../../assets/bombadil.png';
 
 export const MIN_PASSWORD = 10; // MIN_PASSWORD in backend/app/account_schemas.py
 export const USERNAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$/;
 
-export const Logo = ({ title = 'SITE GUARD' }) => (
+// Bombadil's mascot: striding in his bright blue jacket, green belt and big yellow boots, a blue feather in his hat. The picture is
+// src/assets/bombadil.png, cut from the brand sheet with its background cleared; the tab icon in index.html is his head and hat.
+export const Mark = ({ size }) => <img src={mascot} alt="" className="acct-mark" style={size ? { height: size, width: 'auto' } : undefined} />;
+
+export const Logo = ({ title = PRODUCT.name.toUpperCase() }) => (
   <div className="acct-logo">
-    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M24 3 L42 10 V24 C42 35 34 42 24 45 C14 42 6 35 6 24 V10 Z" />
-      <circle cx="24" cy="24" r="9" opacity="0.7" /><circle cx="24" cy="24" r="2" fill="currentColor" />
-      <path d="M24 24 L33 15" />
-    </svg>
-    <h1>{title}</h1>
+    <Mark />
+    <div className="acct-wordmark"><h1>{title}</h1><small title={`Rules version ${GAME_VERSION}, shared with Site Guard`}>v{PRODUCT.version}</small></div>
   </div>
 );
 

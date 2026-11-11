@@ -1,6 +1,6 @@
 # People: simulated people, crews and casualties
 
-This document covers the simulated people in Site Guard: the groups you can place, how protection shelters them, how a drone's blast can kill or injure them, the crews that work some systems by hand, the soldiers of a patrol, and how casualties are counted, shown and replayed. It is written for a reader who wants to know what the casualty numbers mean and how little weight they can bear, and for a developer who wants to change them.
+This document covers the simulated people in Bombadil: the groups you can place, how protection shelters them, how a drone's blast can kill or injure them, the crews that work some systems by hand, the soldiers of a patrol, and how casualties are counted, shown and replayed. It is written for a reader who wants to know what the casualty numbers mean and how little weight they can bear, and for a developer who wants to change them.
 
 **Every casualty figure is a round-number assumption chosen to show the idea. None of it is real casualty or weapons-effects data** ([`people.js:1`](../frontend/src/sim/config/people.js#L1)). Do not base real decisions on it.
 

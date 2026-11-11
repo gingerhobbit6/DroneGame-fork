@@ -49,7 +49,7 @@ def size_problem(size: int, lidar_km: int) -> str | None:
 
 def main(argv: list[str] | None = None) -> int:
     urllib.request.install_opener(urllib.request.build_opener(HttpsRedirects))  # every urlopen in the builder then refuses a redirect to plain http
-    parser = argparse.ArgumentParser(prog="mapbuild", description="Build a Site Guard map pack from open data.")
+    parser = argparse.ArgumentParser(prog="mapbuild", description="Build a Bombadil map pack from open data.")
     parser.add_argument("--centre", required=True, help='the middle of the pack, as a grid reference such as "SU 22 66", or as easting,northing on the British or Estonian grid')
     parser.add_argument("--name", required=True, help="the name shown in the game")
     parser.add_argument("--data", required=True, help="the folder of downloads: terrain50, openmap_su, vmd_su and so on, or the national files for Estonia")

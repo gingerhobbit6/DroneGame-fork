@@ -10,7 +10,7 @@ SystemId = Literal[
     "radar", "radar_s", "radar_a400", "radar_a800", "radar_giraffe", "radar_l", "rf", "rf_s", "rf_elysion", "rf_airfence", "rf_l", "camera", "camera_s", "camera_l", "acoustic", "acoustic_s", "acoustic_l",
     "jammer", "jammer_s", "jammer_l", "jammer_auds", "jammer_neo", "jammer_jupiter", "jammer_sf", "jammer_mk4", "jammer_skywiper", "jammer_kvertus", "jammer_dgmk3", "jammer_dgtac", "interceptor", "interceptor_s", "interceptor_l", "interceptor_p1",
     "missile", "missile_s", "missile_l", "missile_rr", "missile_hvm", "missile_paladin", "missile_skysabre", "gun_hmg", "gun_s", "gun_50", "gun_l", "gun_skyranger", "gun_gepard",
-    "gun_shotgun", "gun_droneround", "rf_rfpatrol", "rf_chuyka", "camera_podview", "radar_xenta", "jammer_vepr",
+    "gun_shotgun", "gun_droneround", "rf_rfpatrol", "rf_chuyka", "camera_podview", "camera_spyke", "radar_xenta", "jammer_vepr",
     "laser", "laser_s", "laser_l", "laser_rfdew",
 ]
 Uplink = Literal["starlink", "cellular"]
@@ -28,6 +28,8 @@ EscortCarrier = Annotated[Literal["patria", "hilux", "themis", "foot"], _renamed
 MAX_ESCORTS = 6
 MAX_ESCORT_GAP = 200  # metres along the route, ahead of the people or (negative) behind
 MAX_ESCORT_SIDE = 100  # metres to the right of the people or (negative) to the left
+MAX_FOOT_BEARERS = 24  # soldiers carrying systems in a column (MAX_FOOT_BEARERS in frontend/src/sim/config/patrol.js)
+PatrolType = Literal["dismounted", "mounted", "mixed"]  # PATROL_TYPES in frontend/src/sim/config/patrol.js
 PATROL_WIDTH = (20, 1000)  # metres: CORRIDOR in frontend/src/sim/route.js
 Formation = Literal["file", "staggered", "wedge"]  # FORMATIONS in frontend/src/sim/formation.js
 
@@ -104,6 +106,18 @@ class Escort(Strict):
     also: list[SystemId] | None = Field(default=None, min_length=1, max_length=2, exclude_if=lambda also: also is None)  # up to 2 more on the same vehicle (MAX_ON_VEHICLE)
     gap: Annotated[float, Field(ge=-MAX_ESCORT_GAP, le=MAX_ESCORT_GAP)]
     side: Annotated[float, Field(ge=-MAX_ESCORT_SIDE, le=MAX_ESCORT_SIDE)] | None = Field(default=None, exclude_if=lambda side: side is None)  # older columns have none
+    soldier: Annotated[int, Field(ge=0, le=99)] | None = Field(default=None, exclude_if=lambda soldier: soldier is None)  # a soldier on foot: their place in the formation
+
+
+def _column_sizes(column: list[Escort] | None) -> list[Escort] | None:
+    """Up to MAX_ESCORTS vehicles and MAX_FOOT_BEARERS soldiers carrying systems, as columnProblem in frontend/src/sim/patrol.js."""
+    if column is not None:
+        foot = sum(e.vehicle == "foot" for e in column)
+        if len(column) - foot > MAX_ESCORTS:
+            raise ValueError(f"a patrol takes {MAX_ESCORTS} vehicles at most")
+        if foot > MAX_FOOT_BEARERS:
+            raise ValueError(f"{MAX_FOOT_BEARERS} soldiers at most can carry systems")
+    return column
 
 
 class PatrolPlan(Strict):
@@ -111,6 +125,8 @@ class PatrolPlan(Strict):
 
     width: Annotated[float, Field(ge=PATROL_WIDTH[0], le=PATROL_WIDTH[1])]
     formation: Formation
+    type: PatrolType | None = Field(default=None, exclude_if=lambda t: t is None)  # older plans have none, and are mixed
+    spacing: Annotated[float, Field(ge=2, le=150)] | None = Field(default=None, exclude_if=lambda spacing: spacing is None)  # metres between members
 
 
 class LaydownSpec(Strict):
@@ -126,7 +142,7 @@ class LaydownSpec(Strict):
     # a patrol's route from its start to its end (see docs/PATROL_MODE.md); the game checks it again on the ground when it is restored
     patrol: list[Annotated[list[Coordinate], Field(min_length=2, max_length=2)]] | None = Field(default=None, min_length=2, max_length=MAX_ZONE_POINTS, exclude_if=lambda patrol: patrol is None)
     # the vehicles that escort it; a patrol saved before there was a choice gets the default column
-    patrolColumn: list[Escort] | None = Field(default=None, min_length=1, max_length=MAX_ESCORTS, exclude_if=lambda column: column is None)
+    patrolColumn: Annotated[list[Escort] | None, AfterValidator(_column_sizes)] = Field(default=None, min_length=0, max_length=MAX_ESCORTS + MAX_FOOT_BEARERS, exclude_if=lambda column: column is None)
     # its corridor and formation; a patrol saved before there was a choice gets the default plan
     patrolPlan: PatrolPlan | None = Field(default=None, exclude_if=lambda plan: plan is None)
 

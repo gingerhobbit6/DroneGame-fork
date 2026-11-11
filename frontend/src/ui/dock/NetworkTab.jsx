@@ -64,6 +64,8 @@ export function NetworkTab({ active }) {
     <>
       <div className="net-tools">
         <button id="net-auto" className="primary" title="Connect every unwired system: cellular where a tower reaches well, otherwise Starlink" onClick={() => commands.autoWire()}>Auto-wire</button>
+        <button id="net-all-starlink" title="Put every system and the fusion node on Starlink, replacing any cellular" onClick={() => commands.wireAll('starlink')}>All on Starlink</button>
+        <button id="net-all-cellular" title="Put every system and the fusion node on cellular, replacing any Starlink" onClick={() => commands.wireAll('cellular')}>All on cellular</button>
         <button id="net-clear" onClick={() => commands.clearAll()}>Clear wires</button>
         <button id="net-step" title="Run the simulation until the next packet is sent, then pause (on the selected wire, if one is selected)" onClick={stepToPacket}>Step to next packet</button>
         <label className="muted">Pulse speed <input type="range" id="net-pace" min="0.3" max="3" step="0.1" value={pace} onChange={(e) => setPace(Number(e.target.value))} /></label>

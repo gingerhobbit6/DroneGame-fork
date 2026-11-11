@@ -47,7 +47,7 @@ const within = (az, [from, to]) => ((az - from + 360) % 360) <= ((to - from + 36
 // Is a direction, as a compass bearing and an elevation in degrees, inside what this system covers? Only radars, and jammers with a
 // sector antenna, are limited here.
 export function inCover(def, az, el) {
-  if (def.kind !== 'radar' && def.kind !== 'jammer') return true;
+  if (def.kind !== 'radar' && def.kind !== 'jammer' && !def.stare) return true; // and a staring camera's fixed view
   const arc = coverArc(def);
   if (arc < 360 && Math.abs(((((az - (def.facing ?? 0)) % 360) + 540) % 360) - 180) > arc / 2) return false;
   if (def.blank && def.blank.some((b) => within(az, b))) return false;

@@ -1,6 +1,6 @@
 # Drones: the threat inventory
 
-This document lists every drone Site Guard can send against you: the four generic types the waves are built from, and the 31 real drones from public sources that can take their place. It gives each drone's figures, how it flies, what it goes for, how it reacts to jamming and fire, how the waves grow, and where each figure comes from. It is written for a defence reader who wants to know what the numbers mean and how far to trust them, and for a developer who wants to change them.
+This document lists every drone Bombadil can send against you: the four generic types the waves are built from, and the 31 real drones from public sources that can take their place. It gives each drone's figures, how it flies, what it goes for, how it reacts to jamming and fire, how the waves grow, and where each figure comes from. It is written for a defence reader who wants to know what the numbers mean and how far to trust them, and for a developer who wants to change them.
 
 ## Contents
 

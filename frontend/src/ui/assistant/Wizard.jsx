@@ -122,7 +122,7 @@ export function Wizard({ openDock, closeDock }) {
     );
   }
   return (
-    <section id="wizard" className="panel" aria-label="Site Guard wizard" data-movable style={style}>
+    <section id="wizard" className="panel" aria-label="Bombadil wizard" data-movable style={style}>
       <div className="wz-head" title="Drag to move. Double-click to put it back." {...handle}>
         <Icon />
         <span>{live ? 'THE RUN IS LIVE' : moved ? `BACK TO STEP ${STEP_IDS.indexOf(moved) + 1} OF ${STEP_IDS.length}` : `STEP ${step + 1} OF ${STEP_IDS.length}${optional ? ' · OPTIONAL' : ''}`}</span>

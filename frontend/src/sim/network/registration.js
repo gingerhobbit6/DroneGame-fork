@@ -74,7 +74,7 @@ export function createRegistration(core, raiseAlert) {
         location_definition: { location_units: 'LOCATION_COORDINATE_SYSTEM_LAT_LNG_DEG_M', location_datum: 'LOCATION_DATUM_WGS84_E' },
       },
       mode_definition: modeDefinitions(s),
-      config_data: [{ manufacturer: 'Site Guard simulation', model: `${def.name} (class model)`, software_version: 'sim-0.1' }],
+      config_data: [{ manufacturer: 'Bombadil simulation', model: `${def.name} (class model)`, software_version: 'sim-0.1' }],
     };
   }
 

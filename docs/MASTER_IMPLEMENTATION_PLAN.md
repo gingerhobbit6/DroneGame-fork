@@ -1,10 +1,10 @@
-# Site Guard: client-server re-engineering plan
+# Bombadil: client-server re-engineering plan
 
 Status: approved 2026-11-04. Work happens on `refactor/client-server`, branched from `main`.
 
 ## Goal
 
-Move Site Guard from static files to a React frontend, a FastAPI backend and a SQLite database, with no loss of existing features and a structure that follows SOLID.
+Move Bombadil from static files to a React frontend, a FastAPI backend and a SQLite database, with no loss of existing features and a structure that follows SOLID.
 
 ## Decisions already made
 

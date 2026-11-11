@@ -20,7 +20,7 @@ const SYSTEMS = {
   laser: 0xe7e8e4, laser_s: SAND, laser_l: 0xbca886, laser_rfdew: 0xe2e3e0,
   gun_l: 0x6b6f5d, gun_skyranger: 0x4e5a3e, gun_gepard: 0x4e5c3e, gun_hmg: 0x5a6146, gun_s: 0x2a2b2a, gun_50: 0x2a2b2a,
   // field-systems.js: the shotgun is black, the rifle coyote and black, the RfPatrol and Chuyka black cases, PodView a grey pod, the XENTA and VEPR in army green
-  gun_shotgun: 0x1f2021, gun_droneround: 0x4b4a3f, rf_rfpatrol: 0x2b2c2e, rf_chuyka: 0x26282a, camera_podview: 0x8f9496, radar_xenta: 0x56603f, jammer_vepr: 0x4f5640,
+  gun_shotgun: 0x1f2021, gun_droneround: 0x4b4a3f, rf_rfpatrol: 0x2b2c2e, rf_chuyka: 0x26282a, camera_podview: 0x8f9496, camera_spyke: 0x3c3f44, radar_xenta: 0x56603f, jammer_vepr: 0x4f5640,
 };
 // What they stand on or ride in, cases and boxes too: NATO green, or tan where the real system goes with desert vehicles.
 const VEHICLES = { missile: SAND, laser_s: SAND, laser_l: 0xbca886 };

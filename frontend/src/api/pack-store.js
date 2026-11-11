@@ -48,7 +48,7 @@ const hex = (buffer) => [...new Uint8Array(buffer)].map((b) => b.toString(16).pa
 export async function decodePack(buffer) {
   if (buffer.byteLength > MAX_FILE) throw new Error('This map pack is too large.');
   const bytes = new Uint8Array(buffer);
-  if (bytes.length < HEAD || String.fromCharCode(...bytes.subarray(0, 5)) !== MAGIC) throw new Error('This is not a Site Guard map pack.');
+  if (bytes.length < HEAD || String.fromCharCode(...bytes.subarray(0, 5)) !== MAGIC) throw new Error('This is not a Bombadil map pack.');
   if (bytes[5] !== VERSION) throw new Error('This map pack was made by a different version of the game.');
   const length = new DataView(buffer).getUint32(6, true);
   if (length > MAX_HEADER || HEAD + length > bytes.length) throw new Error('This map pack is damaged.');

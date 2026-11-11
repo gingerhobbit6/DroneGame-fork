@@ -111,7 +111,7 @@ export const FIELD_SYSTEMS = {
   },
 
   camera_podview: {
-    product: 'Overview PodView2600', variantOf: 'camera', size: 'L', name: 'PodView2600', short: 'POD', model: 'camera', cost: 150000, shotCost: 0, color: 0x90a4ae, role: 'sensor', kind: 'camera', published: 1900, mount: 6, mobile: 'vehicle', falseAlarm: 0.02,
+    product: 'Overview PodView2600', variantOf: 'camera', size: 'L', name: 'PodView2600', short: 'POD', model: 'camera', cost: 40000, shotCost: 0, color: 0x90a4ae, role: 'sensor', kind: 'camera', published: 1900, mount: 6, mobile: 'vehicle', falseAlarm: 0.02,
     health: 30, signature: 0.05, emits: [],
     fov: 10, trackFov: 1.2, slewRate: 720, searchRate: 30, dwell: 2,
     channels: 'both', pixels: 'fhd', fnumber: 2, ir: 'lwir', pitch: 12, rangefinder: 'yes',
@@ -130,7 +130,27 @@ export const FIELD_SYSTEMS = {
         { label: 'Overview: PodView family', url: 'https://overview.co.uk/product/podview-family/' },
         { label: 'Overview: PodView2600 flyer', url: 'https://overview.co.uk/wp-content/uploads/2026/10/Overview_ODD00648_Flyer_PodView2600_Iss03_102026_lr.pdf' },
       ],
-      cost: { capex: 'No public price. Game price $150,000 is a placeholder, at the top of the $50,000 to $150,000 given for imaging-only detection systems.', confidence: 'ASSUMPTION: tune this yourself', sources: [] },
+      cost: { capex: 'Price given by the user: £30,000, which is $40,000 at the game’s £0.75 to the dollar.', confidence: 'User figure', sources: [] },
+    },
+  },
+
+  camera_spyke: {
+    product: 'Quell SPYKE', variantOf: 'camera', size: 'L', name: 'SPYKE array camera', short: 'SPK', model: 'camera', cost: 400000, shotCost: 0, color: 0x9fa8da, role: 'sensor', kind: 'camera', published: 1800, mount: 3, mobile: 'vehicle', falseAlarm: 0.03,
+    health: 25, signature: 0.05, emits: [], channels: 'visible',
+    stare: true, arc: 79, elevation: 57, locators: 6, // a fixed wide view that needs no cue, and six locating cameras inside it
+    desc: 'A Scottish staring camera: an array of cameras watches a wide 79° by 57° view all the time, so it needs no cue, and six mirror-steered locating cameras inside it fix up to six drones at once. Daylight only. It gives bearings, not range, and speaks SAPIENT.',
+    sapient: {
+      nodeType: 'NODE_TYPE_CAMERA', subType: ['EO', 'C-UAS'], scan: 'SCAN_TYPE_FIXED', interval: 0.5,
+      noise: { az: 0.05, el: 0.05 }, modes: ['Search'],
+    },
+    ref: {
+      class: 'Staring electro-optical drone detector with steered locating cameras',
+      analogues: ['Quell SPYKE'],
+      published: 'Quell: detects a DJI Mini 3 Pro (251 x 362 x 70 mm) at 1.3 km, a DJI Matrice 300 RTK (810 x 670 x 430 mm) at 2.6 km and a QinetiQ Banshee (2,840 x 2,490 x 860 mm) at 8 km; coverage 79° x 57°; 270 x 290 x 170 mm; 5.9 kg; static and on the move; set up in 60 s; electro-optical; 50 W, battery operated; Drone ID, SAPIENT and TAK.',
+      basis: 'Game range 1.8 km for the 0.35 m reference drone is the Mini 3 Pro figure scaled by size (1.3 km x 0.35 / 0.25). The game scales a camera’s reach in proportion to a drone’s size, so it gives the larger drones more than Quell does (about 4 km for a Matrice 300, against 2.6 km): an ASSUMPTION that favours it against big drones. The six locating cameras are modelled as a limit of six drones located per look, each to 0.05° (ASSUMED). Visible light only, as the maker says electro-optical; the 3 m mount and false alarm rate are ASSUMPTIONS.',
+      confidence: 'Maker figures; locating accuracy is an assumption',
+      sources: [{ label: 'Quell: SPYKE', url: 'https://quell.scot/spyke/' }],
+      cost: { capex: 'Price given by the user: £300,000, which is $400,000 at the game’s £0.75 to the dollar.', confidence: 'User figure', sources: [] },
     },
   },
 

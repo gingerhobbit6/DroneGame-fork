@@ -1,5 +1,6 @@
 // The start screen before deployment, and the game over card.
 
+import { Mark } from './account/parts.jsx';
 import { useState } from 'react';
 import { ECONOMY, PEOPLE } from '../sim/config/index.js';
 import { money } from '../sim/economy.js';
@@ -47,7 +48,7 @@ function StartCard({ openDock }) {
   };
   return (
     <Movable className={wantReal ? 'card welcome picking' : 'card welcome'} title="Start">
-      <div className="wz-debrief-head">SITE GUARD</div>
+      <div className="wz-debrief-head wz-brand"><Mark size={30} />BOMBADIL</div>
       <h1>Defend a site</h1>
       <p className="lead">You place and network sensors and weapons, from a deployment pack or on a {money(ECONOMY.budget)} budget, then watch your system try to find and stop inbound drones. The heart of it is the gap between where drones really are and where your system believes they are.</p>
       {!wantReal && <div className="stages">{STAGES.map(([head, text]) => <div key={head}><b>{head}</b>{text}</div>)}</div>}

@@ -14,7 +14,7 @@ for (const [id, def] of Object.entries(STRUCTURES)) def.id = id;
 export const TOOLBAR = [
   { kind: 'radar', name: 'Radar', key: '1', classes: ['radar_s', 'radar_a400', 'radar_a800', 'radar', 'radar_giraffe', 'radar_l', 'radar_xenta'] },
   { kind: 'rf', name: 'RF detector', key: '2', classes: ['rf_chuyka', 'rf_rfpatrol', 'rf_s', 'rf', 'rf_elysion', 'rf_airfence', 'rf_l'] },
-  { kind: 'camera', name: 'EO/IR camera', key: '3', classes: ['camera_s', 'camera', 'camera_l', 'camera_podview'] },
+  { kind: 'camera', name: 'EO/IR camera', key: '3', classes: ['camera_s', 'camera', 'camera_l', 'camera_podview', 'camera_spyke'] },
   { kind: 'acoustic', name: 'Acoustic sensor', key: '8', classes: ['acoustic_s', 'acoustic', 'acoustic_l'] },
   { kind: 'jammer', name: 'RF jammer', key: '4', classes: ['jammer_mk4', 'jammer_dgmk3', 'jammer_s', 'jammer_dgtac', 'jammer_kvertus', 'jammer_skywiper', 'jammer', 'jammer_neo', 'jammer_jupiter', 'jammer_auds', 'jammer_l', 'jammer_vepr', 'jammer_sf'] },
   { kind: 'interceptor', name: 'Interceptor drones', key: '5', classes: ['interceptor_s', 'interceptor', 'interceptor_p1', 'interceptor_l'] },

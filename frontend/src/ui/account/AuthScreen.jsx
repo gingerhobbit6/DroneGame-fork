@@ -150,6 +150,7 @@ export function AuthScreen({ api, onSignedIn, notice: said = null }) {
       <div className="acct-login">
         <section className="acct-brand">
           <Logo />
+          <p className="acct-motto">Master of his own ground.</p>
           <p className="acct-tag">Counter-UAS defence simulator</p>
           <p className="acct-pitch">Plan a site&apos;s air defence with real sensors and effectors, then test it against waves of real drones.</p>
           <div className="acct-stats">{STATS.map(([n, label]) => <div key={label}><b>{n}</b><span>{label}</span></div>)}</div>

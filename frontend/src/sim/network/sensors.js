@@ -198,7 +198,10 @@ export function createSensors(core, feed) {
     const found = [];
     const c = ctx.siteCentre(), m = mpu();
     const opens = new Map(), deaf = deafAt(s, nodes.values()); // the same for every drone of a type in this scan
-    for (const d of ctx.drones) {
+    const cap = s.def.locators ?? Infinity; // a staring camera's locating cameras each fix one drone a look, the nearest first
+    const order = cap < ctx.drones.length ? [...ctx.drones].sort((a, b) => rel(s, a).rng - rel(s, b).rng) : ctx.drones;
+    for (const d of order) {
+      if (found.length >= cap) break;
       if (!opens.has(d.def)) opens.set(d.def, reachFor(s.def, d.def));
       const p = pd(s, d, { open: opens.get(d.def), deaf });
       if (p > 0 && rand() < p) { found.push(measure(s, d, pathReach, deaf)); logSeen(d, s.def.id, T(), rel(s, d).rng, Math.hypot(d.pos.x - c.x, d.pos.z - c.z) * m); }

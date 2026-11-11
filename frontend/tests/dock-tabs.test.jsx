@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The SAPIENT panel's spectrum, learn, cost and sources tabs, source links and the minimap, against a real simulation.
+// The SAPIENT panel's spectrum, cost and sources tabs, source links and the minimap, against a real simulation.
 
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,7 +10,6 @@ import { GameContext } from '../src/ui/hooks.js';
 import { Dock } from '../src/ui/dock/Dock.jsx';
 import { safeHref, SourceLinks } from '../src/ui/dock/SourceLinks.jsx';
 import { basisOf } from '../src/ui/dock/SourcesTab.jsx';
-import { followMessages } from '../src/ui/dock/LearnTab.jsx';
 import { drawSpectrum, jamConflicts } from '../src/ui/dock/spectrum-canvas.js';
 import { createPlanCanvas } from '../src/ui/dock/plan-canvas.js';
 import { createNetworkCanvas } from '../src/ui/dock/network-canvas.js';
@@ -84,36 +83,6 @@ describe('on a scaled display', () => {
     expect(diagram.hitTest({ x: 300, y: 130 }).box.kind).toBe('fusion'); // found where it is on the page, not in the canvas's own pixels
     plan.dispose(); diagram.dispose();
   });
-});
-
-describe('learn tab', () => {
-  it('finds examples from this run, or says there are none yet', () => {
-    openDock('learn');
-    fireEvent.click($('[data-step="7"]')); // kills: none yet
-    expect($('#learn-json').textContent).toContain('No message of this kind');
-    running();
-    fireEvent.click($('[data-step="0"]'));
-    expect($('#learn-json').textContent).toContain('A system joins the network');
-    for (let i = 1; i < 9; i++) fireEvent.click($(`[data-step="${i}"]`));
-  }, 30000);
-
-  it('follows a track through its messages', () => {
-    running(MIXED, 0);
-    const named = () => [...game.sim.net.tracks.values()].find((t) => t.short);
-    for (let n = 0; n < 40000 && !named(); n += 100) game.sim.run(100); // drones start 12 to 26 km out: play until one is tracked, before the defence clears the sky
-    openDock('learn');
-    refresh();
-    const tr = named();
-    expect(tr).toBeTruthy();
-    expect(followMessages(tr).length).toBeGreaterThan(0);
-    fireEvent.change($('#follow'), { target: { value: tr.id } });
-    const rows = document.querySelectorAll('#follow-list .pk');
-    expect(rows.length).toBeGreaterThan(0);
-    fireEvent.click(rows[0]);
-    expect($('#learn-json').textContent).toContain(' at ');
-    fireEvent.change($('#follow'), { target: { value: '' } });
-    expect(document.querySelectorAll('#follow-list .pk').length).toBe(0);
-  }, 30000);
 });
 
 describe('cost tab', () => {

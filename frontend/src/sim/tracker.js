@@ -73,6 +73,8 @@ const slackOf = (m) => Math.max(1, m.every ?? 1);
 const quietFor = (tr, t, limit) => { for (const h of tr.heard.values()) if (t - h.t <= limit * h.slack) return false; return true; };
 export const slowestSensor = (tr) => Math.max(1, ...[...tr.heard.values()].map((h) => h.slack));
 
+const MIN_VAR = 0.01; // m² (10 cm), and (m/s)² for velocity
+
 export function createTracker(newId) {
   const tracks = new Map();
   let cands = []; // unmatched bearing-only measurements waiting for a second sensor
@@ -111,6 +113,9 @@ export function createTracker(newId) {
     tr.P22 = m3.sub(tr.P22, m3.mul(K2, tr.P12));
     tr.P12 = m3.mul(I_K1, tr.P12);
     tr.P11 = m3.mul(I_K1, tr.P11);
+    // A very precise bearing (a few hundredths of a degree) against a loose track can round a variance below zero, and its square root
+    // then poisons the track: keep every variance at least MIN_VAR.
+    for (const P of [tr.P11, tr.P22]) for (const i of [0, 4, 8]) if (!(P[i] >= MIN_VAR)) P[i] = MIN_VAR;
   }
 
   // Position error, horizontal only for a track with no measured height: what uses it then compares horizontal distance too.

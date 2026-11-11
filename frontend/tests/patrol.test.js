@@ -72,8 +72,8 @@ describe('the column', () => {
     expect(columnProblem([{ vehicle: 'hilux', system: 'missile_skysabre', gap: 0 }])).toMatch(/cannot ride/);
     expect(columnProblem([{ vehicle: 'toString', system: 'rf', gap: 0 }])).toMatch(/Choose a vehicle/);
     expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 250 }])).toMatch(/within 200 m/);
-    expect(columnProblem(Array(7).fill(COLUMN[0]))).toMatch(/1 to 6/);
-    expect(columnProblem([])).toMatch(/1 to 6/);
+    expect(columnProblem(Array(7).fill(COLUMN[0]))).toMatch(/6 vehicles at most/);
+    expect(columnProblem([])).toBeNull(); // soldiers alone, carrying nothing
     expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 0, side: 120 }])).toMatch(/100 m to the side/);
     expect(sim.commands.setPatrol(ROUTE, [{ vehicle: 'themis', system: 'missile_paladin', gap: 0 }])).toMatch(/cannot carry/);
     expect(sim.getPatrol()).toBeNull();
@@ -225,7 +225,7 @@ describe('a whole run', () => {
     sim.commands.setPatrol(ROUTE);
     const spec = sim.currentLaydown();
     expect(spec.patrol).toEqual(ROUTE);
-    expect(spec.patrolPlan).toEqual({ width: 200, formation: 'file' });
+    expect(spec.patrolPlan).toEqual({ width: 200, formation: 'file', type: 'mixed', spacing: 5 });
     expect(spec.structures).toEqual([]);
     expect(spec.people).toBeUndefined();
     sim.commands.reset('clear');

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DRONES, ESCORT_CARRIERS, PATROL_VEHICLES, STRUCTURES, TOOLBAR, WORLD, escortCarries, resetAllFigures } from '../src/sim/config/index.js';
 import { covers, heardBand } from '../src/sim/rf-model.js';
 import { reachFor } from '../src/sim/site-range.js';
-import { coverArc } from '../src/sim/sensor-model.js';
+import { coverArc, inCover } from '../src/sim/sensor-model.js';
 import { crewed } from '../src/sim/crew.js';
 import { columnProblem } from '../src/sim/patrol.js';
 import { MAST_SIDE } from '../src/sim/sharing.js';
@@ -15,7 +15,7 @@ import { createSimulation } from '../src/sim/simulation.js';
 import { unitDef } from '../src/sim/unit-config.js';
 import { setUp } from './support/scenarios.js';
 
-const NEW = ['gun_shotgun', 'gun_droneround', 'rf_rfpatrol', 'rf_chuyka', 'camera_podview', 'radar_xenta', 'jammer_vepr'];
+const NEW = ['gun_shotgun', 'gun_droneround', 'rf_rfpatrol', 'rf_chuyka', 'camera_podview', 'camera_spyke', 'radar_xenta', 'jammer_vepr'];
 const square = (cx, cz, r) => [[cx - r, cz - r], [cx + r, cz - r], [cx + r, cz + r], [cx - r, cz + r]];
 
 let sim;
@@ -91,6 +91,18 @@ describe('the PodView camera, XENTA-M5 radar and VEPR dome jammer', () => {
   it('fits the PodView with its laser rangefinder and its 720°/s slew', () => {
     expect(STRUCTURES.camera_podview).toMatchObject({ kind: 'camera', rangefinder: 'yes', slewRate: 720 });
     expect(STRUCTURES.camera_podview.range).toBeGreaterThan(STRUCTURES.camera_l.range);
+  });
+
+  it('has the SPYKE stare at a fixed 79° by 57° view, with no aim to cue and six drones located a look', () => {
+    const spyke = STRUCTURES.camera_spyke;
+    expect(spyke).toMatchObject({ kind: 'camera', stare: true, arc: 79, elevation: 57, locators: 6 });
+    expect(spyke.fov).toBeUndefined(); // so nothing cues or turns it
+    const def = { ...spyke, facing: 90 };
+    expect(inCover(def, 90 + 39, 5)).toBe(true);
+    expect(inCover(def, 90 + 41, 5)).toBe(false);
+    expect(inCover(def, 90, 50)).toBe(false);
+    expect(inCover(STRUCTURES.camera_podview, 270, 50)).toBe(true); // a pointed camera's view is checked by its aim instead
+    expect(unitDef('camera_spyke').settings ?? {}).not.toHaveProperty('slew');
   });
 
   it('has the XENTA-M5 see all round, further than any other radar here but the Giraffe', () => {
@@ -242,7 +254,10 @@ describe('up to three systems on a vehicle', () => {
     expect(columnProblem(column)).toBeNull();
     expect(columnProblem([{ ...column[0], also: ['gun_hmg', 'jammer_s', 'rf'] }])).toMatch(/3 systems at most/);
     expect(columnProblem([{ vehicle: 'patria', system: 'missile_paladin', also: ['radar_giraffe'], gap: 0 }])).toMatch(/one heavy/);
-    expect(columnProblem([{ vehicle: 'foot', system: 'rf_rfpatrol', also: ['gun_shotgun'], gap: 0 }])).toMatch(/one system/);
+    expect(columnProblem([{ vehicle: 'foot', system: 'rf_rfpatrol', also: ['gun_shotgun'], gap: 0 }])).toBeNull(); // two hand-held systems
+    expect(columnProblem([{ vehicle: 'foot', system: 'rf_rfpatrol', also: ['gun_shotgun', 'rf_chuyka'], gap: 0 }])).toMatch(/2 systems at most/);
+    expect(columnProblem([{ vehicle: 'patria', system: 'missile_rr', gap: 0 }], 'dismounted')).toMatch(/does not take/);
+    expect(columnProblem([{ vehicle: 'foot', system: 'rf_rfpatrol', gap: 0, soldier: 1 }], 'mounted')).toMatch(/does not take/);
     expect(sim.commands.setPatrol(square(20, 20, 10), column)).toBeNull();
     const escorts = sim.getPatrol().escorts.map(({ s }) => s);
     expect(escorts.map((s) => s.def.id)).toEqual(['radar_a800', 'gun_hmg', 'jammer_s']);

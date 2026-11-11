@@ -42,8 +42,8 @@ describe('reading a pack file', () => {
   });
   const damaged = async (change) => decodePack(await encodePack({ change }));
   it('refuses what is not a pack', async () => {
-    await expect(decodePack(new ArrayBuffer(4))).rejects.toThrow(/not a Site Guard/);
-    await expect(decodePack(new TextEncoder().encode('hello world, not a pack').buffer)).rejects.toThrow(/not a Site Guard/);
+    await expect(decodePack(new ArrayBuffer(4))).rejects.toThrow(/not a Bombadil/);
+    await expect(decodePack(new TextEncoder().encode('hello world, not a pack').buffer)).rejects.toThrow(/not a Bombadil/);
     const other = new Uint8Array(await encodePack());
     other[5] = 9;
     await expect(decodePack(other.buffer)).rejects.toThrow(/different version/);

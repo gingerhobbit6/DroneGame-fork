@@ -9,6 +9,7 @@ import { CONDITIONS, ENV } from './conditions.js';
 import { terrainState } from './terrain.js';
 import { clearSight } from './world.js';
 import { u } from './units.js';
+import { barsDrone } from './engage-rules.js';
 
 const SCAN = 0.5; // seconds between looks round for a new target
 const EYE_HEIGHT = 2.5; // metres: a gunner standing in a vehicle, when the system has no mast height of its own
@@ -37,7 +38,7 @@ function crewSees(s, d) {
 // it has a target, pointed at it.
 export function crewTask(w, s, dt) {
   const jammer = s.def.fire === 'jam', reach = u(s.def.range);
-  const ok = (d) => !d.dead && s.pos.distanceTo(d.pos) <= reach && (crewSees(s, d) || (jammer && alerts(s, d)));
+  const ok = (d) => !d.dead && !barsDrone(w.engageRules, s.def.id, d.def.id) && s.pos.distanceTo(d.pos) <= reach && (crewSees(s, d) || (jammer && alerts(s, d)));
   if (s.task && !ok(s.task.drone)) s.task = null;
   s.scanT = (s.scanT ?? 0) - dt;
   if (s.scanT <= 0) {

@@ -31,7 +31,7 @@ if __name__ == "__main__":
     except OSError as problem:
         sys.exit(f"Could not listen on {', '.join(BIND_HOSTS)} port {PORT}: {problem}. Is the address this machine's, and is another copy already running?")
     for host in BIND_HOSTS:
-        print(f"Site Guard: open http://{'localhost' if host == '127.0.0.1' else host}:{PORT}")
+        print(f"Bombadil: open http://{'localhost' if host == '127.0.0.1' else host}:{PORT}")
     try:
         uvicorn.Server(uvicorn.Config("app.main:app")).run(sockets=sockets)
     except KeyboardInterrupt:

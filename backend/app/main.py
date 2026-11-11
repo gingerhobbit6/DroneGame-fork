@@ -42,7 +42,7 @@ def create_app(db_path: Path | None = None, game: Path = DEFAULT_GAME) -> FastAP
             running_builder.stop()
 
     # Interactive docs are off because they load scripts from a CDN, and this works offline. The schema is at /api/v1/openapi.json.
-    app = FastAPI(title="Site Guard", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url="/api/v1/openapi.json")
+    app = FastAPI(title="Bombadil", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url="/api/v1/openapi.json")
     app.state.db_path = path
     app.state.packs = PackLibrary()
     app.state.pack_builder = PackBuilder(app.state.packs)

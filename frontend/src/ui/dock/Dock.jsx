@@ -6,12 +6,12 @@ import { NodesTab } from './NodesTab.jsx';
 import { PlanTab } from './PlanTab.jsx';
 import { NetworkTab } from './NetworkTab.jsx';
 import { SpectrumTab } from './SpectrumTab.jsx';
-import { LearnTab } from './LearnTab.jsx';
 import { CostTab } from './CostTab.jsx';
 import { SourcesTab } from './SourcesTab.jsx';
 import { SavedTab } from './SavedTab.jsx';
 import { RunsTab } from './RunsTab.jsx';
 import { LabTab } from './LabTab.jsx';
+import { RulesTab } from './RulesTab.jsx';
 import { StatsTab } from '../RunStats.jsx';
 import { Movable } from '../Movable.jsx';
 
@@ -27,20 +27,30 @@ const GROUPS = [
     { id: 'spectrum', label: 'Spectrum', Tab: SpectrumTab, hint: 'Where your jamming, links and radars sit in frequency' },
   ]],
   ['Plan and cost', [
+    { id: 'rules', label: 'Engagement rules', Tab: RulesTab, hint: 'Which of your weapons may fire at which drone types, to keep costly rounds for the drones worth them' },
     { id: 'plan', label: 'Plan', Tab: PlanTab, hint: 'Top-down map with sensor coverage and tracks' },
     { id: 'cost', label: 'Magazine depth', Tab: CostTab, paneId: 'cost', hint: 'Rounds left, budget, cost exchange and shots fired' },
   ]],
   ['Records', [
-    { id: 'saved', label: 'Saved', Tab: SavedTab, hint: 'Save and load laydowns' },
-    { id: 'runs', label: 'Runs', Tab: RunsTab, hint: 'Results of past runs' },
+    { id: 'saved', label: 'Saved', Tab: SavedAndRuns, hint: 'Save and load laydowns, and the results of past runs' },
     { id: 'lab', label: 'Lab', Tab: LabTab, hint: 'Laydowns found by the overnight lab search, with how well each held out' },
   ]],
   ['Reference', [
     { id: 'systems', label: 'Sources', Tab: SourcesTab, paneId: 'systems', hint: 'Every figure and where it comes from. You can edit them here' },
-    { id: 'learn', label: 'Learn', Tab: LearnTab, hint: 'How SAPIENT works, step by step, using this run' },
   ]],
 ];
 const TABS = GROUPS.flatMap(([, tabs]) => tabs);
+
+// Your saved laydowns, and below them every past run.
+function SavedAndRuns({ active }) {
+  return (
+    <>
+      <SavedTab active={active} />
+      <h4 className="dock-section" id="runs-heading">Past runs</h4>
+      <RunsTab active={active} />
+    </>
+  );
+}
 
 // tab and onTab let the wizard open a tab. Without them the dock keeps its own.
 export function Dock({ open, onClose, tab: shown, onTab }) {

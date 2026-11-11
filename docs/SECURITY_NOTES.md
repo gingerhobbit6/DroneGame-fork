@@ -2,7 +2,7 @@
 
 ## What this protects against
 
-Site Guard runs on one machine, with no configured secrets. Each player signs in to a local account, which holds their profile and deployment packs. Saved laydowns, run history and tuning figures stay shared by every account on the machine, by choice. The realistic threats are:
+Bombadil runs on one machine, with no configured secrets. Each player signs in to a local account, which holds their profile and deployment packs. Saved laydowns, run history and tuning figures stay shared by every account on the machine, by choice. The realistic threats are:
 
 1. **A web page you visit** trying to read or change the local service through your browser.
 2. **Someone on your network** reaching the service.

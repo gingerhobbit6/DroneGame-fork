@@ -134,6 +134,16 @@ class TestLaydowns:
         four = [{**column[0], "also": ["gun_hmg", "jammer_s", "rf"]}]
         assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": four})).status_code == 422
 
+    def test_a_dismounted_patrol_saves_its_soldiers_kit_spacing_and_type(self, client):
+        column = [{"vehicle": "foot", "system": "rf_rfpatrol", "also": ["gun_droneround"], "gap": -10, "side": 0, "soldier": 2}]
+        plan = {"width": 200, "formation": "wedge", "type": "dismounted", "spacing": 8}
+        made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": column, "patrolPlan": plan}))
+        assert made.status_code == 201
+        spec = client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]
+        assert spec["patrolColumn"] == column and spec["patrolPlan"] == plan
+        empty = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolColumn": [], "patrolPlan": plan}))
+        assert empty.status_code == 201  # soldiers alone, carrying nothing
+
     def test_a_laydown_written_before_the_themis_had_its_own_id_still_loads(self, client):
         old = {"id": "jammer", "x": 5.0, "z": 5.0, "uplink": None, "cellBand": "B8", "jam": None, "vehicle": "mule"}
         column = [{"vehicle": "mule", "system": "jammer_s", "gap": -25.5}]
@@ -143,7 +153,8 @@ class TestLaydowns:
         assert spec["structures"][0]["vehicle"] == "themis" and spec["patrolColumn"][0]["vehicle"] == "themis"
 
     @pytest.mark.parametrize("column", [
-        [],
+        [{"vehicle": "foot", "system": "rf_rfpatrol", "gap": 0, "soldier": i} for i in range(25)],
+        [{"vehicle": "foot", "system": "rf_rfpatrol", "gap": 0, "soldier": 100}],
         [{"vehicle": "tank", "system": "gun_hmg", "gap": 0}],
         [{"vehicle": "hilux", "system": "nuke", "gap": 0}],
         [{"vehicle": "hilux", "system": "gun_hmg", "gap": 201}],

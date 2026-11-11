@@ -31,6 +31,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; col
 .net-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 12px; }
 .net-tools button { padding: 3px 10px; font-size: 12px; }
 .net-tools input[type=range] { vertical-align: middle; width: 90px; }
+.rules-grid { border-collapse: collapse; font-size: 12px; } .rules-grid th, .rules-grid td { padding: 3px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); text-align: left; vertical-align: bottom; }
 .net-main { flex: 1; min-height: 300px; display: flex; gap: 8px; }
 #net-canvas { flex: 1; min-width: 0; width: 100%; height: 100%; border: 1px solid #1c2b46; border-radius: 4px; background: #0a1120; }
 #net-side { width: 250px; flex: none; overflow-y: auto; font-size: 12px; }
@@ -144,6 +145,7 @@ button.primary:hover:not(:disabled) { background: #1976d2; }
 #dock-close { font-size: 18px; }
 .tabpane { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px; overflow: auto; }
 .tabpane.hidden { display: none; }
+.dock-section { margin: 14px 0 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.12); }
 .msg-tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 .msg-tools .row { display: flex; gap: 4px; flex-wrap: wrap; }
 .msg-tools button, .msg-tools select { padding: 3px 8px; font-size: 12px; }

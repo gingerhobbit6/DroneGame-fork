@@ -320,6 +320,18 @@ export function autoWire(w) {
   wireFusion(w, 'starlink', true); wireFusion(w, 'cellular', true);
   w.emit('toast', `Wired ${cell + sat} systems (${cell} cellular, ${sat} Starlink)${none ? `; ${none} could not be connected` : ''}; fusion node on both`);
 }
+// Wire every networked system, and the fusion node, on one kind of link, replacing what each had. Says how many have no link there.
+export function wireAll(w, kind) {
+  if (locked(w)) return;
+  let done = 0, failed = 0, dead = 0;
+  for (const s of w.net.nodes.values()) {
+    if (!isNode(s) || s.def.networked === false) continue;
+    if (wireNode(w, s, kind)) { done++; if (!w.net.comms.linkFor(s, kind, s.cellBand).up) dead++; } else failed++;
+  }
+  wireFusion(w, kind, true);
+  const name = kind === 'starlink' ? 'Starlink' : 'cellular';
+  w.emit('toast', `Wired ${done} systems and the fusion node on ${name}${failed ? `; ${failed} could not be (the budget?)` : ''}${dead ? `; ${dead} have no ${name} link where they stand` : ''}`);
+}
 export function clearWires(w) {
   if (locked(w)) return;
   for (const s of w.net.nodes.values()) if (isNode(s) && s.uplink) wireNode(w, s, null);

@@ -1,6 +1,6 @@
 # Maps
 
-This document covers the ground Site Guard plays on: generated ground made from a seed, and real maps of Great Britain and Estonia cut from map packs. It explains every base map and overlay, how packs are built, stored, imported and checked, the grids and coordinate conversions, what reveals your area of interest to outside servers, the data licences, and the known limits. It is for players who want to know how far to trust the ground, and for developers who want to change the builder or the pack format. The plan and its history, including the measurements that shaped the design, are in [REAL_MAPPING_PLAN.md](REAL_MAPPING_PLAN.md).
+This document covers the ground Bombadil plays on: generated ground made from a seed, and real maps of Great Britain and Estonia cut from map packs. It explains every base map and overlay, how packs are built, stored, imported and checked, the grids and coordinate conversions, what reveals your area of interest to outside servers, the data licences, and the known limits. It is for players who want to know how far to trust the ground, and for developers who want to change the builder or the pack format. The plan and its history, including the measurements that shaped the design, are in [REAL_MAPPING_PLAN.md](REAL_MAPPING_PLAN.md).
 
 ## Contents
 

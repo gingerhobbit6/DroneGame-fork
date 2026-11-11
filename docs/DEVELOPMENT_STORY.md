@@ -1,6 +1,6 @@
 # Development story
 
-How Site Guard moved from static files to a React, FastAPI and SQLite application, and what was learned on the way. For what is planned next, see the [implementation plan](MASTER_IMPLEMENTATION_PLAN.md).
+How Bombadil moved from static files to a React, FastAPI and SQLite application, and what was learned on the way. For what is planned next, see the [implementation plan](MASTER_IMPLEMENTATION_PLAN.md).
 
 ## Where it started
 

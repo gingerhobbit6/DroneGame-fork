@@ -1,6 +1,6 @@
 # Physics and propagation
 
-This document explains every physical model in the Site Guard simulation: radar, RF, optical and acoustic detection, terrain and canopy line of sight, radio propagation loss, ground clutter, jamming, weather and light, flight, hit chance, and blast and damage. Each section gives the formula the code uses, the constants and where they come from, a comparison with the real physics it simplifies, and how far to trust it. It is written for a defence professional who wants to know what the numbers mean, and for a developer who wants to change them.
+This document explains every physical model in the Bombadil simulation: radar, RF, optical and acoustic detection, terrain and canopy line of sight, radio propagation loss, ground clutter, jamming, weather and light, flight, hit chance, and blast and damage. Each section gives the formula the code uses, the constants and where they come from, a comparison with the real physics it simplifies, and how far to trust it. It is written for a defence professional who wants to know what the numbers mean, and for a developer who wants to change them.
 
 Every number below comes from the code or config (linked with line numbers), or from the worked examples, which were run against the game's own functions (see [Worked examples](#13-worked-examples)). Figures the code labels as assumptions are called assumptions here too.
 

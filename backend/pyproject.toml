@@ -1,7 +1,7 @@
 [project]
 name = "site-guard-backend"
 version = "0.1.0"
-description = "Stores Site Guard's saved laydowns, run history and tuning. It takes no part in live play."
+description = "Stores Bombadil's saved laydowns, run history and tuning. It takes no part in live play."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.156.4",

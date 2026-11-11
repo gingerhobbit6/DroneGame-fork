@@ -1,6 +1,6 @@
 # Architecture
 
-How Site Guard is put together: the layers and the rules between them, the frame loop and the fixed simulation step, why a run replays exactly, how the interface reads state, how a world is built, what is stored where, the backend and the separate map builder. It is for developers changing the code, and for anyone who wants to know how far a saved result can be trusted.
+How Bombadil is put together: the layers and the rules between them, the frame loop and the fixed simulation step, why a run replays exactly, how the interface reads state, how a world is built, what is stored where, the backend and the separate map builder. It is for developers changing the code, and for anyone who wants to know how far a saved result can be trusted.
 
 ## Contents
 

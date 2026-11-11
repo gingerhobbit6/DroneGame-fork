@@ -51,7 +51,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     seed, terrainSeed, ...freshRun(), started: false, autoStart: false, conditions: 'day',
     packed: false, kit: null, // packed: a deployment pack is in use, so the budget only counts; kit: how many of each system it holds
   };
-  const w = { state, drones: [], structures: [], missiles: [], people: [], peopleUid: 0, peopleRev: 0, patrol: null, ledger: createLedger(), emit, droneUid: 0, startLaydown: null, startFigures: null, runEnded: false };
+  const w = { state, drones: [], structures: [], missiles: [], people: [], peopleUid: 0, peopleRev: 0, patrol: null, ledger: createLedger(), emit, droneUid: 0, startLaydown: null, startFigures: null, runEnded: false, engageRules: {} };
   laydown.applyConditions(w, 'day'); // the conditions are module state that physics reads: a new simulation starts on a clear day
   w.rec = createRecorder(() => state.time);
   w.net = createNetwork({
@@ -61,6 +61,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     onFalseAlarm(id) { tally((w.ledger.falseAlarms[state.wave] ||= {}), id); },
     zone: () => state.zone, // the drawn area's outline, or null
     expected: () => state.attack, // the drones the waves send: what an unnamed track is judged to be
+    engageRules: () => w.engageRules, // which weapons may fire at which drone types (engage-rules.js)
     monitoring: () => state.wave > 0 || state.sandbox, // the fusion node only chases lost contact once the attack has started
     onApprovalRequest() { emit('approvalRequest'); emit('toast', 'Engagement request: your decision is needed'); },
     onApprovalDecided() { emit('approvalDecided'); },
@@ -230,6 +231,8 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     configureUnit: (s, key, value) => laydown.configureUnit(w, s, key, value),
     renameUnit: (s, name, callsign) => laydown.renameUnit(w, s, name, callsign),
     autoWire: () => laydown.autoWire(w),
+    setEngageRules: (rules) => { w.engageRules = rules ?? {}; emit('engageRules'); }, // kept across runs, like the laydown
+    wireAll: (kind) => laydown.wireAll(w, kind),
     clearAll: () => laydown.clearWires(w),
     enterSandbox: () => enterSandbox(w),
     exitSandbox: () => { resetRun('keep'); emit('toast', 'Sandbox closed: run reset, laydown kept'); },
@@ -275,6 +278,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     canPlacePeople: (x, z, protection) => !people.peopleProblem(w, x, z, protection),
     designLocked: () => designLocked(w),
     unwired: () => laydown.unwired(w),
+    engageRules: () => w.engageRules,
     spotterBonus: () => spotterBonus(w),
     report: () => deploymentReport(w),
     // for scripted experiments and tests: no budget or placement checks

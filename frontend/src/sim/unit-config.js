@@ -10,7 +10,7 @@ import { JAM_BANDS, LIBRARIES, covers, parseBands } from './rf-model.js';
 
 const each = (ids, limits) => Object.fromEntries(ids.map((id) => [id, limits]));
 const ofKind = (kind) => TOOLBAR.find((row) => row.kind === kind).classes; // every system of a kind, as the purchase bar lists them
-const RADARS = ofKind('radar'), RFS = ofKind('rf'), CAMERAS = ofKind('camera'), JAMMERS = ofKind('jammer'), ACOUSTICS = ofKind('acoustic');
+const RADARS = ofKind('radar'), RFS = ofKind('rf'), CAMERAS = ofKind('camera').filter((id) => !STRUCTURES[id].stare), STARING = ofKind('camera').filter((id) => STRUCTURES[id].stare), JAMMERS = ofKind('jammer'), ACOUSTICS = ofKind('acoustic');
 const PANELLED = { radar_s: [1, 4], radar_l: [1, 3], radar_a800: [1, 4], radar_a400: [1, 4] }; // fixed-panel radars: up to all round
 const MEDIUM_UP = RADARS.filter((id) => STRUCTURES[id].size !== 'S'); // 2D is offered on Medium and Large radars
 const TOP_EDGE = Object.fromEntries(RADARS.filter((id) => STRUCTURES[id].elevation + lowestEdge > 15).map((id) => [id, [15, STRUCTURES[id].elevation + lowestEdge]])); // a narrow beam keeps its top
@@ -170,7 +170,7 @@ export const UNIT_FIELDS = [
     help: 'Narrow is cheaper, but takes in one band at a time, so it hears each band only once per band it monitors.',
   },
   {
-    key: 'threshold', label: 'Detection threshold', base: () => 'normal', limits: { ...each(RADARS, true), ...each(RFS, true), ...each(CAMERAS, true), ...each(ACOUSTICS, true) },
+    key: 'threshold', label: 'Detection threshold', base: () => 'normal', limits: { ...each(RADARS, true), ...each(RFS, true), ...each(CAMERAS, true), ...each(STARING, true), ...each(ACOUSTICS, true) },
     choices: { low: 'Low', normal: 'Normal', high: 'High' },
     range: (v) => THRESHOLD[v]?.range ?? 1, falseAlarm: (v) => THRESHOLD[v]?.falseAlarm ?? 1,
     help: 'Low detects further with more false alarms. High is the reverse.',

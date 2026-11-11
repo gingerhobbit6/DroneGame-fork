@@ -18,7 +18,7 @@ export function makeReport(args) {
 
 const PAGE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Site Guard design convergence</title>
+<title>Bombadil design convergence</title>
 <style>
 :root { --bg:#fff; --fg:#17202c; --mut:#5c6878; --line:#d8dee6; --card:#f5f7fa; --c1:#2864d8; --c2:#d86a28; --c3:#2a9d6a; --c4:#8a4fd1; --c5:#c2398a; --c6:#7a8a00; --ok:#2a9d6a; }
 @media (prefers-color-scheme: dark) { :root { --bg:#0e1420; --fg:#e4eaf2; --mut:#97a3b4; --line:#2a3445; --card:#161e2c; --c1:#6a9bff; --c2:#ff9a5c; --c3:#4cc790; --c4:#b88aff; --c5:#ff7ac0; --c6:#c6d34a; } }

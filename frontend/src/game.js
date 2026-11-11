@@ -154,8 +154,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   function groundClick(x, z) {
     const tool = tools.get();
     if (!tool || state.over || !state.started) return;
-    if (tool === 'sell') { commands.sell(x, z); return; }
-    if (tool === 'move') { putDown(x, z); return; }
+    if (tool === 'sell' || tool === 'move') { if (tool === 'sell') commands.sell(x, z); else putDown(x, z); return; }
     if (tool === 'people') {
       refusal = commands.placePeople(x, z, view.people.count, view.people.protection, view.people.role);
       if (refusal) toast(refusal);
@@ -180,8 +179,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
 
   // The system the Unit panel shows. It is view state, not a command, so it is not logged and cannot change a run.
   function select(s) { view.selected = s; bump(); }
-  // Pick a placed system up: the next click on the map puts it down there. Esc, or picking another tool, leaves it where it was.
-  function startMove(s) { view.moving = s; tools.use('move'); toast(`Click the map where the ${s.def.name} should go, or press Esc`); }
+  function startMove(s) { view.moving = s; tools.use('move'); toast(`Click the map where the ${s.def.name} should go, or press Esc`); } // the next map click puts it down; Esc leaves it
   function putDown(x, z) { const s = view.moving; tools.use(null); view.moving = null; refusal = s ? commands.move(s, x, z) : null; toast(refusal || 'Moved, with its settings, wiring and name'); }
   function lookFrom(s) { view.eye = s ?? null; bump(); } // the ground view from this system's mast, or back to the map
   function selectDrone(d) { view.drone = d; if (!d) view.follow = false; bump(); } // view state too

@@ -1,6 +1,6 @@
 # Backend API
 
-The HTTP API of the Site Guard backend: every route, what it accepts and returns, its status codes, and the rules that apply to all of them. It is for developers working on the frontend client, the backend or the tests. The route list was generated from the running application's OpenAPI schema on 2026-11-09 and checked against the code.
+The HTTP API of the Bombadil backend: every route, what it accepts and returns, its status codes, and the rules that apply to all of them. It is for developers working on the frontend client, the backend or the tests. The route list was generated from the running application's OpenAPI schema on 2026-11-09 and checked against the code.
 
 ## Contents
 

@@ -39,9 +39,9 @@ function laydowns() {
 function index() {
   const rows = laydowns().map((l) => `<tr><td><a href="/laydowns/${encodeURIComponent(l.file)}" download>${esc(l.name)}</a></td><td>${l.n} systems</td></tr>`).join('');
   const report = existsSync(resolve(OUT_DIR, 'report.html')) ? '<p><a href="/report.html">Open the convergence report</a></p>' : '<p>No report has been built yet.</p>';
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Site Guard lab</title>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Bombadil lab</title>
 <style>body{font:16px/1.5 system-ui,sans-serif;max-width:720px;margin:0 auto;padding:16px;background:#0e1420;color:#e4eaf2}a{color:#6a9bff}table{border-collapse:collapse;width:100%}td{padding:8px 4px;border-bottom:1px solid #2a3445}td+td{color:#97a3b4;text-align:right}h1{font-size:22px}p.note{color:#97a3b4;font-size:14px}</style></head><body>
-<h1>Site Guard lab</h1>${report}<h2>Laydowns</h2>
+<h1>Bombadil lab</h1>${report}<h2>Laydowns</h2>
 <p class="note">Download one, then in the game open the Saved tab and use &ldquo;Open a laydown file&rdquo;. It loads the layout without saving it to your account.</p>
 <table>${rows || '<tr><td>No laydowns exported yet.</td></tr>'}</table></body></html>`;
 }

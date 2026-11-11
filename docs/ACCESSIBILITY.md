@@ -1,6 +1,6 @@
 # Accessibility
 
-This document states how accessible Site Guard is today, measured against the Web Content Accessibility Guidelines (WCAG) 2.2 at level AA, from a static review of the frontend code. It is for anyone deciding whether the app suits a user with a disability, and for developers who want to close the gaps. In short: the login and profile screens come close to AA, the game's panels are partly usable by keyboard and screen reader, and the 3D view gives a screen reader user nothing, so the app does not conform to WCAG 2.2 AA today.
+This document states how accessible Bombadil is today, measured against the Web Content Accessibility Guidelines (WCAG) 2.2 at level AA, from a static review of the frontend code. It is for anyone deciding whether the app suits a user with a disability, and for developers who want to close the gaps. In short: the login and profile screens come close to AA, the game's panels are partly usable by keyboard and screen reader, and the 3D view gives a screen reader user nothing, so the app does not conform to WCAG 2.2 AA today.
 
 ## Contents
 
@@ -85,7 +85,7 @@ WCAG 2.5.7 asks for a single-pointer way (a click, no drag) to do anything done 
 | Look round from a mast | None: drag only ([`EyeBar.jsx:14`](../frontend/src/ui/EyeBar.jsx#L14)) | None |
 | Draw the area to defend or a patrol route | Clicks, not drags, with a Close the area button ([`ZonePanel.jsx:49`](../frontend/src/ui/ZonePanel.jsx#L49)) | No way to add corners. The wizard's "Use a 1 km ring" sets an area by keyboard ([`steps.jsx:95`](../frontend/src/ui/assistant/steps.jsx#L95)) |
 | Wire one system to a network | Click its box on the network canvas, then Starlink or Cellular ([`NetworkTab.jsx:35`](../frontend/src/ui/dock/NetworkTab.jsx#L35)) | Only Auto-wire for everything at once ([`NetworkTab.jsx:66`](../frontend/src/ui/dock/NetworkTab.jsx#L66)); the per-system radio buttons only appear after a canvas click |
-| Read one message or packet | Click its row | None: the rows are `div`s with click handlers ([`MessagesTab.jsx:91`](../frontend/src/ui/dock/MessagesTab.jsx#L91), [`NetworkSide.jsx:91`](../frontend/src/ui/dock/NetworkSide.jsx#L91), [`LearnTab.jsx:82`](../frontend/src/ui/dock/LearnTab.jsx#L82)) |
+| Read one message or packet | Click its row | None: the rows are `div`s with click handlers ([`MessagesTab.jsx:91`](../frontend/src/ui/dock/MessagesTab.jsx#L91), [`NetworkSide.jsx:91`](../frontend/src/ui/dock/NetworkSide.jsx#L91)) |
 | Pick a bearing in the Range view | Click the polar plot ([`SiteRange.jsx:28`](../frontend/src/ui/SiteRange.jsx#L28)) | The bearing slider ([`SiteRange.jsx:105`](../frontend/src/ui/SiteRange.jsx#L105)) |
 
 The wizard's "Show me a good spot" works out a spot and marks it on the map, but the player still has to click the map there ([`steps.jsx:31`](../frontend/src/ui/assistant/steps.jsx#L31)).
@@ -122,8 +122,8 @@ The wizard's "Show me a good spot" works out a spot and marks it on the map, but
 | Timeline slider | [`Timeline.jsx:66`](../frontend/src/ui/Timeline.jsx#L66) | No label |
 | Figure reset | [`SourcesTab.jsx:41`](../frontend/src/ui/dock/SourcesTab.jsx#L41) | Named "↺"; it also sits inside the figure's `<label>`, so its glyph joins the input's name |
 | Message type filters | [`MessagesTab.jsx:74`](../frontend/src/ui/dock/MessagesTab.jsx#L74) | Not a gap since 11 November 2026: each chip has `aria-pressed` and a title saying whether its messages are shown or hidden |
-| Message, packet and follow rows | [`MessagesTab.jsx:91`](../frontend/src/ui/dock/MessagesTab.jsx#L91), [`NetworkSide.jsx:91`](../frontend/src/ui/dock/NetworkSide.jsx#L91), [`LearnTab.jsx:82`](../frontend/src/ui/dock/LearnTab.jsx#L82) | Clickable `div`s with no role and no keyboard access |
-| Unlabelled fields | [`SavedTab.jsx:42`](../frontend/src/ui/dock/SavedTab.jsx#L42), [`FigureSets.jsx:30`](../frontend/src/ui/dock/FigureSets.jsx#L30), [`MapControls.jsx:232`](../frontend/src/ui/MapControls.jsx#L232), [`MessagesTab.jsx:77`](../frontend/src/ui/dock/MessagesTab.jsx#L77), [`PlanTab.jsx:26`](../frontend/src/ui/dock/PlanTab.jsx#L26), [`LearnTab.jsx:76`](../frontend/src/ui/dock/LearnTab.jsx#L76) | Placeholder or neighbouring text only |
+| Message and packet rows | [`MessagesTab.jsx:91`](../frontend/src/ui/dock/MessagesTab.jsx#L91), [`NetworkSide.jsx:91`](../frontend/src/ui/dock/NetworkSide.jsx#L91) | Clickable `div`s with no role and no keyboard access |
+| Unlabelled fields | [`SavedTab.jsx:42`](../frontend/src/ui/dock/SavedTab.jsx#L42), [`FigureSets.jsx:30`](../frontend/src/ui/dock/FigureSets.jsx#L30), [`MapControls.jsx:232`](../frontend/src/ui/MapControls.jsx#L232), [`MessagesTab.jsx:77`](../frontend/src/ui/dock/MessagesTab.jsx#L77), [`PlanTab.jsx:26`](../frontend/src/ui/dock/PlanTab.jsx#L26) | Placeholder or neighbouring text only |
 | Plan view toggle | [`MapControls.jsx:200`](../frontend/src/ui/MapControls.jsx#L200) | Its name flips between "2D" and "3D" as its pressed state flips, so "3D, pressed" means plan view is on |
 | Map switcher | [`MapControls.jsx:192`](../frontend/src/ui/MapControls.jsx#L192) | Named only by its `title` |
 | Account chip | [`Root.jsx:26`](../frontend/src/ui/account/Root.jsx#L26) | Named by the player's name; "opens your profile" is only in the `title` |
@@ -201,7 +201,6 @@ What a screen reader user can get as text:
 | Nodes tab ([`NodesTab.jsx:11`](../frontend/src/ui/dock/NodesTab.jsx#L11)) | Every system with its SAPIENT type, mode, task, range, position and message counts, as a table |
 | Unit panel ([`UnitPanel.jsx:259`](../frontend/src/ui/UnitPanel.jsx#L259)) | Everything about one system: status, health, magazine, range on each bearing, odds, network, position, price |
 | Messages tab ([`MessagesTab.jsx:89`](../frontend/src/ui/dock/MessagesTab.jsx#L89)) | Every SAPIENT message with a one-line summary, including detections with bearing and range, tasks and alerts. The list reads, but a single message's JSON cannot be opened by keyboard |
-| Learn tab ([`LearnTab.jsx:76`](../frontend/src/ui/dock/LearnTab.jsx#L76)) | A list of current tracks, and every message about the one chosen |
 | Statistics and Magazine depth tabs | Tables of hit rates, ranges, costs, rounds and shots |
 | Spectrum tab notes ([`SpectrumTab.jsx:16`](../frontend/src/ui/dock/SpectrumTab.jsx#L16)) | Each clash between your jamming and your links, in a sentence |
 | Range view ([`SiteRange.jsx:28`](../frontend/src/ui/SiteRange.jsx#L28)) | Its two diagrams have `role="img"` and a name, and a table beside them |
@@ -212,7 +211,7 @@ What is missing: nothing describes the live air picture as it changes (where eac
 
 ## Zoom, reflow, language and title
 
-- **Language and title.** `<html lang="en">` ([`index.html:2`](../frontend/index.html#L2)) and the title "Site Guard" ([`index.html:6`](../frontend/index.html#L6)). The title never changes between the login page, the profile and the game.
+- **Language and title.** `<html lang="en">` ([`index.html:2`](../frontend/index.html#L2)) and the title "Bombadil" ([`index.html:6`](../frontend/index.html#L6)). The title never changes between the login page, the profile and the game.
 - **Zoom.** The viewport tag allows pinch zoom ([`index.html:5`](../frontend/index.html#L5)), and sizes are in CSS pixels, which browser zoom scales. But the game page cannot scroll (`overflow: hidden` on `html` and `body`, [`style.css:2`](../frontend/src/style.css#L2)) and every box is fixed-position with a fixed width (for example 236 px, 190 px, 300 px). At 200 % zoom on a 1280 px wide screen the page is 640 CSS px wide and the boxes overlap. Long boxes scroll inside themselves, and every box can be minimised or moved, which is the only way to reach what is underneath.
 - **Reflow (1.4.10).** The login and profile screens reflow to one column below 980 px and 560 px ([`account.css:152`](../frontend/src/ui/account/account.css#L152)), and the start card stacks below 900 px ([`map-panel.css:61`](../frontend/src/ui/map-panel.css#L61)). The game screen does not reflow; WCAG exempts the map itself, but not the panels around it.
 - **Text spacing (1.4.12).** Many lines are cut off with an ellipsis rather than wrapping (box titles, toolbar key lines, message rows), so wider letter or word spacing will hide text. Not tested.
@@ -289,7 +288,7 @@ Pass, Partial or Fail is a judgement from the code; nothing here has been confir
 | 2.2.2 Pause, stop, hide | Partial | The login backdrop animates without a pause control; reduced motion stops it |
 | 2.3.1 Three flashes | Not tested | Short weapon flashes; rate not measured |
 | 2.4.1 Bypass blocks | Partial | Account screens use `<main>`; the game has no landmarks or headings to jump between boxes |
-| 2.4.2 Page titled | Pass | "Site Guard", though it never changes |
+| 2.4.2 Page titled | Pass | "Bombadil", though it never changes |
 | 2.4.3 Focus order | Fail | Start card last; no focus moved into opened panels or back on close; recovery code screen loses focus |
 | 2.4.4 Link purpose | Pass | Source links use the source's name as text |
 | 2.4.5 Multiple ways | Not applicable | One page |

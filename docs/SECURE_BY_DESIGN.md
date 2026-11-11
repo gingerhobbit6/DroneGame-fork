@@ -1,6 +1,6 @@
 # Secure by Design review
 
-This document says how well Site Guard follows Secure by Design practice, with the code as evidence and the gaps stated plainly. It is for a security reviewer or accreditor who needs to judge the app, and for a developer who has to close the gaps. The detailed register of protections and accepted limits is [SECURITY_NOTES.md](SECURITY_NOTES.md): this document links to it and does not repeat it.
+This document says how well Bombadil follows Secure by Design practice, with the code as evidence and the gaps stated plainly. It is for a security reviewer or accreditor who needs to judge the app, and for a developer who has to close the gaps. The detailed register of protections and accepted limits is [SECURITY_NOTES.md](SECURITY_NOTES.md): this document links to it and does not repeat it.
 
 Review date: 9 November 2026, branch `docs/handbook`, read from the code. Nothing here was exploited. The only command run was `npm audit --package-lock-only` (see [Dependencies](#6-dependencies)). No server was started, no test suite was run, and no code or configuration was changed.
 
@@ -31,16 +31,16 @@ Review date: 9 November 2026, branch `docs/handbook`, read from the code. Nothin
 | Framework | Status in this review |
 |---|---|
 | NCSC, [Secure development and deployment guidance](https://www.ncsc.gov.uk/collection/developers-collection) | Verified. The index page was fetched and lists eight principles. Their exact names are used in the [scorecard](#14-scorecard). Each principle's own page was not read, so the scoring uses the principle titles and the NCSC summary of them, not their full text. |
-| CISA, [Secure by Design pledge](https://www.cisa.gov/securebydesign/pledge) | Verified. The page was fetched and lists seven goals, used in the scorecard. The pledge is written for software manufacturers who ship to many customers. Site Guard is a single-machine tool with no customers, so some goals apply only loosely. |
+| CISA, [Secure by Design pledge](https://www.cisa.gov/securebydesign/pledge) | Verified. The page was fetched and lists seven goals, used in the scorecard. The pledge is written for software manufacturers who ship to many customers. Bombadil is a single-machine tool with no customers, so some goals apply only loosely. |
 | UK MOD Secure by Design (JSP 440 and JSP 453, and the cross-government principles on [security.gov.uk](https://www.security.gov.uk/guidance/secure-by-design/principles)) | **Not verified.** The security.gov.uk principles page answered HTTP 403 to the fetch tool, and the MOD pages found by search ([digital.mod.uk](https://www.digital.mod.uk/secure-by-design/secure-from-the-start), [Defence Technology Principles](https://www.digital.mod.uk/service-manual/architecture/defence-technology-principles/make-your-technical-solution-secure)) answered 404 or were not retrievable. Search results confirm that the MOD requires Secure by Design, that JSP 440 and JSP 453 are the policy documents, and that a secondary source puts the mandate in JSP 440 Leaflet 5C. They did not give the principle names. This document does not list or paraphrase MOD principle names from memory. |
 
 For the MOD, this document gives evidence organised by topic (sections 2 to 13). An accreditor can map that evidence onto the current MOD principles after reading them at source. JSP 440 and JSP 453 may also be restricted to MOD networks, which this review could not reach.
 
-Also noted but not assessed: the NCSC's newer Software Security Code of Practice (reported in search results as 14 principles, voluntary) and Def Stan 05-138 (MOD supplier cyber requirements, Issue 4 dated 14 May 2024 according to a secondary source). Site Guard has no MOD contract, so neither is binding on it.
+Also noted but not assessed: the NCSC's newer Software Security Code of Practice (reported in search results as 14 principles, voluntary) and Def Stan 05-138 (MOD supplier cyber requirements, Issue 4 dated 14 May 2024 according to a secondary source). Bombadil has no MOD contract, so neither is binding on it.
 
 ## 2. Threat model
 
-Site Guard is a local, offline, single-machine tool. The backend binds to `127.0.0.1` ([`__main__.py:9`](../backend/app/__main__.py#L9)). Nothing is hosted, so the realistic attackers are few.
+Bombadil is a local, offline, single-machine tool. The backend binds to `127.0.0.1` ([`__main__.py:9`](../backend/app/__main__.py#L9)). Nothing is hosted, so the realistic attackers are few.
 
 ```mermaid
 flowchart LR
@@ -98,7 +98,7 @@ A state-changing DELETE with no JSON body is not stopped by the 415 rule. What s
 | Property | Value | Evidence |
 |---|---|---|
 | Password hashing | scrypt, N 2^14, r 8, p 5, 16-byte random salt, 32-byte output, compared with `hmac.compare_digest`. The parameters are stored in each hash string. | [`accounts.py:17`](../backend/app/services/accounts.py#L17) |
-| Hash cost against current guidance | OWASP's Password Storage Cheat Sheet (fetched on the review date) lists N 2^14, r 8, p 5 as an equivalent of its stated minimum of N 2^17, r 8, p 1. Site Guard uses N 2^14 with p 5, which meets that guidance. The code comment gives about 16 MB and 0.2 to 0.3 s. | Raised from p 1 on 10 November 2026; a test pins the floor ([`test_accounts.py`](../backend/tests/test_accounts.py)). `hashlib.scrypt` has a default memory limit, so N 2^17 would need a `maxmem` argument. |
+| Hash cost against current guidance | OWASP's Password Storage Cheat Sheet (fetched on the review date) lists N 2^14, r 8, p 5 as an equivalent of its stated minimum of N 2^17, r 8, p 1. Bombadil uses N 2^14 with p 5, which meets that guidance. The code comment gives about 16 MB and 0.2 to 0.3 s. | Raised from p 1 on 10 November 2026; a test pins the floor ([`test_accounts.py`](../backend/tests/test_accounts.py)). `hashlib.scrypt` has a default memory limit, so N 2^17 would need a `maxmem` argument. |
 | Password rules | 10 to 128 characters, no character-class rules, must not equal the username. The 128 maximum bounds hashing work. | [`account_schemas.py:25`](../backend/app/account_schemas.py#L25) |
 | Timing of unknown users | An unknown username is hashed against a dummy hash, so it takes as long as a wrong password. | [`accounts.py:60`](../backend/app/services/accounts.py#L60) |
 | Lockout | Five failures lock an account for 5 minutes. Each try is counted in one SQL statement before the slow hash, so parallel tries still lock after five. Password and recovery-code tries share the count. | [`accounts.py:18`](../backend/app/services/accounts.py#L18), `count_attempt` in [`account_stores.py:48`](../backend/app/db/account_stores.py#L48) |

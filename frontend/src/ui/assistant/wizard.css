@@ -57,7 +57,8 @@ button.wz-go:hover:not(:disabled) { background: #d4ff4d; }
 .card.welcome { max-width: 680px; }
 .card.welcome h1 { font-size: 32px; letter-spacing: 0.02em; color: #fff; }
 .card.welcome .lead { font-size: 16px; line-height: 24px; color: #dbe4f0; }
-.wz-debrief-head { margin-bottom: 8px; font-size: 11px; letter-spacing: 0.12em; color: #c6ff00; }
+.wz-debrief-head { margin-bottom: 8px; font-size: 11px; letter-spacing: 0.12em; color: #ffc61a; }
+.wz-brand { display: flex; align-items: center; gap: 6px; }
 .stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
 .stages div { display: flex; flex-direction: column; gap: 4px; padding: 10px; font-size: 13px; line-height: 18px; color: #b9c7dc; border: 1px solid #2f4468; border-radius: 6px; }
 .stages b { color: #fff; }

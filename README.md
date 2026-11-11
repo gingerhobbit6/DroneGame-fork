@@ -1,4 +1,6 @@
-# Site Guard
+# Bombadil
+
+Bombadil is a fork of Site Guard ([ShabalalaWATP/DroneGame](https://github.com/ShabalalaWATP/DroneGame)), with its own name and version (see `PRODUCT` in `frontend/src/sim/config/world.js`). It keeps Site Guard's rules version, so laydowns and runs saved in either replay the same.
 
 A counter-drone defence game and command-and-control simulator. You place and network real sensors and weapons around a site you choose, then watch a fusion node detect, track and engage inbound drones using [SAPIENT](docs/SAPIENT.md) (BSI Flex 335 v2.0) messages.
 
@@ -14,7 +16,7 @@ A counter-drone defence game and command-and-control simulator. You place and ne
 
 ## About this app
 
-Site Guard puts you in charge of defending a site against small drones: first-person-view (FPV) strike drones, fibre-optic drones that emit no radio, fixed-wing strike drones, and the spotters that guide them. You have one fixed budget. Every radar, RF detector, camera, acoustic sensor, jammer, interceptor, missile, gun and laser costs money, and so does every shot. No single system handles every drone.
+Bombadil puts you in charge of defending a site against small drones: first-person-view (FPV) strike drones, fibre-optic drones that emit no radio, fixed-wing strike drones, and the spotters that guide them. You have one fixed budget. Every radar, RF detector, camera, acoustic sensor, jammer, interceptor, missile, gun and laser costs money, and so does every shot. No single system handles every drone.
 
 The heart of it is the gap between where drones really are and where your system believes they are. The fusion node is never told which drone a detection came from. It builds tracks from noisy, delayed and sometimes missing reports, so it can lag, merge two drones, or chase a ghost. A truth overlay shows both at once.
 

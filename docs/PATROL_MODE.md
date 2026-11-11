@@ -14,7 +14,7 @@ The corridor is a band along the route, 20 to 1000 m wide (200 m to start with).
 
 ## The formation
 
-The soldiers (12 to start with, 5 m apart) walk in single file, a staggered column or a wedge behind the lead soldier. Each vehicle in the column has a place in the formation: metres ahead of the lead (behind if negative, up to 200 m) and metres to the right (left if negative, up to 100 m).
+The soldiers (12 to start with, 5 m apart unless the planner sets another spacing) walk in single file, a staggered column or a wedge behind the lead soldier. Each vehicle in the column has a place in the formation: metres ahead of the lead (behind if negative, up to 200 m) and metres to the right (left if negative, up to 100 m).
 
 Every member follows the route at its own place along it, offset to the side of the way the route runs there. So the shape bends round a turn as a real patrol's would, rather than swinging round as a rigid block. Walking back, ahead and right stay ahead and right of the way the patrol faces, so the column reverses its order on the way home. At the ends of the route, members that would be beyond it bunch at the end point.
 
@@ -24,9 +24,18 @@ Mobile systems ride in the column on a Patria 6x6, a Toyota Hilux or a Milrem TH
 
 Sensors work on the move. Weapons fire from the halt: while any weapon in the column has an engagement task, the whole patrol stops, and it walks on once the task ends. A jammer works on the move. Making this a per-system choice was considered and left out: the only systems that need it today are jammers, and the rule already exempts them.
 
+## The patrol planner
+
+Opened from the Area to defend panel, the patrol planner ([`PatrolPlanner.jsx`](../frontend/src/ui/PatrolPlanner.jsx), worked out in [`patrol-bearers.js`](../frontend/src/ui/patrol-bearers.js)) plans the one patrol a game has. It is one of two kinds (`PATROL_TYPES`):
+
+- **Dismounted**: the soldiers walk, in single file, a staggered column or a wedge, at one spacing for the whole patrol (2 to 30 m). Each soldier can carry up to two hand-held systems (`MAX_ON_FOOT`), and a THeMIS walks beside them with light systems. Anything bigger is greyed out: it needs a mounted patrol.
+- **Mounted**: the vehicles (Patria, Hilux, THeMIS) drive the route at `driveSpeed` (8 m/s, an assumption) in a column, staggered or box, at one spacing (10 to 80 m), and carry every system. The soldiers ride, spread over the vehicles.
+
+Every soldier and vehicle that can carry a system is a marker of the same size, at its place in the formation, to scale. Click one to see what it carries and add systems from the deployment pack, each greyed out with the reason where it cannot take it. Fill from the pack loads the patrol from what the pack has left (soldiers one system each before anyone takes a second, soldier-only weapons first; vehicles largest first, heaviest systems first), and Clear empties it to do by hand. Going beyond the pack is allowed, with a warning. A soldier's systems are saved with their place in the formation (`soldier`), so they stay with that soldier when the formation or spacing changes. A patrol drawn before choosing a kind, or saved before there was one, is mixed: soldiers walk with any vehicles, as patrols always did, and the Area panel's older column editor still edits it.
+
 ## Soldiers on foot
 
-A place in the column can be a soldier on foot instead of a vehicle ([`patrol.js`](../frontend/src/sim/config/patrol.js), `ON_FOOT`). A soldier carries a hand-held system at 1.5 m: DroneShield's RfPatrol, the Chuyka FPV video detector, a shotgun, or a rifle firing Drone Round. Soldiers are not a deployment pack's vehicles, so a pack never runs out of them. The guns are only carried on foot; the detectors can also ride on any vehicle. The detectors report to the fusion node over the soldier's radio, an assumption.
+A place in the column can be a soldier on foot instead of a vehicle ([`patrol.js`](../frontend/src/sim/config/patrol.js), `ON_FOOT`). A soldier carries up to two hand-held systems at 1.5 m: DroneShield's RfPatrol, the Chuyka FPV video detector, a shotgun, or a rifle firing Drone Round. Soldiers are not a deployment pack's vehicles, so a pack never runs out of them. The guns are only carried on foot; the detectors can also ride on any vehicle. The detectors report to the fusion node over the soldier's radio, an assumption.
 
 ## Out and back
 

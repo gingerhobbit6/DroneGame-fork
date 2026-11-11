@@ -183,7 +183,7 @@ class TestServingTheGame:
     def game(self, tmp_path):
         folder = tmp_path / "dist"
         (folder / "assets").mkdir(parents=True)
-        (folder / "index.html").write_text("<!doctype html><title>Site Guard</title>", encoding="utf-8")
+        (folder / "index.html").write_text("<!doctype html><title>Bombadil</title>", encoding="utf-8")
         (folder / "assets" / "index.js").write_text("console.log(1)", encoding="utf-8")
         (tmp_path / "secret.db").write_text("private", encoding="utf-8")
         return folder
@@ -196,7 +196,7 @@ class TestServingTheGame:
 
     def test_the_game_and_the_api_share_one_origin(self, site):
         page = site.get("/")
-        assert page.status_code == 200 and "Site Guard" in page.text
+        assert page.status_code == 200 and "Bombadil" in page.text
         assert site.get("/assets/index.js").status_code == 200
         assert site.get(f"{API}/health").json() == {"status": "ok"}
         assert site.post(f"{API}/laydowns", json=laydown()).status_code == 201

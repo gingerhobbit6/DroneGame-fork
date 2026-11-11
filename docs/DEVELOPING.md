@@ -1,6 +1,6 @@
 # Developing
 
-How to set up, run and test Site Guard, how the reference digests pin its behaviour, the project's conventions, and how to add a drone, a sensor or an effector. It is for developers. For how the parts fit together, read [ARCHITECTURE.md](ARCHITECTURE.md) first; for the HTTP routes, [API.md](API.md).
+How to set up, run and test Bombadil, how the reference digests pin its behaviour, the project's conventions, and how to add a drone, a sensor or an effector. It is for developers. For how the parts fit together, read [ARCHITECTURE.md](ARCHITECTURE.md) first; for the HTTP routes, [API.md](API.md).
 
 ## Contents
 

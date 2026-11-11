@@ -11,6 +11,7 @@ import { canFollow, hears } from '../jamming.js';
 import { burnTime, hitChance, meetTime } from '../hit-chance.js';
 import { threatLibrary } from './threats.js';
 import { cueCameras } from './cameras.js';
+import { barsTrack } from '../engage-rules.js';
 
 // s: a jammer on its own receiver that has heard nothing for this long stops to listen. It switches once a second, so a barrage, deaf to
 // the bands it fills, jams 3 s in every 4: an assumption.
@@ -190,6 +191,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     if (s.denied.has(tr.id) || authority().pending.some((p) => p.s === s)) return false; // one request at a time for each effector
     if (T() < (s.rejected.get(tr.id) ?? 0) || T() < (tr.emptyUntil ?? 0)) return false;
     if (!takesAirframe(def, tr.airframe)) return false; // already known to be beyond this effector
+    if (barsTrack(ctx.engageRules?.(), def.id, tr, ctx.expected?.() ?? [])) return false; // the player's rules keep it for other drones
     if (flies(def) && leaveToJammer(tr)) return false; // soft kill first
     if (def.engagePolicy === 'fixed-wing' && tr.airframe !== 'Fixed wing') {
       if (tr.airframe === 'Multirotor') return false; // a known quadcopter is never worth the round

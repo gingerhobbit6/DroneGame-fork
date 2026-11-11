@@ -11,7 +11,7 @@ import { PATROL } from './patrol.js';
 const STRUCT_KEYS = ['published', 'cost', 'shotCost', 'missileSpeed', 'pk', 'damage', 'splash', 'fuze', 'cooldown', 'magazine', 'storage', 'reloadTime', 'dps', 'falseAlarm', 'lowRange', 'fov', 'dwell', 'slow', 'killTime', 'minRange', 'rangeLoss'];
 const DRONE_KEYS = ['cost', 'speed', 'hp', 'rcs', 'size', 'rfPower', 'sound', 'evade', 'jamResist', 'warhead', 'terminal'];
 const PEOPLE_KEYS = ['pCasualty', 'reachScale'];
-const PATROL_KEYS = ['walkSpeed', 'escortGap', 'groupSize', 'spacing', 'endDelay', 'sightRange', 'strikeSight', 'holdRadius', 'holdTime'];
+const PATROL_KEYS = ['walkSpeed', 'driveSpeed', 'escortGap', 'groupSize', 'spacing', 'endDelay', 'sightRange', 'strikeSight', 'holdRadius', 'holdTime'];
 
 export const FIGURE_FIELDS = {
   published: { label: 'Range', unit: 'm', step: 100, basis: 'research' },
@@ -52,6 +52,7 @@ export const FIGURE_FIELDS = {
   pCasualty: { label: 'Casualty chance at the blast', unit: '0–1', step: 0.05, basis: 'assumption' },
   reachScale: { label: 'Blast reach', unit: 'x radius', step: 0.05, basis: 'assumption' },
   walkSpeed: { label: 'Walking speed', unit: 'm/s', step: 0.1, basis: 'assumption' },
+  driveSpeed: { label: 'Mounted patrol speed', unit: 'm/s', step: 0.5, basis: 'assumption' },
   escortGap: { label: 'Gap to each escort', unit: 'm', step: 5, basis: 'assumption' },
   groupSize: { label: 'People', unit: 'people', step: 1, basis: 'assumption' },
   spacing: { label: 'Spacing in the formation', unit: 'm', step: 1, basis: 'assumption' },

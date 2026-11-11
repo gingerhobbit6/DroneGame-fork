@@ -2,11 +2,13 @@
 // can be changed in the Sources tab. See docs/PATROL_MODE.md.
 //
 // walkSpeed: how fast the group walks its route (m/s). escortGap: how far apart a new vehicle keeps from the last, along the route (m).
-// groupSize: how many soldiers walk in the patrol. spacing: metres between soldiers in the formation. endDelay: seconds the patrol
+// driveSpeed: how fast a mounted patrol drives its route, with the soldiers riding (m/s, about 29 km/h on a track: an ASSUMPTION).
+// groupSize: how many soldiers walk in the patrol. spacing: metres between soldiers in a new patrol's formation (the patrol planner
+// sets its own). endDelay: seconds the patrol
 // waits at the end of its route before it walks back.
 export const PATROL = {
   foot: {
-    name: 'Foot patrol', walkSpeed: 1.4, escortGap: 40, groupSize: 12, spacing: 5, endDelay: 60,
+    name: 'Foot patrol', walkSpeed: 1.4, driveSpeed: 8, escortGap: 40, groupSize: 12, spacing: 5, endDelay: 60,
     // the column a new patrol gets: gap is metres along the route, ahead of the lead soldier or (negative) behind; side is metres to
     // the right of the way it faces, or (negative) to the left
     column: [{ vehicle: 'hilux', system: 'radar_a800', gap: 40, side: 0 }, { vehicle: 'patria', system: 'missile_rr', gap: -40, side: 0 }],
@@ -37,7 +39,7 @@ export const MOUNTS = {
   radar_s: 2, radar_a400: 2, radar_a800: 2, camera: 2, jammer_jupiter: 2, jammer_sf: 2, missile_rr: 2,
   gun_s: 2, gun_50: 2, // a gunner stands in the back, so not on an uncrewed Mule
   radar_giraffe: 3, missile_paladin: 3, gun_skyranger: 3,
-  rf_chuyka: 1, rf_rfpatrol: 1, camera_podview: 1, jammer_vepr: 1, gun_shotgun: 2, gun_droneround: 2, radar_xenta: 3, // field-systems.js
+  rf_chuyka: 1, rf_rfpatrol: 1, camera_podview: 1, camera_spyke: 1, jammer_vepr: 1, gun_shotgun: 2, gun_droneround: 2, radar_xenta: 3, // field-systems.js
 };
 // A soldier on foot can take a place in a patrol's column with a hand-held system, walking with the others. Not a vehicle, so it is
 // not part of a deployment pack's vehicles: a unit always has soldiers. `takes` lists what one can carry.
@@ -55,6 +57,16 @@ const ON_FOOT_ONLY = new Set(['gun_shotgun', 'gun_droneround']); // a soldier's 
 export const RENAMED_VEHICLES = { mule: 'themis' };
 export const vehicleId = (id) => RENAMED_VEHICLES[id] ?? id;
 export const MAX_ON_VEHICLE = 3; // systems one vehicle carries at most, in a patrol or parked
+export const MAX_ON_FOOT = 2; // hand-held systems one soldier carries at most
+export const MAX_FOOT_BEARERS = 24; // soldiers in a column carrying systems: MAX_FOOT_BEARERS in backend/app/schemas.py
 export const MAX_ESCORTS = 6; // MAX_ESCORTS in backend/app/schemas.py
 export const MAX_ESCORT_GAP = 200; // metres
 export const MAX_ESCORT_SIDE = 100; // metres: MAX_ESCORT_SIDE in backend/app/schemas.py
+// The two kinds of patrol. Dismounted: the soldiers walk, each can carry hand-held systems, and only a THeMIS goes with them.
+// Mounted: the vehicles drive at driveSpeed with the soldiers riding, and carry every system. spacing: metres between members, [min, max].
+export const PATROL_TYPES = {
+  dismounted: { name: 'Dismounted', takes: ['themis', 'foot'], spacing: [2, 30] },
+  mounted: { name: 'Mounted', takes: ['patria', 'hilux', 'themis'], spacing: [10, 80] }, // 80 m keeps six vehicles within 200 m of the middle
+  // a patrol drawn before choosing, or saved before there was a choice: soldiers walk with any vehicles, as patrols always did
+  mixed: { name: 'Mixed', takes: ['patria', 'hilux', 'themis', 'foot'], spacing: [2, 30], older: true },
+};

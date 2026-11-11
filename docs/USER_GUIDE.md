@@ -1,6 +1,6 @@
 # User guide
 
-How to play Site Guard, from signing in to reading the debrief. It is for players and for anyone demonstrating the game. The numbers behind each system, drone and model are in the reference documents linked throughout, so this guide stays about what to do.
+How to play Bombadil, from signing in to reading the debrief. It is for players and for anyone demonstrating the game. The numbers behind each system, drone and model are in the reference documents linked throughout, so this guide stays about what to do.
 
 ## Contents
 
@@ -125,7 +125,7 @@ The **Cost** tab compares what you spent with what the attack cost the enemy, br
 
 ![The Cost tab showing the budget, cost exchange and shots fired per effector](screenshots/cost.jpg)
 
-When the site falls, the run is saved to your history in the **Runs** tab. You can retry the same laydown or start a new one, and laydowns are kept in the **Saved** tab. A laydown made on other ground, generated or a different real map, has **Load here** beside **Load**: it lays the laydown out round the site you are on now, keeping each system's distance and bearing from it, and leaves out any that would stand in water, on a building, on steep ground or off the map. The **Lab** tab has the same button for the lab's laydowns.
+When the site falls, the run is saved to your history under Past runs in the **Saved** tab. You can retry the same laydown or start a new one, and laydowns are kept in the **Saved** tab. A laydown made on other ground, generated or a different real map, has **Load here** beside **Load**: it lays the laydown out round the site you are on now, keeping each system's distance and bearing from it, and leaves out any that would stand in water, on a building, on steep ground or off the map. The **Lab** tab has the same button for the lab's laydowns.
 
 ![The Site Lost card after 12 full waves](screenshots/gameover.jpg)
 

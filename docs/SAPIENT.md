@@ -95,7 +95,7 @@ The game runs a complete SAPIENT network inside the simulation. It has no real n
 | [`sim/network/tasking.js`](../frontend/src/sim/network/tasking.js), [`cameras.js`](../frontend/src/sim/network/cameras.js) | Tasks to effectors, jammers and cameras, and their acknowledgements |
 | [`sim/network/authority.js`](../frontend/src/sim/network/authority.js) | Alerts, and operator approval of engagements |
 | [`sim/comms.js`](../frontend/src/sim/comms.js) | Delay and loss over Starlink or cellular |
-| [`ui/dock/`](../frontend/src/ui/dock/) | The Nodes, Messages, Network and Learn tabs |
+| [`ui/dock/`](../frontend/src/ui/dock/) | The Nodes, Messages and Network tabs |
 | [`ui/sapient-help.js`](../frontend/src/ui/sapient-help.js) | Plain-English notes for each field, used by Explain and Learn |
 
 ### Nodes
@@ -145,7 +145,7 @@ The **SAPIENT** panel shows the network as it runs ([USER_GUIDE.md](USER_GUIDE.m
 
 ## Where the game departs from the standard
 
-These are deliberate. The Learn tab explains the first three to the player.
+These are deliberate.
 
 - **Engaging.** SAPIENT has no engage command. The fusion node sends a Task with `request: "Engage"` and the track in `command_parameter`, which effectors declare in their registration.
 - **Weapon release.** SAPIENT has no message for asking permission to fire. When engagement authority requires it, the fusion node sends an Alert to the operator screen, and the operator's answer comes back as an AlertAck: accepted, rejected, or cancelled if it lapses.
