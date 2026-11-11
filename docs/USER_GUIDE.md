@@ -95,7 +95,9 @@ The **Sandbox** launches any wave's attack, or a custom one, without risk: the s
 
 ## 5. Fight the waves
 
-Press **Start wave**. The laydown locks and the fusion node takes over: it builds tracks from noisy detections, cues cameras and tasks effectors. **Engagement authority** decides whether it fires by itself, or asks you first for costly shots or for every engagement. Space pauses, and the speed control runs time at 1 to 10 times real speed.
+Press **Start wave**. The laydown locks for the whole run, as the button says, and the fusion node takes over: it builds tracks from noisy detections, cues cameras and tasks effectors. If a system has no network link, the first press starts nothing: a warning stays under the button until you press **Auto-wire and start** or **Start anyway**. **Engagement authority** decides whether the fusion node fires by itself, or asks you first for costly shots or for every engagement. Space pauses, also just after you have clicked a button, and the timeline shows PAUSED while the clock is stopped. The speed control runs time at 1 to 10 times real speed.
+
+The **Run** box shows the site's integrity and the budget left throughout (with a deployment pack there is no budget to run out of, so it shows only in the sandbox), then kills and leaks. A drone that comes down on one of your own systems is neither: from the first one, the box counts those hits and the systems you have lost. The fusion node's warnings, such as a system struck, contact lost or a track close to the site, show above the timeline for about 20 seconds each.
 
 With **Truth overlay** on, a tag like `First-person-view` marks where a drone really is, and a marker like `T88 · UAV ±52 m` marks where the fusion node believes it is. Tracks can lag, get confused or turn out to be ghosts, and effectors only hit a real drone they find at the cued position. How the fusion engine decides, and how well it does, is in [FUSION_AND_TARGETING.md](FUSION_AND_TARGETING.md).
 
@@ -107,7 +109,7 @@ With the truth overlay on, click a drone to open the **Selected drone** panel: w
 
 ## 6. Read the messages
 
-The **Messages** tab shows every SAPIENT message between nodes, filterable by node. Tick **Explain** for a plain-English note beside each field, or use **Inject fault** to see how errors are reported. **Learn** walks through the protocol using messages from your own run.
+The **Messages** tab shows the SAPIENT messages between nodes, filterable by node and by type. Status reports and raw detections are nine messages in ten, so they start hidden and the list opens on the decisions: tasks, their answers and alerts. Click the **Status** or **Detect** chip to show them. **Freeze** stops new messages joining the list while you read it, and the filters still work. Tick **Explain** for a plain-English note beside each field, or use **Inject fault** to see how errors are reported. **Learn** walks through the protocol using messages from your own run.
 
 ![A fused detection report with a plain-English note on each field](screenshots/messages.jpg)
 
@@ -157,15 +159,15 @@ On a real map the switcher offers OS (or the Estonian basic map), light, dark, s
 
 ## Keys
 
-Keys are ignored while you type in a field, and Ctrl, Alt and Cmd combinations belong to the browser ([`useHotkeys.js:21`](../frontend/src/ui/useHotkeys.js#L21)).
+Keys are ignored while you type in a field, and Ctrl, Alt and Cmd combinations belong to the browser ([`useHotkeys.js:28`](../frontend/src/ui/useHotkeys.js#L28)).
 
 | Key | Does |
 |---|---|
-| 1 to 8, 0 | Pick a kind's systems in turn: 1 radar, 2 RF detector, 3 camera, 4 jammer, 5 interceptor, 6 missile, 7 laser, 8 acoustic, 0 gun ([`systems.js:13`](../frontend/src/sim/config/systems.js#L13)). With a deployment pack deployed, they open that kind's list of the pack's kit instead ([`game.js:123`](../frontend/src/game.js#L123)) |
+| 1 to 8, 0 | Pick a kind's systems in turn: 1 radar, 2 RF detector, 3 camera, 4 jammer, 5 interceptor, 6 missile, 7 laser, 8 acoustic, 0 gun ([`systems.js:13`](../frontend/src/sim/config/systems.js#L13)). With a deployment pack deployed, they open that kind's list of the pack's kit instead ([`game.js:125`](../frontend/src/game.js#L125)) |
 | 9 | The People tool |
 | X | The Remove tool: the next system clicked is removed, with its cost back unless a pack is deployed |
 | Esc | The first that applies: leave the mast view, close the map panel, drop the tool, close the list, clear the selected system and drone |
-| Space | Pause and resume, or play and pause a replay |
+| Space | Pause and resume, or play and pause a replay. A button reached with Tab keeps Space for itself; one you have just clicked does not |
 | Left, Right | Step back and forward through a replay |
 | R, T, L | Range rings, truth overlay, labels |
 | W, A, S, D (held) | Move the camera ahead, left, back and right |

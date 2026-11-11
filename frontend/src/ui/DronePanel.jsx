@@ -63,5 +63,5 @@ export function DronePanel() {
   useTick();
   const game = useGame();
   const d = view.drone;
-  return d ? <DroneCard key={d.uid} d={d} game={game} centre={game.sim.state.zoneCentre} /> : null;
+  return d ? <DroneCard d={d} game={game} centre={game.sim.state.zoneCentre} /> : null;
 }

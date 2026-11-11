@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The login page, the login gate and the profile hub, against an in-memory server.
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game.js';
 import { ApiError, SIGNED_OUT, createApi } from '../src/api/client.js';
@@ -16,6 +16,7 @@ const $ = (sel) => document.querySelector(sel);
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 const type = (label, value) => fireEvent.change(screen.getByLabelText(label, { exact: false, selector: 'input' }), { target: { value } });
 const press = (text) => fireEvent.click(screen.getByRole('button', { name: text }));
+const loginNotice = () => within($('.acct-login')).getByRole('status').textContent; // the game waiting underneath has a status of its own, its toast
 const USER = { id: 1, username: 'operator', display_name: 'Sgt Alex Smith', rank: '', organisation: '', created_at: '2026-11-07T10:00:00+00:00', last_sign_in: null };
 const CODE = 'AAAAAA-BBBBBB-CCCCCC-DDDDDD';
 
@@ -147,6 +148,16 @@ describe('the login gate', { timeout: 120000 }, () => {
     expect(game.sim.state.kit).toEqual({ radar_a800: 1 });
   });
 
+  it('leaves a run under way on the pack it began with, and withdraws the pack when the run is reset', async () => {
+    await deployFirstPack();
+    act(() => { game.sim.state.started = true; game.sim.state.warnedWire = true; game.sim.commands.startWave(); });
+    expect(game.sim.designLocked()).toBe(true);
+    act(() => { dispatchEvent(new Event(SIGNED_OUT)); }); // the pack goes from the page, as it would on signing out
+    expect(game.sim.state.packed).toBe(true); // or a budget below zero would stop every weapon
+    act(() => { game.sim.commands.reset('clear'); });
+    expect(game.sim.state.packed).toBe(false);
+  });
+
   it('keeps the hidden game\'s hotkeys off under the profile', async () => {
     await inGame();
     fireEvent.click($('#acct-chip'));
@@ -163,12 +174,21 @@ describe('the login gate', { timeout: 120000 }, () => {
     press('Sign out');
     await settle();
     expect(api.auth.signOut).toHaveBeenCalled();
-    expect(screen.getByRole('status').textContent).toBe('You are signed out.');
+    expect(loginNotice()).toBe('You are signed out.');
     expect(game.storage.getItem(DEPLOYED)).toBeNull();
     await signBackIn();
     expect($('#enter-game').textContent).toBe('Back to the game');
     expect(screen.getByText(/Build a deployment pack/)).not.toBeNull();
     expect(game.attach).toHaveBeenCalledTimes(1);
+  });
+
+  it('says why an account cannot be opened when the save server is too old to give its id', async () => {
+    gate();
+    await settle();
+    api.auth.signIn.mockResolvedValueOnce({ username: 'operator', display_name: 'Sgt Alex Smith' });
+    await signBackIn();
+    expect(loginNotice()).toMatch(/save server must be updated/); // given after the login page was already up
+    expect($('.acct-hub')).toBeNull();
   });
 
   it('keeps the account open and reports a failed sign-out', async () => {
@@ -287,7 +307,7 @@ describe('the login gate', { timeout: 120000 }, () => {
     press('Delete my account');
     await settle();
     expect(api.auth.deleteAccount).toHaveBeenLastCalledWith({ password: 'correct horse battery' });
-    expect(screen.getByRole('status').textContent).toBe('Your account and its deployment packs were deleted.');
+    expect(loginNotice()).toBe('Your account and its deployment packs were deleted.');
     expect(game.storage.getItem(DEPLOYED)).toBeNull();
   });
 });

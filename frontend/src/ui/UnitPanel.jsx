@@ -256,7 +256,7 @@ function UnitCard({ s, game }) {
   const editing = side === 'configure' && !frame;
   const ranging = side === 'range' && !frame;
   return (
-    <Movable id="unit-panel" title="Selected system" role="region" aria-label={`Selected system: ${s.short}`}>
+    <>
       <div className="up-head" style={{ borderLeftColor: hex(def.color) }}>
         <b>{s.short} · {s.custom?.name || def.name}</b>
         {!frame && <button id="unit-eye" className="up-eye" aria-pressed={view.eye === s} title="Watch from the top of its mast: what it engages or tracks, and the drones and rounds coming in" onClick={() => game.lookFrom(view.eye === s ? null : s)}>{view.eye === s ? 'Map view' : 'View from here'}</button>}
@@ -288,7 +288,7 @@ function UnitCard({ s, game }) {
       {isEffector && !frame && <Totals def={def} ledger={ledger} />}
       <Row label="Modelled on">{def.ref.analogues.join(', ')}<span className="muted">{def.ref.confidence}</span></Row>
       </>}
-    </Movable>
+    </>
   );
 }
 
@@ -296,5 +296,6 @@ export function UnitPanel() {
   useTick();
   const game = useGame();
   const s = game.getSelected();
-  return s ? <UnitCard key={s.nodeId} s={s} game={game} /> : null;
+  // the card is keyed, so each system opens on its details; the box is not, so it stays where it was dragged
+  return s ? <Movable id="unit-panel" title="Selected system" role="region" aria-label={`Selected system: ${s.short}`}><UnitCard key={s.nodeId} s={s} game={game} /></Movable> : null;
 }

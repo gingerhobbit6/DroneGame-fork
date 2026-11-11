@@ -127,10 +127,6 @@ class SqliteAccountStore:
         with self.conn:
             self.conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
 
-    def drop_sessions(self, user_id: int, keep: str | None = None) -> None:
-        with self.conn:
-            self.conn.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash IS NOT ?", (user_id, keep))
-
     def drop_expired(self, now: int) -> None:
         with self.conn:
             self.conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))

@@ -14,6 +14,7 @@ import { ControlPanel } from '../src/ui/ControlPanel.jsx';
 import { Approvals, Toast, Tuning } from '../src/ui/Panels.jsx';
 import { Sandbox } from '../src/ui/Sandbox.jsx';
 import { Overlay } from '../src/ui/Overlay.jsx';
+import { Timeline } from '../src/ui/Timeline.jsx';
 import { MIXED, setUp, play } from './support/scenarios.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 
@@ -46,8 +47,18 @@ describe('HUD', () => {
     expect($('#status img')).toBeNull();
     expect($('#status').textContent).toContain('<img src=x onerror=alert(1)>');
     expect($('#status').textContent).toContain('<b>t</b>');
-    expect($('#budget')).toBeNull(); // the budget shows only in the sandbox
+    expect($('#budget').textContent).toMatch(/^£/); // what is left to spend, and the site's integrity, show throughout a run
+    expect($('#health-num').textContent).toBe('100%');
     expect($('#hud-spend').textContent).toBe('Spent £0: systems £0, shots and rounds £0');
+  });
+  it('counts the drones that came down on your own systems, and the systems lost: they are neither kills nor leaks', () => {
+    armed();
+    show(<Hud />);
+    expect($('#hud-systems')).toBeNull(); // nothing to say yet, and the box is tall enough
+    game.sim.ledger.flights.push({ type: 'fpv', wave: 1, seen: {}, shots: {}, engaged: null, end: 'struck' });
+    game.sim.ledger.lost.radar = 1;
+    refresh();
+    expect([$('#struck').textContent, $('#lost').textContent, $('#kills').textContent, $('#leaks').textContent]).toEqual(['1', '1', '0', '0']);
   });
   it('reports spotters and the cost exchange during a run', () => {
     armed();
@@ -60,9 +71,17 @@ describe('HUD', () => {
     expect($('#status .warn').textContent).toMatch(/spotter on station/);
     expect($('#status').textContent).toMatch(/per £1 destroyed/);
     expect($('#hud-ammo').textContent).toMatch(/Ammunition \d+ of \d+ left · \d+ loaded/);
-    act(() => { game.sim.state.sandbox = true; game.bump(); });
-    expect($('#health-fill').style.background).toMatch(/229|e53935/);
+    expect($('#health-fill').style.background).toMatch(/229|e53935/); // red, in a real run and not only in the sandbox
+    expect($('#health-num').textContent).toBe('20%');
   }, 30000);
+  it('gives the evasion of the level chosen in the sandbox, which is what its drones get', () => {
+    show(<Hud />);
+    const evasion = () => $('#hud-top-left').textContent.match(/first-person-view ([\d.]+)/)[1];
+    const wave1 = evasion();
+    act(() => { game.sim.state.sandbox = true; game.sim.state.sbLevel = 6; game.bump(); });
+    expect(Number(evasion())).toBeLessThan(Number(wave1));
+    expect(Number(evasion())).toBe(Number(game.sim.spawnDrone('fpv', 0, {}).evade.toFixed(2)));
+  });
 });
 
 describe('toolbar', () => {
@@ -111,6 +130,34 @@ describe('control panel', () => {
     expect(game.clock.speed).toBe(3);
     fireEvent.click($('[data-speed="10"]'));
     expect(game.clock).toMatchObject({ speed: 10, lastSpeed: 10 });
+  });
+
+  it('says that starting locks the laydown, and keeps the wiring warning up until it is put right', () => {
+    armed();
+    panel();
+    expect($('#btn-wave').dataset.note).toBe('locks systems and wiring'); // drawn under the button's own text
+    expect($('#btn-wave').title).toMatch(/locks your systems and wiring for the whole run/);
+    expect($('#btn-wave').textContent).toBe('Start wave 1');
+    expect($('#wire-warning')).toBeNull();
+    act(() => { game.sim.commands.wireNode(game.sim.structures[0], null); });
+    fireEvent.click($('#btn-wave')); // the first press only warns
+    expect(game.sim.state.wave).toBe(0);
+    expect($('#wire-warning').textContent).toMatch(/1 system has no network link and will be offline/);
+    expect($('#wire-warning').getAttribute('role')).toBe('alert');
+    fireEvent.click($('#btn-wire-start'));
+    expect(game.sim.unwired()).toEqual([]);
+    expect(game.sim.state.wave).toBe(1);
+    expect($('#wire-warning')).toBeNull();
+    expect($('#btn-wave').dataset.note).toBeUndefined();
+  });
+  it('can start with a system left unwired, when told to', () => {
+    armed();
+    panel();
+    act(() => { game.sim.commands.wireNode(game.sim.structures[0], null); });
+    fireEvent.click($('#btn-wave'));
+    fireEvent.click($('#btn-start-anyway'));
+    expect(game.sim.state.wave).toBe(1);
+    expect(game.sim.unwired()).toHaveLength(1);
   });
 
   it('toggles the view options, including the page class for tracks', () => {
@@ -185,6 +232,43 @@ describe('approvals', () => {
   }, 30000);
 });
 
+describe('the timeline\'s notes', () => {
+  it('shows the fusion node\'s warnings for a while, but not its news or an engagement request', () => {
+    armed();
+    show(<Timeline />);
+    expect($('#tl-alerts').children.length).toBe(0);
+    const { net } = game.sim;
+    act(() => {
+      net.raiseAlert('information', 'New track T1 confirmed');
+      net.raiseAlert('warning', 'Engagement request: Authorise Interceptor drones 01 to engage T1?');
+      net.raiseAlert('warning', 'Lost contact with Radar 01: no terminal wired');
+      net.raiseAlert('critical', 'Radar 01 destroyed');
+      game.bump();
+    });
+    expect([...$('#tl-alerts').children].map((r) => r.className)).toEqual(['warn', 'crit']);
+    expect($('#tl-alerts').textContent).toContain('0:00 Lost contact with Radar 01: no terminal wired');
+    expect(screen.getByRole('log')).toBe($('#tl-alerts')); // a screen reader announces each one
+    const steps = (seconds) => seconds / 0.05;
+    game.sim.run(steps(20 * WORLD.timeScale) - 20); // nearly 20 real seconds at 1x
+    refresh();
+    expect($('#tl-alerts').children.length).toBe(2);
+    game.sim.run(40);
+    refresh();
+    expect($('#tl-alerts').children.length).toBe(0);
+  });
+  it('says when the clock is stopped', () => {
+    armed();
+    show(<Timeline />);
+    expect($('#tl-paused')).toBeNull();
+    act(() => game.setSpeed(0));
+    expect($('#tl-paused').textContent).toBe('PAUSED');
+    expect($('#tl-paused').title).toMatch(/Press Space/);
+    expect($('#timeline').className).toContain('paused');
+    act(() => game.setSpeed(1));
+    expect($('#tl-paused')).toBeNull();
+  });
+});
+
 describe('toasts', () => {
   it('show a message and fade it out', () => {
     vi.useFakeTimers();
@@ -192,6 +276,7 @@ describe('toasts', () => {
     act(() => game.toast('hello'));
     expect($('#toast').textContent).toBe('hello');
     expect($('#toast').className).toBe('show');
+    expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite'); // a screen reader announces it
     act(() => { vi.advanceTimersByTime(3000); });
     expect($('#toast').className).toBe('');
     vi.useRealTimers();
@@ -208,6 +293,9 @@ describe('tuning', () => {
     fireEvent.change(time, { target: { value: '0.1' } }); // under the minimum
     expect(WORLD.timeScale).toBe(9);
     expect(time.value).toBe('9');
+    fireEvent.change(time, { target: { value: '1000' } }); // a slip that would have the frame loop at its cap on every frame
+    expect(WORLD.timeScale).toBe(20);
+    expect(time.value).toBe('20');
     fireEvent.change(evade, { target: { value: '' } });
     expect(ADAPT.evadePerWave).toBe(adapt);
     WORLD.timeScale = before;

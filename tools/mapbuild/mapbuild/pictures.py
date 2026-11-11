@@ -120,29 +120,33 @@ def satellite(window: Window, years: list[int], say, crs: int = BRITISH_CRS) -> 
         raise SystemExit("satellite picture has an unexpected size")
     transform = from_origin(window.west, window.top, SATELLITE_M, SATELLITE_M)
     layers, latest = [], None
-    for attempted, item in enumerate(scenes_for(window, years, crs)):
-        if attempted >= MAX_SCENE_ATTEMPTS:
-            break
-        href = item["assets"]["visual"]["href"]
-        url = urllib.parse.urlsplit(href)
-        if (not href.startswith(SCENE_HOST) or url.scheme != "https" or url.netloc != urllib.parse.urlsplit(SCENE_HOST).netloc
-                or not url.path.lower().endswith(".tif")):
-            raise SystemExit(f"unexpected host for a scene: {href}")
-        with rasterio.open(href, driver="GTiff") as source:
-            if (source.count < 3 or any(dtype != "uint8" for dtype in source.dtypes[:3]) or source.crs is None
-                    or source.width * source.height > MAX_SOURCE_PIXELS):
-                raise SystemExit("satellite scene has unexpected raster metadata")
-            check_raster_blocks(source)
-            with WarpedVRT(source, crs=f"EPSG:{crs}", transform=transform, width=size, height=size, resampling=Resampling.bilinear, nodata=0) as vrt:
-                data = vrt.read([1, 2, 3])
-        filled = data.sum(axis=0) > 0
-        if filled.mean() < 0.25:
-            continue
-        layers.append(data)
-        latest = max(latest or 0, int(item["properties"]["datetime"][:4]))
-        say(f"satellite: {item['id']}, covers {filled.mean():.0%}")
-        if len(layers) >= MAX_SCENES:
-            break
+    try:
+        for attempted, item in enumerate(scenes_for(window, years, crs)):
+            if attempted >= MAX_SCENE_ATTEMPTS:
+                break
+            href = item["assets"]["visual"]["href"]
+            url = urllib.parse.urlsplit(href)
+            if (not href.startswith(SCENE_HOST) or url.scheme != "https" or url.netloc != urllib.parse.urlsplit(SCENE_HOST).netloc
+                    or not url.path.lower().endswith(".tif")):
+                raise SystemExit(f"unexpected host for a scene: {href}")
+            with rasterio.open(href, driver="GTiff") as source:
+                if (source.count < 3 or any(dtype != "uint8" for dtype in source.dtypes[:3]) or source.crs is None
+                        or source.width * source.height > MAX_SOURCE_PIXELS):
+                    raise SystemExit("satellite scene has unexpected raster metadata")
+                check_raster_blocks(source)
+                with WarpedVRT(source, crs=f"EPSG:{crs}", transform=transform, width=size, height=size, resampling=Resampling.bilinear, nodata=0) as vrt:
+                    data = vrt.read([1, 2, 3])
+            filled = data.sum(axis=0) > 0
+            if filled.mean() < 0.25:
+                continue
+            layers.append(data)
+            latest = max(latest or 0, int(item["properties"]["datetime"][:4]))
+            say(f"satellite: {item['id']}, covers {filled.mean():.0%}")
+            if len(layers) >= MAX_SCENES:
+                break
+    except OSError as problem:  # this runs last, so a network fault (rasterio's RasterioIOError is an OSError too) must not cost the whole build
+        say(f"satellite: could not be fetched ({str(problem)[:100]}), so this pack has no satellite layer")
+        return [], None
     if len(layers) < MIN_SCENES:
         say("satellite: too few clear scenes, so this pack has no satellite layer")
         return [], None

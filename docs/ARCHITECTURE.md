@@ -87,21 +87,21 @@ flowchart LR
 1. [`main.jsx:10`](../frontend/src/main.jsx#L10) reads `?seed=` and `?terrain=` from the address, cleans them to at most 64 characters with no control characters ([`game.js:27`](../frontend/src/game.js#L27)), and calls `createGame`. If `terrain` holds a real-world id, the page starts on generated ground with terrain seed `1` instead ([`main.jsx:12`](../frontend/src/main.jsx#L12)): the pack is not loaded yet, and a site does not belong in an address.
 2. `createGame` ([`game.js:32`](../frontend/src/game.js#L32)) makes the simulation, the run saver, the pack store and the tool state.
 3. [`Root.jsx`](../frontend/src/ui/account/Root.jsx#L32) shows the login page until `GET /api/v1/auth/me` succeeds, then the profile hub, then the game. The game mounts once and stays mounted behind the profile screen.
-4. [`App.jsx:22`](../frontend/src/ui/App.jsx#L22) puts the canvas in the page and calls `game.attach`, which builds the three.js scene and starts the frame loop ([`game.js:270`](../frontend/src/game.js#L270)).
+4. [`App.jsx:22`](../frontend/src/ui/App.jsx#L22) puts the canvas in the page and calls `game.attach`, which builds the three.js scene and starts the frame loop ([`game.js:284`](../frontend/src/game.js#L284)).
 5. `pagehide` calls `game.pageClosing` ([`main.jsx:14`](../frontend/src/main.jsx#L14)), which ends a run still going and keeps it in the browser to save later.
 
 ## The frame loop and the fixed step
 
-The simulation moves in fixed steps of 0.05 game seconds (`SIM_STEP`, [`simulation.js:29`](../frontend/src/sim/simulation.js#L29)). The frame loop ([`game.js:251`](../frontend/src/game.js#L251)) runs on every animation frame:
+The simulation moves in fixed steps of 0.05 game seconds (`SIM_STEP`, [`simulation.js:29`](../frontend/src/sim/simulation.js#L29)). The frame loop ([`game.js:253`](../frontend/src/game.js#L253)) runs on every animation frame:
 
-1. It takes the real time since the last frame, capped at 0.05 s ([`game.js:252`](../frontend/src/game.js#L252)).
-2. If a run is under way and not paused, it adds real time x `WORLD.timeScale` (5 game seconds per real second, [`world.js:19`](../frontend/src/sim/config/world.js#L19)) x the chosen speed to an accumulator, then runs whole steps until the accumulator is under one step, at most 400 in a frame ([`game.js:256`](../frontend/src/game.js#L256)). At 1x that is 100 steps per real second. The fastest speed offered is 10x ([`SpeedControl.jsx:8`](../frontend/src/ui/SpeedControl.jsx#L8)), so a capped frame asks for at most 50 steps and the 400 guard does not bite in normal play.
-3. It updates the scene, the replay view and the placement preview, then draws, unless the profile screen covers the game ([`game.js:264`](../frontend/src/game.js#L264)).
-4. It refreshes the panels at most every 100 ms, and only if steps ran, the player moved the mouse or pressed a key, or a replay is playing ([`game.js:266`](../frontend/src/game.js#L266)).
+1. It takes the real time since the last frame, capped at 0.05 s ([`game.js:254`](../frontend/src/game.js#L254)).
+2. If a run is under way and not paused, it adds real time x `WORLD.timeScale` (5 game seconds per real second, [`world.js:19`](../frontend/src/sim/config/world.js#L19)) x the chosen speed to an accumulator, then runs whole steps until the accumulator is under one step, at most 400 in a frame ([`game.js:269`](../frontend/src/game.js#L269)). At 1x that is 100 steps per real second. The fastest speed offered is 10x ([`SpeedControl.jsx:8`](../frontend/src/ui/SpeedControl.jsx#L8)), so a capped frame asks for at most 50 steps and the 400 guard does not bite in normal play.
+3. It updates the scene, the replay view and the placement preview, then draws, unless the profile screen covers the game ([`game.js:278`](../frontend/src/game.js#L278)).
+4. It refreshes the panels at most every 100 ms, and only if steps ran, the player moved the mouse or pressed a key, or a replay is playing ([`game.js:280`](../frontend/src/game.js#L280)).
 
 Because the step is fixed, a slow machine or a high speed changes how fast the game runs, not what happens in it. A frame longer than 0.05 s counts as 0.05 s, so on a slow machine game time falls behind the wall clock rather than taking larger steps.
 
-The clock stops by itself when the fusion node asks the operator to approve an engagement ([`game.js:215`](../frontend/src/game.js#L215)), and while the player rewinds (`reviewClock`, [`game.js:223`](../frontend/src/game.js#L223)).
+The clock stops by itself when the fusion node asks the operator to approve an engagement ([`game.js:217`](../frontend/src/game.js#L217)), and while the player rewinds (`reviewClock`, [`game.js:225`](../frontend/src/game.js#L225)).
 
 ## Inside one step
 
@@ -122,7 +122,7 @@ flowchart TD
   over -- "yes" --> endrun["endRun: emit runEnded with the run record and digest"]
 ```
 
-The SAPIENT network runs third, before any weapon acts. `net.update` ([`network/index.js:35`](../frontend/src/sim/network/index.js#L35)) delivers messages whose delay has passed, lets each sensor scan on its own interval, sends status reports every `FUSION.statusInterval` (5 s), keeps the tracks, expires unanswered approval requests, confirms kills, raises alerts, sends fused reports to the operator, and re-runs tasking every `FUSION.taskInterval` (1 s) ([`world.js:85`](../frontend/src/sim/config/world.js#L85)). Effectors only act on a task once its message has arrived. Every message goes through the bus in [`sapient.js`](../frontend/src/sim/sapient.js#L131), which keeps at most the newest 5,000 for the dock. The messages, registration and tasking are described in [SAPIENT.md](SAPIENT.md); tracking, threat evaluation and weapon assignment in [FUSION_AND_TARGETING.md](FUSION_AND_TARGETING.md).
+The SAPIENT network runs third, before any weapon acts. `net.update` ([`network/index.js:35`](../frontend/src/sim/network/index.js#L35)) delivers messages whose delay has passed, lets each sensor scan on its own interval, sends status reports every `FUSION.statusInterval` (5 s), keeps the tracks, expires unanswered approval requests, confirms kills, raises alerts, sends fused reports to the operator, and re-runs tasking every `FUSION.taskInterval` (1 s) ([`world.js:85`](../frontend/src/sim/config/world.js#L85)). Effectors only act on a task once its message has arrived. Every message goes through the bus in [`sapient.js`](../frontend/src/sim/sapient.js#L137), which keeps at most the newest 5,000 for the dock. The messages, registration and tasking are described in [SAPIENT.md](SAPIENT.md); tracking, threat evaluation and weapon assignment in [FUSION_AND_TARGETING.md](FUSION_AND_TARGETING.md).
 
 ## Determinism
 
@@ -136,8 +136,8 @@ The same scenario seed, world and laydown, with the same commands at the same st
   | `ids` | `<seed>:ids` | SAPIENT message and node ids |
   | Wave | `<seed>:wave:<n>` ([`rng.js:35`](../frontend/src/sim/rng.js#L35)) | Each wave's contents, rolled when it starts, so they do not depend on when that is |
   | Terrain | `<terrain seed>:terrain` ([`terrain.js:61`](../frontend/src/sim/terrain.js#L61)) | Generated ground |
-  | Masts | `<world>:masts` ([`world-pack.js:112`](../frontend/src/sim/world-pack.js#L112)) | Cell towers on a real map, which open data does not list |
-  | People | `people:<x>:<z>` and `<seed>:blast:<drone>` ([`people.js:41`](../frontend/src/sim/people.js#L41), [`people.js:133`](../frontend/src/sim/people.js#L133)) | Where people stand and who a blast hurts, so people never shift the other streams |
+  | Masts | `<world>:masts` ([`world-pack.js:115`](../frontend/src/sim/world-pack.js#L115)) | Cell towers on a real map, which open data does not list |
+  | People | `people:<x>:<z>` and `<seed>:blast:<drone>` ([`people.js:42`](../frontend/src/sim/people.js#L42), [`people.js:134`](../frontend/src/sim/people.js#L134)) | Where people stand and who a blast hurts, so people never shift the other streams |
 
 - **A fixed step and a fixed epoch.** Steps are always 0.05 s, and message timestamps count from 2026-01-01 00:00 UTC ([`rng.js:47`](../frontend/src/sim/rng.js#L47)), not the wall clock.
 - **Every input is a logged command.** The `logged` wrapper ([`simulation.js:186`](../frontend/src/sim/simulation.js#L186)) records each command as `{ step, name, args }`, with any placed system replaced by `{ node: <its SAPIENT node id> }`. Figure edits from the Sources tab, the engagement authority, approvals and jammer bands are all commands. Speed, pausing, selection, camera and map style are not, and cannot change a run.
@@ -166,17 +166,17 @@ React never owns game state ([`game.js:1`](../frontend/src/game.js#L1)). The gam
 - Every command the interface sends bumps at once ([`game.js:44`](../frontend/src/game.js#L44)), so a control never lags a click.
 - The frame loop bumps at most every 100 ms while something can change, as above. Paused or idle, nothing re-renders.
 - The `gameOver`, `sandbox` and `reset` events bump too.
-- Canvas diagrams in the dock (network, plan, spectrum) draw on animation frames through `useAnimation` ([`hooks.js:18`](../frontend/src/ui/hooks.js#L18)) while their tab is open, some no more often than every 200 or 300 ms.
-- The three.js scene is not React at all: [`game-view.js:228`](../frontend/src/render/game-view.js#L228) syncs it from the simulation every frame.
+- Canvas diagrams in the dock (network, plan, spectrum) draw on animation frames through `useAnimation` ([`hooks.js:19`](../frontend/src/ui/hooks.js#L19)) while their tab is open, some no more often than every 200 or 300 ms.
+- The three.js scene is not React at all: [`game-view.js:243`](../frontend/src/render/game-view.js#L243) syncs it from the simulation every frame.
 
 ## How a world is chosen and built
 
 A world is named by one string, saved with laydowns and runs.
 
 - **Generated ground.** Any terrain seed, such as `3`. `generateTerrain` ([`terrain.js:54`](../frontend/src/sim/terrain.js#L54)) builds a square 54 km across (`WORLD.radius` 27,000 m, [`world.js:13`](../frontend/src/sim/config/world.js#L13)) on a 20 m grid (`TERRAIN.cell`, [`world.js:44`](../frontend/src/sim/config/world.js#L44)): heights, tree canopy, buildings, cover, power lines and cell towers. It keeps the last world it made, because a restart asks for the same ground and making it takes seconds.
-- **A real map.** An id of the form `pack:<32 hex>:<easting>:<northing>:real` ([`world-pack.js:9`](../frontend/src/sim/world-pack.js#L9)): the first 32 hex digits of the pack's grid fingerprint and the site on the national grid. The pack must be loaded first. The pack store ([`pack-store.js:126`](../frontend/src/api/pack-store.js#L126)) lists packs on the server and packs imported into this browser, fetches one, and checks the whole file before use ([`decodePack`](../frontend/src/api/pack-store.js#L48), then [`parsePack`](../frontend/src/sim/world-pack.js#L31)). `game.loadPack` registers it with the simulation ([`game.js:65`](../frontend/src/game.js#L65)). `cutWorld` ([`world-pack.js:88`](../frontend/src/sim/world-pack.js#L88)) then cuts a 54 km square around the site, snapped to a 20 m post, with heights relative to the site and features moved to match. A site too near the pack's edge or on water is refused ([`world-pack.js:70`](../frontend/src/sim/world-pack.js#L70)).
+- **A real map.** An id of the form `pack:<32 hex>:<easting>:<northing>:real` ([`world-pack.js:9`](../frontend/src/sim/world-pack.js#L9)): the first 32 hex digits of the pack's grid fingerprint and the site on the national grid. The pack must be loaded first. The pack store ([`pack-store.js:126`](../frontend/src/api/pack-store.js#L126)) lists packs on the server and packs imported into this browser, fetches one, and checks the whole file before use ([`decodePack`](../frontend/src/api/pack-store.js#L48), then [`parsePack`](../frontend/src/sim/world-pack.js#L31)). `game.loadPack` registers it with the simulation ([`game.js:65`](../frontend/src/game.js#L65)). `cutWorld` ([`world-pack.js:91`](../frontend/src/sim/world-pack.js#L91)) then cuts a 54 km square around the site, snapped to a 20 m post, with heights relative to the site and features moved to match. A site too near the pack's edge or on water is refused ([`world-pack.js:73`](../frontend/src/sim/world-pack.js#L73)).
 
-Both kinds go through [`makeWorld`](../frontend/src/sim/world.js#L42), which wraps the grids with the questions the rules ask: ground height, line of sight, canopy, buildings and slope. The start card calls `commands.deploy(seed, world)` ([`simulation.js:170`](../frontend/src/sim/simulation.js#L170)), which swaps the world, re-seeds and restarts the network when a real map is involved, and emits `terrain`, on which the view rebuilds the ground mesh and its picture ([`game-view.js:214`](../frontend/src/render/game-view.js#L214)). A saved laydown loads on its own world, after `game.ensureWorld` has found and loaded its pack ([`game.js:72`](../frontend/src/game.js#L72)). Map types, pack contents and how they are built are in [MAPS.md](MAPS.md).
+Both kinds go through [`makeWorld`](../frontend/src/sim/world.js#L42), which wraps the grids with the questions the rules ask: ground height, line of sight, canopy, buildings and slope. The start card calls `commands.deploy(seed, world)` ([`simulation.js:170`](../frontend/src/sim/simulation.js#L170)), which swaps the world, re-seeds and restarts the network when a real map is involved, and emits `terrain`, on which the view rebuilds the ground mesh and its picture ([`game-view.js:229`](../frontend/src/render/game-view.js#L229)). A saved laydown loads on its own world, after `game.ensureWorld` has found and loaded its pack ([`game.js:72`](../frontend/src/game.js#L72)). Map types, pack contents and how they are built are in [MAPS.md](MAPS.md).
 
 ## Persistence
 

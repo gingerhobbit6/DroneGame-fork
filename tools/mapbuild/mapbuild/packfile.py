@@ -4,6 +4,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import struct
 import tempfile
 from dataclasses import dataclass
@@ -78,8 +79,25 @@ def thin_buildings(features: dict, limit: int) -> dict:
         keep = int(keep * 0.95)
 
 
+def _remove_leftovers(folder: str, prefix: str) -> None:
+    """A build killed at its time or storage limit runs no finally, so its temporary file would stay and count against the storage limit."""
+    leftover = re.compile(re.escape(prefix) + r"[a-z0-9_]{8}\.part")  # only the names tempfile gives this pack, so nothing else in the folder is touched
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if leftover.fullmatch(name):
+            try:
+                os.remove(os.path.join(folder, name))
+            except OSError:  # still open in another build, or not this user's to remove
+                pass
+
+
 def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: list[dict], say=None) -> dict:
     """pictures: { layer, west, top, width, height (metres), type, data }. Returns the header written. `say` is told of any thinning."""
+    folder, prefix = os.path.dirname(os.path.abspath(path)), f".{os.path.basename(path)}."
+    _remove_leftovers(folder, prefix)
     check(grids)
     if len(pictures) > MAX_PICTURES or sum(len(picture["data"]) for picture in pictures) > MAX_PICTURE_BYTES:
         raise ValueError("the map pictures are larger than the game reads: build a smaller pack")
@@ -113,7 +131,7 @@ def write_pack(path: str, header: dict, grids: Grids, features: dict, pictures: 
         raise ValueError("the map pack is larger than the game reads: build a smaller pack")
     part = None
     try:
-        with tempfile.NamedTemporaryFile("wb", dir=os.path.dirname(os.path.abspath(path)), prefix=f".{os.path.basename(path)}.", suffix=".part", delete=False) as out:
+        with tempfile.NamedTemporaryFile("wb", dir=folder, prefix=prefix, suffix=".part", delete=False) as out:
             part = out.name
             out.write(MAGIC + bytes([VERSION]) + struct.pack("<I", len(head)) + head)
             for blob in blobs:

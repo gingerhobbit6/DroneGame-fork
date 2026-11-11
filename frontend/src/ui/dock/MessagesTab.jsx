@@ -11,6 +11,8 @@ const TYPES = [
   ['task', 'Task'], ['task_ack', 'TaskAck'], ['alert', 'Alert'], ['alert_ack', 'AlertAck'], ['error', 'Error'],
 ];
 const MAX_ROWS = 150;
+// Heartbeats and raw detections are nine rows in ten, and buried the decisions (tasks, answers and alerts). They start hidden.
+const QUIET = ['status_report', 'detection_report'];
 const count = (n) => n.toLocaleString('en-US');
 
 export function summary(e) {
@@ -44,23 +46,20 @@ export function MessagesTab({ active }) {
   useTick(active);
   const { sim, commands } = useGame();
   const { net } = sim;
-  const [off, setOff] = useState(() => new Set());
+  const [off, setOff] = useState(() => new Set(QUIET));
   const [nodeFilter, setNodeFilter] = useState('all');
-  const [frozen, setFrozen] = useState(false);
+  const [frozen, setFrozen] = useState(null); // the log as it was when Freeze was pressed, so the filters still work on it
   const [selected, setSelected] = useState(null);
   const [explain, setExplain] = useState(false);
-  const shown = useRef([]);
   const list = useRef(null);
 
-  if (!frozen) {
-    // while rewinding, the log shows only what had been sent up to the moment being reviewed
-    const matches = (e) => !off.has(e.type) && (view.replayT == null || e.t <= view.replayT) && (nodeFilter === 'all' || e.from === nodeFilter || e.to === nodeFilter);
-    const rows = [];
-    for (let i = bus.entries.length - 1; i >= 0 && rows.length < MAX_ROWS; i--) if (matches(bus.entries[i])) rows.push(bus.entries[i]);
-    shown.current = rows.reverse();
-  }
+  // while rewinding, the live log shows only what had been sent up to the moment being reviewed
+  const matches = (e) => !off.has(e.type) && (frozen || view.replayT == null || e.t <= view.replayT) && (nodeFilter === 'all' || e.from === nodeFilter || e.to === nodeFilter);
+  const source = frozen || bus.entries, shown = [];
+  for (let i = source.length - 1; i >= 0 && shown.length < MAX_ROWS; i--) if (matches(source[i])) shown.push(source[i]);
+  shown.reverse();
 
-  const lastSeq = shown.current.length ? shown.current[shown.current.length - 1].seq : 0;
+  const lastSeq = shown.length ? shown[shown.length - 1].seq : 0;
   const stick = useRef(true);
   useLayoutEffect(() => { // stay at the bottom unless the player has scrolled up
     const el = list.current;
@@ -72,15 +71,15 @@ export function MessagesTab({ active }) {
     <>
       <div className="msg-tools">
         <div id="chips">
-          {TYPES.map(([t, label]) => <button key={t} className={`chip t-${t}${off.has(t) ? ' off' : ''}`} data-type={t} onClick={() => toggleType(t)}>{label} <b>{bus.counts[t] || 0}</b></button>)}
+          {TYPES.map(([t, label]) => <button key={t} className={`chip t-${t}${off.has(t) ? ' off' : ''}`} data-type={t} aria-pressed={!off.has(t)} title={off.has(t) ? 'Hidden. Click to show these' : 'Shown. Click to hide these'} onClick={() => toggleType(t)}>{label} <b>{bus.counts[t] || 0}</b></button>)}
         </div>
         <div className="row">
           <select id="node-filter" value={nodeFilter} onChange={(e) => setNodeFilter(e.target.value)}>
             <option value="all">All nodes</option>
             {[...net.nodes.values(), net.gui].map((n) => <option key={n.nodeId} value={n.nodeId}>{n.name}</option>)}
           </select>
-          <button id="log-freeze" className={frozen ? 'active' : ''} onClick={() => setFrozen((f) => !f)}>{frozen ? 'Resume' : 'Freeze'}</button>
-          <button id="log-clear" onClick={() => { commands.clearMessages(); setSelected(null); shown.current = []; }}>Clear</button>
+          <button id="log-freeze" className={frozen ? 'active' : ''} title="Stop new messages joining the list, to read it. The filters still work." onClick={() => setFrozen((f) => (f ? null : bus.entries.slice()))}>{frozen ? 'Resume' : 'Freeze'}</button>
+          <button id="log-clear" onClick={() => { commands.clearMessages(); setSelected(null); setFrozen((f) => f && []); }}>Clear</button>
           <button id="log-export" title={`Download the messages still kept (the newest ${count(bus.max)} at most) as newline-delimited JSON`} onClick={() => download('sapient-log.ndjson', bus.entries.map((e) => JSON.stringify(e.msg)).join('\n'), 'application/x-ndjson')}>Export</button>
           <button id="log-fault" title="Send a malformed report to see the middleware's Error reply" onClick={() => commands.injectFault()}>Inject fault</button>
           <label className="muted" title="Show a plain-English note beside each field"><input type="checkbox" id="log-explain" checked={explain} onChange={(e) => setExplain(e.target.checked)} /> Explain</label>
@@ -88,7 +87,7 @@ export function MessagesTab({ active }) {
         {bus.entries.length < bus.seq && <div id="log-kept" className="muted">Keeping {count(bus.entries.length)} of {count(bus.seq)} messages. Older ones can no longer be listed, rewound to or exported.</div>}
       </div>
       <div id="msg-list" ref={list} onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 30; }}>
-        {shown.current.map((e) => (
+        {shown.map((e) => (
           <div key={e.seq} className={`row t-${e.type}${selected && selected.seq === e.seq ? ' sel' : ''}`} onClick={() => setSelected(e)}>
             <span className="tm">{e.t.toFixed(1)}s</span>
             <span className="ft">{net.nameOf(e.from)} → {net.nameOf(e.to)}</span>

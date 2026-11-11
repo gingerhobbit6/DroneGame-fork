@@ -29,6 +29,9 @@ const road = (r, remaining) => Array.isArray(r) && r.length === 2 && typeof r[0]
 const name = (n) => Array.isArray(n) && n.length === 5 && typeof n[0] === 'string' && n[0].length <= 80 &&
   typeof n[1] === 'string' && n[1].length <= 64 && typeof n[2] === 'string' && n[2].length <= 32 &&
   Number.isFinite(n[3]) && Number.isFinite(n[4]); // text, kind, height, x, z
+// A pack's data licences go on screen with the map, and an imported file can put anything there: only the ones the map shows, as text, cut short.
+const CREDITS = ['satellite', 'osmap', 'lidar', 'heights', 'names'], MAX_CREDIT = 600;
+const cleanCredits = (c) => Object.fromEntries(CREDITS.filter((k) => typeof c?.[k] === 'string').map((k) => [k, c[k].slice(0, MAX_CREDIT)]));
 
 // Checks everything the rules will trust. Grids are { ground: Float32Array, canopy, bldg, cover: Uint8Array }.
 export function parsePack(header, grids, features) {
@@ -76,7 +79,7 @@ export function parsePack(header, grids, features) {
       borderPoints += ring.length;
     }
   }
-  return { hash: gridsSha256.slice(0, 32), header, grids, features };
+  return { hash: gridsSha256.slice(0, 32), header: { ...header, credits: cleanCredits(header.credits) }, grids, features };
 }
 
 const rowOf = (pack, n) => (pack.header.north + pack.header.half - n) / CELL;

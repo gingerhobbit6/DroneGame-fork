@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DRONES, STRUCTURES, WORLD, resetAllFigures } from '../src/sim/config/index.js';
+import { muzzle } from '../src/sim/effectors.js';
 import { hitChance, meetTime } from '../src/sim/hit-chance.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { antennaHeight, reachOnPath, usesPath } from '../src/sim/site-range.js';
@@ -152,5 +153,19 @@ describe('meeting a target', () => {
     expect(meetTime([1000, 0, 0], [50, 0, 0], 25)).toBe(Infinity); // a faster one going away never is
     expect(meetTime([1000, 0, 0], [0, 50, 0], 25)).toBe(Infinity); // nor one crossing at twice its speed
     expect(meetTime([1000, 0, 0], [0, 0, 0], 300)).toBeCloseTo(1000 / 300, 6);
+  });
+});
+
+describe('a gun round', () => {
+  it('leaves its low muzzle for a low drone without being taken for a round in the ground', () => {
+    setUp(sim, { seed: '1', laydown: [] });
+    const gun = sim.addStructure('gun_hmg', -20, 0); // on the flat station platform, 400 m west of the middle
+    const d = hover('fpv', gun, 800, 20); // 800 m off, at the height strike drones come in at
+    const round = { def: gun.def, pos: muzzle(gun).clone(), target: d, life: 10, from: 800, cueError: 0, src: gun, shot: null };
+    round.vel = d.pos.clone().sub(round.pos).setLength(u(gun.def.missileSpeed));
+    sim.missiles.push(round);
+    sim.step();
+    expect(sim.missiles).toContain(round); // 2.6 m up and climbing 1 m a step: under the 4 m at which a missile counts as down
+    expect(round.pos.y).toBeGreaterThan(hereU(round.pos.x, round.pos.z));
   });
 });

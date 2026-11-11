@@ -14,6 +14,7 @@ from app.db.connection import connect
 from app.services import accounts
 
 API = "/api/v1/auth"
+REAL_SCRYPT = dict(accounts.SCRYPT)  # read at import, before conftest lowers the cost for each test
 
 
 def sign_in(c, username="operator", password=PASSWORD, **more):
@@ -250,6 +251,19 @@ def test_tries_made_at_the_same_moment_still_lock_the_account(db_path, anon, mon
             service.sign_in("operator", "wrong password", False)
         with pytest.raises(accounts.Locked):
             service.sign_in("operator", PASSWORD, False)
+
+
+def test_the_hash_cost_is_one_owasp_lists():
+    n, r, p = REAL_SCRYPT["n"], REAL_SCRYPT["r"], REAL_SCRYPT["p"]
+    assert r >= 8 and (n >= 2**17 or (n >= 2**14 and p >= 5))
+
+
+def test_a_hash_made_at_the_old_cost_still_verifies(monkeypatch):
+    monkeypatch.setattr(accounts, "SCRYPT", {"n": 2**14, "r": 8, "p": 1})
+    stored = accounts.hash_secret(PASSWORD)
+    monkeypatch.setattr(accounts, "SCRYPT", REAL_SCRYPT)
+    assert stored.startswith("scrypt$16384$8$1$")
+    assert accounts.check_secret(PASSWORD, stored) and not accounts.check_secret("wrong password", stored)
 
 
 def test_account_sql_only_ever_uses_bound_parameters():

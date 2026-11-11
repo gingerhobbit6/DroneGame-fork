@@ -38,14 +38,15 @@ const SUN_FROM = new THREE.Vector3(60, 120, 40).normalize();
 // Half the width of the ground the sun's shadows cover, about what is in view, or nothing when too far out to cast them.
 export const shadowReach = (zoom, eye) => (eye ? u(150) : zoom < SHADOW_ZOOM ? Math.max(zoom * 1.2, u(25)) : 0);
 
-// getMapSource(world): the pictures, roads and names for a real world. The simulation never sees them.
+// getMapSource(world): the pictures, roads and names for a real world. The simulation never sees them. onProblem(text) tells the player.
 const WHEEL_ZOOM = 2, PINCH_ZOOM = 8; // OrbitControls zoom speeds, against its default of 1
 
-export function createGameView(canvas, labelLayer, sim, getMapSource = () => null) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); // the camera goes from metres to kilometres away
+export function createGameView(canvas, labelLayer, sim, getMapSource = () => null, onProblem = () => {}) {
+  // logarithmic depth: the camera goes from metres to kilometres away. high-performance: on a laptop with two graphics cards, a hint
+  // to use the faster one (a browser may ignore it): London's buildings ran at 18 frames a second on integrated graphics.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // A faint studio reflection on the models only: scene.environment stays unset, so the map keeps its true colours.
   const pmrem = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment(renderer);
   setModelEnv(pmrem.fromScene(room, 0.04).texture);
@@ -110,7 +111,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     if (!source) return Promise.resolve(null);
     if (['satellite', 'hybrid'].includes(view.baseMap) && !source.pictures.some((p) => p.layer === 'satellite')) view.baseMap = 'os'; // the last world had it, this one doesn't
     return map.paint(data, source, { baseMap: view.baseMap, roads: view.mapRoads, grid: view.mapGrid, contours: view.mapContours }).then((result) => {
-      if (terrainState.data === data && !result.stale) view.hillshade = map.small;
+      if (terrainState.data === data && !result.stale) { view.hillshade = map.small; worldView.mesh.material = map.material; } // back on the ground, if the last paint failed
       return result;
     });
   }
@@ -121,7 +122,12 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
     worldView = buildWorldView(scene, terrainState.data, siteMat);
     for (const m of [worldView.mesh, ...worldView.scenery]) m.receiveShadow = true;
     ownMaterial = worldView.mesh.material;
-    if (terrainState.data.geo) { worldView.mesh.material = map.material; refreshMap().catch(() => {}); } // the terrain still shows if its picture fails
+    if (terrainState.data.geo) {
+      const { mesh } = worldView;
+      mesh.material = map.material;
+      // A picture that fails would leave the ground wearing the last world's, so the ground goes back to its own colours.
+      refreshMap().catch(() => { if (worldView.mesh === mesh) { mesh.material = ownMaterial; onProblem('The map could not be drawn, so the ground is shown without it'); } });
+    }
     siteRing.update(0, 0);
     buildRing.update(0, 0);
     siteRing.mesh.position.y = buildRing.mesh.position.y = groundU(0, 0); // a draped ring's heights are from the ground at its centre
@@ -256,6 +262,7 @@ export function createGameView(canvas, labelLayer, sim, getMapSource = () => nul
   }
 
   function resize() {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); // browser zoom, or another monitor's scale, changes it and fires this
     renderer.setSize(innerWidth, innerHeight, false);
     sizeWideLines(innerWidth, innerHeight); // beams and tracer are drawn so many pixels wide
     camera.aspect = innerWidth / innerHeight;

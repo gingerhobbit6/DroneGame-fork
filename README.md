@@ -76,7 +76,7 @@ Three rules hold it together: the simulation has no DOM and no rendering, so a w
 | Layer | Technology | What it does here |
 |---|---|---|
 | Simulation | JavaScript (ES modules), no runtime dependencies | Rules, sensor and propagation models, Kalman filter tracking, SAPIENT messages. Runs in the browser or in Node |
-| 3D view | [three.js](https://threejs.org) 0.160 | Terrain, systems, drones, tracks and range rings |
+| 3D view | [three.js](https://threejs.org) 0.186 | Terrain, systems, drones, tracks and range rings |
 | Interface | [React](https://react.dev) 19, [Leaflet](https://leafletjs.com) 1.9 | Panels, the SAPIENT dock and the start screen's map |
 | Build | [Vite](https://vite.dev) 8 | Development server and production bundle |
 | Backend | Python 3.12+, [FastAPI](https://fastapi.tiangolo.com), Pydantic, Uvicorn | Accounts, saved data, map pack listing and builds, and serving the built game |

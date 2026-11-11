@@ -132,7 +132,8 @@ export function updateMissiles(w, dt) {
     // A fast round flies further in a step than its fuze reaches, so it could pass clean through its target between checks:
     // look along the path it just flew too, and burst where it came closest.
     if (m.target && !fuzed && closestOnPath(_from, m.pos, m.target.pos, _near) < r) { m.pos.copy(_near); fuzed = true; }
-    if (fuzed || m.life <= 0 || m.pos.y < hereU(m.pos.x, m.pos.z) + 0.2) {
+    // a gun's muzzle is lower than the 4 m margin, and its round flies straight, so it is held only to the ground itself
+    if (fuzed || m.life <= 0 || m.pos.y < hereU(m.pos.x, m.pos.z) + (m.def.kind === 'gun' ? 0 : 0.2)) {
       const hit = fuzed && (!m.def.beamRider || opticalLos(m.src, m.target)) && rand() < hitChance(m.def, { speed: m.target.def.speed, evade: m.target.evade }, m.from, m.cueError); // a beam-rider is lost once its launcher cannot see the target
       if (hit) { // it reaches its target, and its blast anything else close by. A miss costs the round and does nothing.
         if (m.shot) m.shot.hits++;

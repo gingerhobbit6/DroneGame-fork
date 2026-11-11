@@ -18,7 +18,7 @@ from rasterio.transform import from_origin
 from rasterio.windows import from_bounds
 from shapely.geometry import mapping
 
-from . import copernicus, geonames
+from . import copernicus, features, geonames
 from .estonia_files import AGENT, BUILDINGS, CRS, HEIGHTS, LAND, PLACES, SURFACE, TRANSPORT, UTILITIES, WATER, _retrying, ensure  # noqa: F401 - ensure is part of this module's face
 from .grid import CELL, Window
 from .source_limits import check_raster_blocks, read_capped, read_shapefile, safe_archive_members
@@ -308,6 +308,7 @@ def gather(data_root: str, window: Window, lidar_km: int, say, fetch: bool = Fal
         say(f"GeoNames: {len(far_names)} settlements past the border")
         names, name_fields = np.concatenate([names, far_names]), {k: np.concatenate([v, far_fields[k]]) for k, v in name_fields.items()}
     power = shapely.get_parts(power)
+    features.check_counts(window, power, roads, names)  # before the lidar, so a refusal does not throw that work away
     return Inputs(np.nan_to_num(base).astype("float32"), no_data, wood, houses, power, np.concatenate(water), roads, classes, names, name_fields,
                   lidar(data_root, window, lidar_km * 500, ground, houses) if lidar_km else None, bool(past.any()), past, bool(len(far_names)))
 

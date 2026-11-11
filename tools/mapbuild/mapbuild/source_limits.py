@@ -2,6 +2,9 @@
 
 import posixpath
 import shutil
+import urllib.error
+import urllib.parse
+import urllib.request
 import zipfile
 
 import numpy as np
@@ -19,6 +22,15 @@ MAX_ARCHIVE_EXPANDED_BYTES = 20_000_000_000
 MAX_DECODED_BLOCK_BYTES = 64 * 1024 * 1024
 MIN_FREE_BYTES = 8_000_000_000
 SHAPE_MAGIC = b"\x00\x00\x27\x0a"
+
+
+class HttpsRedirects(urllib.request.HTTPRedirectHandler):
+    """A redirect may change the host, as a download address can lead on to a file store, but it may not leave https."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urllib.parse.urlsplit(newurl).scheme != "https":
+            raise urllib.error.HTTPError(newurl, code, "refusing a redirect that leaves https", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def read_capped(reply, limit: int, description: str) -> bytes:

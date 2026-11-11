@@ -6,7 +6,7 @@ import { BEARINGS, predictRange, usesPath } from '../../sim/site-range.js';
 import { terrainState } from '../../sim/terrain.js';
 import { view } from '../../render/view.js';
 import { coverageGrid } from '../coverage.js';
-import { hex } from '../hooks.js';
+import { hex, sharpCanvas } from '../hooks.js';
 
 const TR_COL = { tentative: '#8a94a3', confirmed: '#ffcc66', coasting: '#ff9800' };
 const mpu = () => WORLD.metresPerUnit;
@@ -25,6 +25,7 @@ function traceRange(g, n, X, Y, k) {
 
 // Not seen, seen by one sensor, seen by two or more: the coverage map's three colours, which the key in PlanTab.jsx matches.
 export const COVER_FILL = ['rgba(229,57,53,0.32)', 'rgba(255,193,7,0.32)', 'rgba(102,187,106,0.45)'];
+const COVER_MS = 12; // of each frame go on working the coverage map out: all of it at once froze the page for over half a second
 
 export function createPlanCanvas(cv, sim) {
   const { net, drones } = sim;
@@ -38,25 +39,32 @@ export function createPlanCanvas(cv, sim) {
   cv.addEventListener('wheel', onWheel, { passive: false });
 
   // The coverage map, painted once for each grid worked out into a canvas of one pixel a cell, then drawn as one picture: filling every
-  // cell of a 54 km map each time the view is drawn was about 46,000 rectangles every 200 ms, even while paused.
-  let cover = { grid: null, canvas: null };
-  function coverLayer(c) {
-    if (cover.grid === c) return cover.canvas;
-    const canvas = cover.canvas ?? document.createElement('canvas'), cg = canvas.getContext('2d');
-    canvas.width = canvas.height = c.n;
-    for (let j = 0; j < c.n; j++) for (let i = 0; i < c.n; i++) {
-      cg.fillStyle = COVER_FILL[Math.min(c.counts[j * c.n + i], 2)];
-      cg.fillRect(i, j, 1, 1); // row 0 is the north edge: z is south
+  // cell of a 54 km map each time the view is drawn was about 46,000 rectangles every 200 ms, even while paused. Rows are painted as
+  // they are worked out. When the same type's map is worked out again (a jammer switching does it, twice a second at 10x late in a
+  // run), the last picture stays and is replaced a row at a time, so it is never left half empty; another type or world starts clear.
+  let cover = { grid: null, canvas: null, rows: 0, of: null };
+  function coverLayer(c, of) {
+    if (cover.grid !== c) {
+      const canvas = cover.canvas ?? document.createElement('canvas');
+      if (cover.of !== of || canvas.width !== c.n) canvas.width = canvas.height = c.n; // sizing it clears the last picture
+      cover = { grid: c, canvas, rows: 0, of };
     }
-    cover = { grid: c, canvas };
-    return canvas;
+    const cg = cover.canvas.getContext('2d');
+    for (; cover.rows < c.rows; cover.rows++) {
+      cg.clearRect(0, cover.rows, c.n, 1); // the fills are see-through, so the last picture's row goes first
+      for (let i = 0; i < c.n; i++) {
+        cg.fillStyle = COVER_FILL[Math.min(c.counts[cover.rows * c.n + i], 2)];
+        cg.fillRect(i, cover.rows, 1, 1); // row 0 is the north edge: z is south
+      }
+    }
+    return cover.canvas;
   }
 
-  // coverage: the drone type to map, or null for none
+  // coverage: the drone type to map, or null for none. Returns true while the coverage map has rows left to work out.
   function draw(coverage) {
-    const w = cv.clientWidth, h = cv.clientHeight;
-    if (!w || !h) return;
-    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const { w, h } = sharpCanvas(cv, g) ?? {};
+    if (!w) return false;
+    let more = false;
     const k = Math.min(w, h) / 2 / viewR;
     const X = (e) => w / 2 + e * k, Y = (n) => h / 2 - n * k;
     g.clearRect(0, 0, w, h);
@@ -67,9 +75,10 @@ export function createPlanCanvas(cv, sim) {
       g.drawImage(view.hillshade, X(-Rt), Y(Rt), 2 * Rt * k, 2 * Rt * k);
     }
     if (coverage) {
-      const c = coverageGrid(sim, coverage), side = c.n * c.cell * k;
+      const c = coverageGrid(sim, coverage, COVER_MS), side = c.n * c.cell * k;
+      more = c.rows < c.n;
       g.imageSmoothingEnabled = false; // crisp cells, as they were drawn one by one
-      g.drawImage(coverLayer(c), X(-c.half), Y(c.half), side, side);
+      g.drawImage(coverLayer(c, `${coverage}|${sim.state.terrainSeed}`), X(-c.half), Y(c.half), side, side);
     }
     g.lineWidth = 1; g.font = '10px system-ui'; g.fillStyle = '#5f7391'; g.strokeStyle = '#1c2b46';
     for (let r = ringStep(); r <= viewR * 1.5; r += ringStep()) {
@@ -144,6 +153,7 @@ export function createPlanCanvas(cv, sim) {
         g.fillStyle = col; g.fillText(`${tr.short} · ${cls}`, x + 7, y + 3);
       }
     }
+    return more;
   }
 
   return { draw, dispose() { bus.listeners.delete(onMessage); cv.removeEventListener('wheel', onWheel); } };

@@ -108,7 +108,7 @@ export function UnitEditor({ s, game }) {
         </fieldset>
       )}
       {!locked && !s.escort && !def.rider && <button id="unit-move" title="Pick it up and click the map where it should go. A vehicle moves with everything on it." onClick={() => game.startMove(s)}>Move</button>}
-      {!locked && <button id="unit-sell" onClick={sell.confirm('sell', () => commands.sell(s.pos.x, s.pos.z))}>{sell.armed ? 'Sure? Click again' : sim.state.packed ? 'Remove from the map' : `Remove, ${money(refund)} back`}</button>}
+      {!locked && !s.escort && <button id="unit-sell" onClick={sell.confirm('sell', () => commands.sell(s.pos.x, s.pos.z))}>{sell.armed ? 'Sure? Click again' : sim.state.packed ? 'Remove from the map' : `Remove, ${money(refund)} back`}</button>}
     </div>
   );
 }

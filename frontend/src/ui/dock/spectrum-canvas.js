@@ -1,7 +1,7 @@
 // Who uses which frequencies, and where your jamming overlaps your own links.
 
 import { COMMS, SPECTRUM, STRUCTURES, overlaps } from '../../sim/config/index.js';
-import { hex } from '../hooks.js';
+import { hex, sharpCanvas } from '../hooks.js';
 import { nodeList } from './network-canvas.js';
 
 const F0 = 0.05, F1 = 30;
@@ -26,9 +26,8 @@ export function jamConflicts(net) {
 
 export function drawSpectrum(cv, net) {
   const g = cv.getContext('2d');
-  const W = cv.clientWidth, H = cv.clientHeight;
-  if (!W || !H) return;
-  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const { w: W, h: H } = sharpCanvas(cv, g) ?? {};
+  if (!W) return;
   g.clearRect(0, 0, W, H); g.fillStyle = '#0a1120'; g.fillRect(0, 0, W, H);
   const L = 128, R = 10, T0 = 22, B = 26, span = Math.log10(F1 / F0);
   const X = (f) => L + (Math.log10(Math.max(f, F0) / F0) / span) * (W - L - R);

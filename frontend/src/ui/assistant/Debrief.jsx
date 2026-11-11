@@ -1,6 +1,7 @@
 // After the site falls: what got through, and a look back at the first leak. The run is over, so showing the truth is fine.
 
 import { DRONES } from '../../sim/config/index.js';
+import { liveStats } from '../../sim/stats.js';
 import { useGame } from '../hooks.js';
 
 const ADVICE = {
@@ -13,7 +14,9 @@ export function Debrief({ onReview }) {
   const game = useGame();
   const { ledger, rec } = game.sim;
   const n = (counts, type) => counts[type] || 0;
-  const worst = Object.keys(ledger.leaked).sort((a, b) => ledger.leaked[b] - ledger.leaked[a])[0];
+  // a drone hit you if it reached the site or came down on one of your systems: counting only the site left most of a wave out
+  const hit = Object.fromEntries(liveStats(game.sim).types.map((t) => [t.id, t.leaked + t.struck]).filter(([, count]) => count));
+  const worst = Object.keys(hit).sort((a, b) => hit[b] - hit[a])[0];
   const replay = game.getReplay();
   const t0 = rec.frames.length ? rec.frames[0].t : 0;
   const leak = rec.events.find((e) => e.type === 'leak' && e.t >= t0);
@@ -30,7 +33,7 @@ export function Debrief({ onReview }) {
         <tbody>
           {Object.values(DRONES).filter((d) => !d.variantOf || ledger.launched[d.id]).map((d) => (
             <tr key={d.id} className={d.id === worst ? 'gap' : ''}>
-              <th scope="row">{d.name}</th><td>{n(ledger.launched, d.id)}</td><td>{n(ledger.killed, d.id)}</td><td>{n(ledger.leaked, d.id)}</td>
+              <th scope="row">{d.name}</th><td>{n(ledger.launched, d.id)}</td><td>{n(ledger.killed, d.id)}</td><td>{n(hit, d.id)}</td>
             </tr>
           ))}
         </tbody>

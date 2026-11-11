@@ -132,7 +132,7 @@ export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = 
   const ghost = new THREE.Group();
   ghost.visible = false;
   scene.add(ghost);
-  let ghostRing = null;
+  let ghostRing = null, ghostDef = null; // ghostDef: the picked system with its chosen settings, so the preview judges the price a click charges
   let ghostAt = { x: NaN, z: NaN }, ghostRadii = null, predictedAt = 0;
   const ghostMat = new THREE.MeshBasicMaterial({ color: 0x66ff66, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
   const ghostMarker = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 1.5, 16), ghostMat);
@@ -142,6 +142,7 @@ export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = 
   function refresh() {
     if (ghostRing) { ghost.remove(ghostRing.mesh); ghostRing.mesh.geometry.dispose(); ghostRing = null; }
     const def = STRUCTURES[getTool()];
+    ghostDef = def ? defFor(getTool()) : null;
     if (def) {
       const r = u(def.range);
       ghostRadii = usesPath(def) ? new Array(BEARINGS).fill(r) : null;
@@ -164,13 +165,13 @@ export function createPlacement({ scene, camera, canvas, sim, getTool, defFor = 
         if (predicting) { // the preview shows the range this spot really gets
           predictedAt = now;
           const m = WORLD.metresPerUnit;
-          const def = standingAt(defFor(tool), sim.state.zoneCentre, mouseGround); // facing as it will once placed
+          const def = standingAt(ghostDef, sim.state.zoneCentre, mouseGround); // facing as it will once placed
           predictRange(def, DRONES.fpv, terrainState.data, mouseGround.x * m, mouseGround.z * m).first.forEach((metres, i) => { ghostRadii[i] = u(metres); });
         }
         ghostRing.update(mouseGround.x, mouseGround.z); // re-drape the ring over the ground under the cursor
         if (!ghostRadii || predicting) ghostAt = { x: mouseGround.x, z: mouseGround.z }; // a spot skipped to throttle is predicted once the cursor rests
       }
-      const ok = tool === 'sell' || tool === 'move' || (tool === 'people' ? sim.canPlacePeople(mouseGround.x, mouseGround.z, view.people.protection) : sim.canPlace(mouseGround.x, mouseGround.z, STRUCTURES[tool]));
+      const ok = tool === 'sell' || tool === 'move' || (tool === 'people' ? sim.canPlacePeople(mouseGround.x, mouseGround.z, view.people.protection) : sim.canPlace(mouseGround.x, mouseGround.z, ghostDef));
       ghostMat.color.set(tool === 'sell' ? 0xff9800 : tool === 'move' ? 0x40c4ff : ok ? 0x66ff66 : 0xff5252);
     } else ghost.visible = false;
   }

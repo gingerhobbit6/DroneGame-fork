@@ -65,7 +65,7 @@ function typeRows(fs) {
     const def = DRONES[id], mine = fs.filter((f) => f.type === id), k = mine.filter((f) => f.end === 'killed'), seen = known(mine.map(firstSeen)), shots = shotsAt(mine);
     return {
       id, name: def.name, color: def.color, launched: mine.length, seen: seen.length, killed: k.length, leaked: ended(mine, 'leaked'), struck: ended(mine, 'struck'),
-      left: ended(mine, 'left'), detect: spread(seen.map((s) => s.site)), kill: spread(k.map((f) => f.site)), shots: shots.n, spent: shots.cost, cost: mine.length * def.cost,
+      left: ended(mine, 'left'), missed: ended(mine, 'missed'), detect: spread(seen.map((s) => s.site)), kill: spread(k.map((f) => f.site)), shots: shots.n, spent: shots.cost, cost: mine.length * def.cost,
     };
   }).sort((a, b) => b.launched - a.launched || a.name.localeCompare(b.name));
 }
@@ -81,7 +81,7 @@ export function runStats({ ledger, structures }, wave = null) {
     wave,
     drones: {
       launched: fs.length, seen: seen.length, engaged: fs.filter((f) => f.engaged != null).length, killed: kills.length,
-      leaked: ended(fs, 'leaked'), struck: ended(fs, 'struck'), left: ended(fs, 'left'), airborne: fs.filter((f) => !f.end).length,
+      leaked: ended(fs, 'leaked'), struck: ended(fs, 'struck'), left: ended(fs, 'left'), missed: ended(fs, 'missed'), airborne: fs.filter((f) => !f.end).length,
     },
     fire: {
       rounds: rounds.n, hits: rounds.hits, hitRate: per(rounds.hits, rounds.n), roundsPerKill: per(rounds.n, kills.filter((f) => fireOf(f.by) === 'guided').length),

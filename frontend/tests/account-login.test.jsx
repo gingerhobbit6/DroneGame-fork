@@ -9,7 +9,7 @@ import { resetAllFigures } from '../src/sim/config/index.js';
 import { view } from '../src/render/view.js';
 import { AuthScreen } from '../src/ui/account/AuthScreen.jsx';
 import { Root } from '../src/ui/account/Root.jsx';
-import { passwordStrength } from '../src/ui/account/parts.jsx';
+import { RecoveryCode, passwordStrength } from '../src/ui/account/parts.jsx';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -137,6 +137,14 @@ describe('the login page', () => {
     press('Sign in');
     expect(screen.getByRole('status').textContent).toMatch(/Sign in with your new password/);
     expect(screen.getByRole('button', { name: 'Sign in' })).not.toBeNull();
+  });
+
+  it('asks before the page is left while a recovery code is showing, and not once it has gone', () => {
+    const leaving = () => { const e = new Event('beforeunload', { cancelable: true }); dispatchEvent(e); return e.defaultPrevented; };
+    const { unmount } = render(<RecoveryCode code={CODE} title="Save your recovery code" doneLabel="Done" onDone={() => {}}>Shown once.</RecoveryCode>);
+    expect(leaving()).toBe(true);
+    unmount();
+    expect(leaving()).toBe(false);
   });
 
   it('goes back from the reset form', () => {

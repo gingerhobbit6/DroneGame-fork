@@ -44,7 +44,7 @@ function ProfileCard({ api, user, onChange }) {
   );
 }
 
-function SecurityCard({ api, onSignOut, onDeleted, signOutError }) {
+function SecurityCard({ api, onSignOut, onDeleted, signOutError, onCode }) {
   const [open, setOpen] = useState(null); // password | code | delete
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -57,10 +57,10 @@ function SecurityCard({ api, onSignOut, onDeleted, signOutError }) {
     if (next.length < MIN_PASSWORD) { setError(`The new password needs at least ${MIN_PASSWORD} characters.`); return; }
     run(async () => { await api.auth.changePassword({ current_password: current, new_password: next }); close(); setDone('Password changed. Every other device was signed out.'); });
   };
-  const newCode = (e) => { e.preventDefault(); run(async () => setCode((await api.auth.newRecoveryCode({ password: current })).recovery_code)); };
+  const newCode = (e) => { e.preventDefault(); run(async () => { setCode((await api.auth.newRecoveryCode({ password: current })).recovery_code); onCode(true); }); };
   const remove = (e) => { e.preventDefault(); run(async () => { await api.auth.deleteAccount({ password: current }); onDeleted(); }); };
   const submit = { password: [change, 'Change password'], code: [newCode, 'Show a new code'], delete: [remove, 'Delete my account'] }[open];
-  if (code) return <section className="acct-box"><RecoveryCode code={code} title="Your new recovery code" doneLabel="Done" onDone={() => { close(); setDone('The old recovery code no longer works.'); }}>Save it somewhere safe. The old one no longer works.</RecoveryCode></section>;
+  if (code) return <section className="acct-box"><RecoveryCode code={code} title="Your new recovery code" doneLabel="Done" onDone={() => { close(); onCode(false); setDone('The old recovery code no longer works.'); }}>Save it somewhere safe. The old one no longer works.</RecoveryCode></section>;
   return (
     <section className="acct-box" aria-label="Security">
       <h3>Security</h3>
@@ -89,7 +89,7 @@ function SecurityCard({ api, onSignOut, onDeleted, signOutError }) {
   );
 }
 
-function PackCard({ pack, active, onDeploy, onEdit, onDelete }) {
+function PackCard({ pack, active, locked, onDeploy, onEdit, onDelete }) {
   const del = useArmed();
   const totals = packTotals(pack.assets);
   return (
@@ -98,7 +98,7 @@ function PackCard({ pack, active, onDeploy, onEdit, onDelete }) {
       <span className="acct-muted">{pack.callsign ? `Callsign ${pack.callsign} · ` : ''}{describeTotals(totals)}</span>
       <span className="acct-price">{money(totals.cost)} of systems</span>
       <div className="acct-actions">
-        <button className="acct-go" onClick={onDeploy}>{active ? 'Deployed: open the game' : 'Deploy'}</button>
+        <button className="acct-go" disabled={locked} onClick={onDeploy}>{active ? 'Deployed: open the game' : 'Deploy'}</button>
         <button className="acct-ghost" onClick={onEdit}>Edit</button>
         <button className="acct-ghost danger" onClick={del.confirm('delete', onDelete)}>{del.armed ? 'Sure?' : 'Delete'}</button>
       </div>
@@ -107,19 +107,19 @@ function PackCard({ pack, active, onDeploy, onEdit, onDelete }) {
 }
 
 // Deploying with no pack: any system can be bought, one by one, out of the run's budget. It stands a deployed pack down.
-function NoPackCard({ active, onDeploy }) {
+function NoPackCard({ active, locked, onDeploy }) {
   return (
     <article className="acct-pack" data-pack="none">
       <header><b>No pack</b></header>
       <span className="acct-muted">Buy any system in the catalogue, one by one, out of the run&apos;s budget.</span>
       <div className="acct-actions">
-        <button className="acct-go" id="deploy-no-pack" onClick={onDeploy}>{active ? 'In use: open the game' : 'Deploy with no pack'}</button>
+        <button className="acct-go" id="deploy-no-pack" disabled={locked} onClick={onDeploy}>{active ? 'In use: open the game' : 'Deploy with no pack'}</button>
       </div>
     </article>
   );
 }
 
-function Packs({ api, account, onEnter }) {
+function Packs({ api, account, onEnter, locked }) {
   const [packs, setPacks] = useState(null);
   const [editing, setEditing] = useState(() => (account.editActive ? account.activeUnit : null)); // opened from the game's pack tray
   const { error, run } = useRequest();
@@ -138,8 +138,8 @@ function Packs({ api, account, onEnter }) {
         <div className="acct-empty"><p>No deployment packs yet.</p><button className="acct-go" onClick={() => setEditing(blankPack())}>Build your first pack</button></div>
       ) : (
         <div className="acct-packs">
-          <NoPackCard active={!account.activeUnit} onDeploy={() => { account.deploy(null); onEnter(); }} />
-          {packs.map((p) => <PackCard key={p.id} pack={p} active={account.activeUnit?.id === p.id} onEdit={() => setEditing(p)} onDelete={() => remove(p.id)} onDeploy={() => { account.deploy(p); onEnter(); }} />)}
+          <NoPackCard active={!account.activeUnit} locked={locked} onDeploy={() => { account.deploy(null); onEnter(); }} />
+          {packs.map((p) => <PackCard key={p.id} pack={p} active={account.activeUnit?.id === p.id} locked={locked} onEdit={() => setEditing(p)} onDelete={() => remove(p.id)} onDeploy={() => { account.deploy(p); onEnter(); }} />)}
         </div>
       )}
     </section>
@@ -148,6 +148,7 @@ function Packs({ api, account, onEnter }) {
 
 export function ProfileHub({ api, account, inGame, onEnter }) {
   const { user } = account;
+  const [unsaved, setUnsaved] = useState(false); // a new recovery code is showing, the old one is dead, and leaving this page would lose it
   return (
     <main className="acct" onKeyDown={(e) => e.stopPropagation()}>
       <div className="acct-sky" aria-hidden="true" />
@@ -155,16 +156,16 @@ export function ProfileHub({ api, account, inGame, onEnter }) {
         <header className="acct-bar">
           <Logo />
           <ZuluClock />
-          <button className="acct-go" id="enter-game" onClick={onEnter}>{inGame ? 'Back to the game' : 'Enter the game'}</button>
+          <button className="acct-go" id="enter-game" disabled={unsaved} title={unsaved ? 'Save your new recovery code first' : undefined} onClick={onEnter}>{inGame ? 'Back to the game' : 'Enter the game'}</button>
         </header>
         <h2 className="acct-hello">Welcome, {user.display_name}</h2>
         <p>{account.activeUnit ? `Deployed: ${account.activeUnit.name}. Its kit waits in the pack tray in the game.` : 'Build a deployment pack, or go straight into the game and buy systems one by one.'}</p>
         <div className="acct-grid">
           <div className="acct-side">
             <ProfileCard api={api} user={user} onChange={account.setUser} />
-            <SecurityCard api={api} onSignOut={account.signOut} onDeleted={() => account.leave('Your account and its deployment packs were deleted.')} signOutError={account.signOutError} />
+            <SecurityCard api={api} onSignOut={account.signOut} onDeleted={() => account.leave('Your account and its deployment packs were deleted.')} signOutError={account.signOutError} onCode={setUnsaved} />
           </div>
-          <Packs api={api} account={account} onEnter={onEnter} />
+          <Packs api={api} account={account} onEnter={onEnter} locked={unsaved} />
         </div>
       </div>
     </main>

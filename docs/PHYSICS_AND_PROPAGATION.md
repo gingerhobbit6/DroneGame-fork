@@ -39,7 +39,7 @@ flowchart LR
   F --> G[Measurement with<br/>range-dependent error]
 ```
 
-1. **Unit settings and weather.** A placed system's range is the catalogue range times the product of every changed setting (transmit power, scan period, arc, band, threshold, resolution and so on), times a beam-shape gain, times the weather factor ([`unit-config.js:284`](../frontend/src/sim/unit-config.js#L284)).
+1. **Unit settings and weather.** A placed system's range is the catalogue range times the product of every changed setting (transmit power, scan period, arc, band, threshold, resolution and so on), times a beam-shape gain, times the weather factor ([`unit-config.js:286`](../frontend/src/sim/unit-config.js#L286)).
 2. **Per drone type.** `reachFor` scales that range by what the drone presents to the sensor: radar cross-section, physical size, radio link power or loudness ([`site-range.js:35`](../frontend/src/sim/site-range.js#L35)).
 3. **Per path.** `reachOnPath` cuts it down for the real ground between the sensor and the drone ([`site-range.js:55`](../frontend/src/sim/site-range.js#L55)). Radio systems use the propagation model; cameras and lasers need a clear line; acoustic sensors use hill and noise factors.
 4. **Per scan.** Each sensor scans once every `sapient.interval` seconds ([`network/index.js:42`](../frontend/src/sim/network/index.js#L42)). On each scan every drone gets one roll against the detection probability below.
@@ -203,7 +203,7 @@ A camera, laser, gun or beam-riding missile keeps its full reach if the line is 
 
 An interceptor drone, or a missile with its own seeker, is cued over the terrain and needs no line of sight from where it stands ([`site-range.js:28`](../frontend/src/sim/site-range.js#L28), [`effectors.js:25`](../frontend/src/sim/effectors.js#L25)).
 
-Two kinds of effector whose `fire` is `guided` do need the optical line above, from the muzzle their rounds leave ([`site-range.js:29`](../frontend/src/sim/site-range.js#L29), [`site-range.js:32`](../frontend/src/sim/site-range.js#L32)): **every gun**, and a **beam-riding missile** (`beamRider`: the Rapid Ranger and the Stormer HVM, whose launcher holds a laser beam on the target). Their rounds still fly as guided rounds (see [section 11](#11-weapons-hit-chance-time-of-flight-and-beam-dwell)). The line is checked when the weapon is offered a task and each time it fires, and for a beam-rider once more as the missile arrives: if the launcher has lost the target by then, it misses ([`effectors.js:136`](../frontend/src/sim/effectors.js#L136)). Guns worked by a crew off the network also need the crew to see the drone ([`crew.js`](../frontend/src/sim/crew.js)).
+Two kinds of effector whose `fire` is `guided` do need the optical line above, from the muzzle their rounds leave ([`site-range.js:29`](../frontend/src/sim/site-range.js#L29), [`site-range.js:32`](../frontend/src/sim/site-range.js#L32)): **every gun**, and a **beam-riding missile** (`beamRider`: the Rapid Ranger and the Stormer HVM, whose launcher holds a laser beam on the target). Their rounds still fly as guided rounds (see [section 11](#11-weapons-hit-chance-time-of-flight-and-beam-dwell)). The line is checked when the weapon is offered a task and each time it fires, and for a beam-rider once more as the missile arrives: if the launcher has lost the target by then, it misses ([`effectors.js:137`](../frontend/src/sim/effectors.js#L137)). Guns worked by a crew off the network also need the crew to see the drone ([`crew.js`](../frontend/src/sim/crew.js)).
 
 ### One model for prediction and play
 
@@ -506,9 +506,9 @@ The Shahed-class drone is faster than the FPV but less evasive (0.8 against 0.6)
 
 ### Time of flight and how a round flies
 
-A round leaves its launcher at a constant `missileSpeed` ([`effectors.js:34`](../frontend/src/sim/effectors.js#L34)). A gun round starts straight at the target; a missile or interceptor starts climbing at 0.6 of its speed. Each step its velocity is blended towards the direction of its target with factor 1 - e^(-4 dt), a first-order steering lag with a 0.25 s time constant ([`effectors.js:126`](../frontend/src/sim/effectors.js#L126)). It fuzes when within `fuze` metres of the target, checked along the whole path flown in the step so a fast round cannot pass through ([`effectors.js:134`](../frontend/src/sim/effectors.js#L134)). Only then is the hit rolled, with the range and cue error from launch ([`effectors.js:136`](../frontend/src/sim/effectors.js#L136)). A round's life is 1.5 x range / speed; it dies on the ground; if its target dies, it turns to the nearest tracked drone within 1.5 km ([`effectors.js:121`](../frontend/src/sim/effectors.js#L121)).
+A round leaves its launcher at a constant `missileSpeed` ([`effectors.js:34`](../frontend/src/sim/effectors.js#L34)). A gun round starts straight at the target; a missile or interceptor starts climbing at 0.6 of its speed. Each step its velocity is blended towards the direction of its target with factor 1 - e^(-4 dt), a first-order steering lag with a 0.25 s time constant ([`effectors.js:126`](../frontend/src/sim/effectors.js#L126)). It fuzes when within `fuze` metres of the target, checked along the whole path flown in the step so a fast round cannot pass through ([`effectors.js:134`](../frontend/src/sim/effectors.js#L134)). Only then is the hit rolled, with the range and cue error from launch ([`effectors.js:137`](../frontend/src/sim/effectors.js#L137)). A round's life is 1.5 x range / speed; it dies on the ground; if its target dies, it turns to the nearest tracked drone within 1.5 km ([`effectors.js:121`](../frontend/src/sim/effectors.js#L121)).
 
-Before firing, the fusion node checks that a round can meet the track within its range, using `meetTime`, which solves |p + vt| = v_m t ([`hit-chance.js:18`](../frontend/src/sim/hit-chance.js#L18), [`network/tasking.js:171`](../frontend/src/sim/network/tasking.js#L171)). Examples from the function:
+Before firing, the fusion node checks that a round can meet the track within its range, using `meetTime`, which solves |p + vt| = v_m t ([`hit-chance.js:18`](../frontend/src/sim/hit-chance.js#L18), [`network/tasking.js:175`](../frontend/src/sim/network/tasking.js#L175)). Examples from the function:
 
 | Engagement | Time to meet |
 |---|---|
@@ -542,7 +542,7 @@ Add the lay time for each new target: 4 s, or none for the RF weapon.
 
 ### Damage to drones
 
-A round that hits does its `damage` to the target and to every other drone within `splash` metres ([`effectors.js:140`](../frontend/src/sim/effectors.js#L140)). A drone is destroyed when its hp reaches 0.
+A round that hits does its `damage` to the target and to every other drone within `splash` metres ([`effectors.js:141`](../frontend/src/sim/effectors.js#L141)). A drone is destroyed when its hp reaches 0.
 
 ### Damage to the site and to systems
 
@@ -566,7 +566,7 @@ anchored on the M67 grenade (0.18 kg of explosive, US Army figures of 5 m lethal
 | In a building | 0.35 | 0.6 |
 | In a bunker | 0.03 | 0.2 |
 
-For each person, with d the 3D distance from the burst, one roll decides ([`people.js:119`](../frontend/src/sim/people.js#L119)): killed if below pCasualty x (1 - d / r_lethal), otherwise injured if below pCasualty x (1 - d / r_injury). A drone shot down bursts where it is, so its height above a group protects them; a drone that reaches the site lands at a random point inside the 150 m site radius ([`people.js:137`](../frontend/src/sim/people.js#L137), [`people.js:147`](../frontend/src/sim/people.js#L147)). A drone landed by take-over does not go off.
+For each person, with d the 3D distance from the burst, one roll decides ([`people.js:120`](../frontend/src/sim/people.js#L120)): killed if below pCasualty x (1 - d / r_lethal), otherwise injured if below pCasualty x (1 - d / r_injury). A drone shot down bursts where it is, so its height above a group protects them; a drone that reaches the site lands at a random point inside the 150 m site radius ([`people.js:138`](../frontend/src/sim/people.js#L138), [`people.js:148`](../frontend/src/sim/people.js#L148)). A drone landed by take-over does not go off.
 
 | Drone | Warhead | Site damage | Lethal radius | Injury radius |
 |---|---|---|---|---|

@@ -14,7 +14,8 @@ export function useTick(active = true) {
   return useSyncExternalStore(active ? game.subscribe : noSubscribe, active ? game.getTick : zero);
 }
 
-// Run a drawing function on animation frames while `active`, at most once every minMs.
+// Run a drawing function on animation frames while `active`, at most once every minMs. A draw that returns true has work left over,
+// and is run again on the next frame.
 export function useAnimation(active, draw, minMs = 0) {
   const latest = useRef(draw);
   latest.current = draw;
@@ -22,12 +23,23 @@ export function useAnimation(active, draw, minMs = 0) {
     if (!active) return undefined;
     let id = 0, last = -Infinity;
     const loop = (t) => {
-      if (t - last >= minMs) { last = t; latest.current(t); }
+      if (t - last >= minMs) last = latest.current(t) === true ? -Infinity : t;
       id = requestAnimationFrame(loop);
     };
     id = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(id);
   }, [active, minMs]);
+}
+
+// Give a 2D canvas as many pixels as the display has for it, and draw in CSS pixels: on a scaled display it was stretched and blurred.
+// Returns its CSS size, or null while it has none.
+export function sharpCanvas(cv, g) {
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = Math.min(globalThis.devicePixelRatio || 1, 3);
+  if (!w || !h) return null;
+  const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+  if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); // sizing a canvas puts its scale back to 1
+  return { w, h };
 }
 
 // Fetch while `active`, keeping the last good data if a later fetch fails. Only the newest request's answer counts.

@@ -1,5 +1,6 @@
-// Simulated people: placing groups, and the casualties a blast causes. People never change the attack: they are not targets, and
-// every roll comes from a stream of its own, so a run with people plays out exactly as it does without them.
+// Simulated people: placing groups, and the casualties a blast causes. Outside a drawn area people never change the attack: nothing
+// aims at them, and every roll comes from a stream of its own, so a run with people plays out exactly as it does without them.
+// Inside a drawn area a strike may aim at a group (chooseAim in targeting.js).
 
 import { PEOPLE, PEOPLE_LIMITS, PEOPLE_ROLES, SITE, WORLD, casualtyRadii } from './config/index.js';
 import { hashSeed, mulberry32 } from './rng.js';

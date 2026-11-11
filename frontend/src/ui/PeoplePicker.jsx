@@ -35,7 +35,7 @@ export function PeopleChoice() {
           </button>
         ))}
       </div>
-      <p className="muted">{locked ? 'The laydown is locked once the first wave starts.' : 'Click the map to place them. They cost nothing and are not targets, but a blast nearby can hurt them.'} Casualties come from assumed figures in the Sources tab, not real data.</p>
+      <p className="muted">{locked ? 'The laydown is locked once the first wave starts.' : 'Click the map to place them. They cost nothing. Strikes on a drawn area can aim at them, and a blast nearby can hurt them.'} Casualties come from assumed figures in the Sources tab, not real data.</p>
       {sim.people.length > 0 && (
         <ul className="people-list">
           {sim.people.map((g) => (

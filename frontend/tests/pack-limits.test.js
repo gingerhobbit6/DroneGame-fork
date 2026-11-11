@@ -68,6 +68,16 @@ describe('features', () => {
   });
 });
 
+describe('credits', () => {
+  it('reach the map only as the licence lines it shows, each as text cut to 600 characters', async () => {
+    const credits = { osmap: 'OS credit', satellite: 'x'.repeat(5000), lidar: { text: 'not text' }, heights: 7, names: ['not text'], other: 'not shown' };
+    const { pack } = await decodePack(await encodePack({ change: (h) => { h.credits = credits; } }));
+    expect(pack.header.credits).toEqual({ osmap: 'OS credit', satellite: 'x'.repeat(600) }); // what game.js hands to the map controls
+    const { header, grids, features } = pack;
+    for (const bad of ['free text', null, 5]) expect(parsePack({ ...header, credits: bad }, grids, features).header.credits).toEqual({});
+  });
+});
+
 describe('live map tile limits', () => {
   it('refuses non-geographic and excessive bounds before enumeration', () => {
     expect(() => tilesOver({ north: 51, south: 50, east: 1e30, west: 1e30 })).toThrow(/tile/);

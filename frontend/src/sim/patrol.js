@@ -11,6 +11,7 @@ import { designLocked } from './lock.js';
 import { addGroup, cleanCount } from './people.js';
 import { FORMATIONS, placeIn, soldierSpot } from './formation.js';
 import { legEnds, routeProblem, widthProblem } from './route.js';
+import { cleanSettings, unitCost } from './unit-config.js';
 
 export { MAX_WAYPOINTS, routeProblem } from './route.js';
 
@@ -55,7 +56,9 @@ function placeAll(w) {
 // Every system in the column and its terminal, and a terminal for the fusion node if it has none. The vehicles themselves are
 // not priced: the budget is for counter-drone systems.
 const carried = (e) => [e.system, ...(e.also ?? [])];
-const escortCost = (w, column) => column.flatMap(carried).reduce((sum, id) => sum + STRUCTURES[id].cost, 0)
+const onVehicle = (vehicle, system) => (STRUCTURES[system].mount == null ? {} : { mount: ESCORT_CARRIERS[vehicle].mast }); // its mast on the vehicle
+// priced as startPatrol charges it, on its vehicle's mast, so what passes the check can be paid for
+const escortCost = (w, column) => column.reduce((sum, e) => sum + carried(e).reduce((a, id) => a + unitCost(id, cleanSettings(id, onVehicle(e.vehicle, id))), 0), 0)
   + COMMS.starlink.cost * (column.flatMap(carried).filter((id) => STRUCTURES[id].networked !== false).length + (w.net.fusion.uplinks.has('starlink') ? 0 : 1));
 
 function startPatrol(w, route, column, plan) {
@@ -65,7 +68,7 @@ function startPatrol(w, route, column, plan) {
   const escorts = column.flatMap((e) => {
     const { vehicle, gap, side } = e, ids = carried(e), platform = ids.length > 1 ? `patrol-${++platforms}` : null;
     return ids.map((system, k) => {
-      const s = addStructure(w, system, x, z, { settings: STRUCTURES[system].mount == null ? {} : { mount: ESCORT_CARRIERS[vehicle].mast } }); // its mast on the vehicle
+      const s = addStructure(w, system, x, z, { settings: onVehicle(vehicle, system) });
       s.escort = true; s.def.vehicle = vehicle; // the unit's own definition, so the drawing puts it on the vehicle
       if (k > 0) s.def.rider = true;
       if (platform) s.platform = platform; // they share a strike (targeting.js)

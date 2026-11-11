@@ -1,38 +1,38 @@
 {
   "mixed-seed1": {
-    "digest": "e80fce8e",
+    "digest": "c4372085",
     "wave": 6,
-    "kills": 58,
-    "leaks": 3,
-    "health": 10,
-    "budget": 10652953
+    "kills": 68,
+    "leaks": 2,
+    "health": 40,
+    "budget": 11052953
   },
   "mixed-seed7": {
-    "digest": "a0b93cb4",
+    "digest": "436eca81",
     "wave": 6,
-    "kills": 73,
+    "kills": 71,
     "leaks": 0,
     "health": 100,
     "budget": 10852953
   },
   "mixed-gnss-seed42": {
-    "digest": "9ba327ab",
+    "digest": "33482c2e",
     "wave": 4,
-    "kills": 39,
+    "kills": 40,
     "leaks": 0,
     "health": 100,
-    "budget": 12042953
+    "budget": 12007953
   },
   "lasers-seed42": {
-    "digest": "3d544860",
+    "digest": "7a997a93",
     "wave": 8,
-    "kills": 126,
+    "kills": 128,
     "leaks": 0,
     "health": 100,
-    "budget": 3997144
+    "budget": 3996871
   },
   "jammers-seed1": {
-    "digest": "2b2d8179",
+    "digest": "e9dfc58f",
     "wave": 4,
     "kills": 31,
     "leaks": 4,

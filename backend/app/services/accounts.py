@@ -14,7 +14,7 @@ from typing import Any
 from app.db.account_stores import SqliteAccountStore
 from app.services.records import utc_now
 
-SCRYPT = {"n": 2**14, "r": 8, "p": 1}  # about 16 MB and 50 ms a hash: slow for a guesser, fine for one sign-in
+SCRYPT = {"n": 2**14, "r": 8, "p": 5}  # one of the settings OWASP lists; about 16 MB and 0.2 to 0.3 s a hash: slow for a guesser, fine for one sign-in
 MAX_FAILURES = 5
 LOCKOUT_SECONDS = 5 * 60
 SESSION_SECONDS = 12 * 3600

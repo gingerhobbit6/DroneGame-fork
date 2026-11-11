@@ -119,7 +119,7 @@ A track's reported error (`estErr`, drawn as the ring round a track) is the root
 
 The values are in [`tracker.js:55`](../frontend/src/sim/tracker.js#L55). The timeouts are for sensors that report about once a second; each sensor stretches them by its own interval if it is slower than 1 s, and a track drops only when every sensor that fed it has gone quiet for that long ([`tracker.js:72`](../frontend/src/sim/tracker.js#L72)). No catalogue sensor reports less often than once a second, so in practice the stretch is 1.
 
-A coasting track is still reported and still drawn (dimmer), but only confirmed tracks are offered to effectors and cameras ([`fusion.js:19`](../frontend/src/sim/network/fusion.js#L19)). When a track is first confirmed it gets a short name (`T1`, `T2` and so on) and a "New track" alert.
+A coasting track is still reported and still drawn (dimmer), but only confirmed tracks are offered to effectors and cameras ([`fusion.js:19`](../frontend/src/sim/network/fusion.js#L19)). Jammers are the exception: a networked jammer is switched on for a coasting track as well as a confirmed one (see [Jammers](#jammers)). When a track is first confirmed it gets a short name (`T1`, `T2` and so on) and a "New track" alert.
 
 ## Bearing-only fixes
 
@@ -164,7 +164,7 @@ Other judgements:
 
 | Judgement | Rule | Value |
 |---|---|---|
-| Leaving | closing on the site faster than −10 m/s and not heading for the site or any of your systems at more than 10 m/s ([`tasking.js:48`](../frontend/src/sim/network/tasking.js#L48)) | `minClosing` 10 m/s |
+| Leaving | closing on the site faster than −10 m/s and not heading for the site or any of your systems at more than 10 m/s ([`tasking.js:50`](../frontend/src/sim/network/tasking.js#L50)) | `minClosing` 10 m/s |
 | Loitering, "probable spotter" | moving at 8 m/s or more, with less than 0.3 of its speed towards or away from the site, for 10 s, outside any drawn area ([`fusion.js:56`](../frontend/src/sim/network/fusion.js#L56)) | `loiterAfter` 10 s |
 | Warning alert | track within 2,500 m of the site | `warnZone` |
 | Critical alert | track within 800 m | `critZone` |
@@ -183,54 +183,56 @@ Radar and RF find things; a camera has a narrow view and must be told where to l
 
 ## Jammers
 
-A networked jammer is switched to `Jam` by a SAPIENT `mode_change` task when any confirmed track it reaches and faces could use a band it jams, and back to `Standby` when none does ([`tasking.js:204`](../frontend/src/sim/network/tasking.js#L204)). The mode changes when the task arrives. A jammer with `trigger: 'receiver'` switches itself on what its own receiver hears, and stops to listen after 2.5 s of hearing nothing (`LOOK`, an assumption, [`tasking.js:17`](../frontend/src/sim/network/tasking.js#L17)); one with `trigger: 'manual'` follows the player. A sector jammer on a pan-and-tilt head is turned onto the most urgent track it could jam, at once and without a SAPIENT task (a recorded shortcut at [`tasking.js:213`](../frontend/src/sim/network/tasking.js#L213)).
+A networked jammer is switched to `Jam` by a SAPIENT `mode_change` task when any confirmed or coasting track it reaches and faces could use a band it jams, and back to `Standby` when none does ([`tasking.js:212`](../frontend/src/sim/network/tasking.js#L212)). Tentative tracks and tracks on kill watch do not count. A coasting track counts so that a track that has missed a scan or two does not switch the jammer off and on again. The mode changes when the task arrives. A jammer with `trigger: 'receiver'` switches itself on what its own receiver hears, and stops to listen after 2.5 s of hearing nothing (`LOOK`, an assumption, [`tasking.js:17`](../frontend/src/sim/network/tasking.js#L17)); one with `trigger: 'manual'` follows the player. A sector jammer on a pan-and-tilt head is turned onto the most urgent track it could jam, at once and without a SAPIENT task (a recorded shortcut at [`tasking.js:221`](../frontend/src/sim/network/tasking.js#L221)).
 
-**Soft kill first.** An interceptor or missile launcher is not offered a track that a jammer should be left to deal with ([`tasking.js:91`](../frontend/src/sim/network/tasking.js#L91)). The track is left to the jammers when all of these hold:
+**Soft kill first.** An interceptor or missile launcher is not offered a track that a jammer should be left to deal with ([`tasking.js:93`](../frontend/src/sim/network/tasking.js#L93)). The track is left to the jammers when all of these hold:
 
 - the track is named to its model (by a camera or an RF library), that model has a radio control link jamming can break, and a networked jammer that jams that band and can follow that link is available (one switched by its own receiver must already be jamming);
 - it is not yet inside the 800 m critical zone;
 - its path to the site spends at least `softKillWait` (10 s) inside a jammer's reach before reaching the critical zone, judged over the real ground between them;
 - a jammer has not already had it for more than 10 s;
-- that model has not outlasted the jammers in more than half of at least 3 holds this run (the fusion node learns, as a crew would, [`tasking.js:87`](../frontend/src/sim/network/tasking.js#L87)).
+- that model has not outlasted the jammers in more than half of at least 3 holds this run (the fusion node learns, as a crew would, [`tasking.js:89`](../frontend/src/sim/network/tasking.js#L89)).
 
 ## Weapon-target assignment
 
-Once a second the tasking pass decides what every networked effector does ([`tasking.js:229`](../frontend/src/sim/network/tasking.js#L229)). Systems with `networked: false` are worked by their crews and are never tasked ([`crew.js`](../frontend/src/sim/crew.js)).
+Once a second the tasking pass decides what every networked effector does ([`tasking.js:237`](../frontend/src/sim/network/tasking.js#L237)). Systems with `networked: false` are worked by their crews and are never tasked ([`crew.js`](../frontend/src/sim/crew.js)).
 
-**An effector already engaged** first checks its task. It reports and drops the task if it can no longer fire, if its target is dead (and starts a kill watch), if the track has gone, if the track has left its envelope or if the track is leaving. Otherwise it looks for the most urgent track it could take; it switches only if that track's urgency score is at most 75% of its current target's (`retaskGain` 0.25), or freely if the rounds already in the air are enough for the current one ([`tasking.js:274`](../frontend/src/sim/network/tasking.js#L274)). A switch sends `CONTROL_STOP` for the old task, then a new `Engage`.
+**An effector already engaged** first checks its task. It reports and drops the task if it can no longer fire, if its target is dead (and starts a kill watch), if the track has gone, if the track has left its envelope or if the track is leaving. Otherwise it looks for the most urgent track it could take, passing over any track another effector already holds outside the 800 m critical zone (the same one-effector-a-track rule as pairing); it switches only if that track's urgency score is at most 75% of its current target's (`retaskGain` 0.25), or freely if the rounds already in the air are enough for the current one ([`tasking.js:285`](../frontend/src/sim/network/tasking.js#L285)). A switch sends `CONTROL_STOP` for the old task, then a new `Engage`.
 
-**Free effectors** are paired with tracks in order of urgency ([`tasking.js:292`](../frontend/src/sim/network/tasking.js#L292)):
+**Free effectors** are paired with tracks in order of urgency ([`tasking.js:303`](../frontend/src/sim/network/tasking.js#L303)):
 
 1. A track already being engaged is skipped unless it is inside the 800 m critical zone, where every effector that can takes it on.
 2. Of the free effectors that can take the track, those with at least half the best chance of a kill (`FAIR` 0.5) are kept.
-3. The one with the lowest expected cost per kill wins: shot cost / chance of a hit, or for a beam, shot cost × seconds to burn a drone of the model's hit points (20 if unknown) ([`tasking.js:283`](../frontend/src/sim/network/tasking.js#L283)). This is why a gun or laser takes a quadcopter before a missile does.
-4. Repeat until no pairing is made.
+3. The one with the lowest expected cost per kill wins: shot cost / chance of a hit, or for a beam, shot cost × seconds to burn a drone of the model's hit points (20 if unknown) ([`tasking.js:294`](../frontend/src/sim/network/tasking.js#L294)). This is why a gun or laser takes a quadcopter before a missile does.
+4. If that effector refuses the task, or the task is lost on the network, the track stays open to the other free effectors and the refused effector may be paired with another track in the same pass.
+5. Repeat until no pairing is made.
 
 The chance used is the game's own hit chance with the target's evasion unknown (taken as 1), at the distance to the track's estimate, including the penalty for the track's error ([`hit-chance.js:34`](../frontend/src/sim/hit-chance.js#L34)).
 
-**What an effector can take** ([`tasking.js:280`](../frontend/src/sim/network/tasking.js#L280), [`tasking.js:178`](../frontend/src/sim/network/tasking.js#L178)):
+**What an effector can take** ([`tasking.js:291`](../frontend/src/sim/network/tasking.js#L291), [`tasking.js:186`](../frontend/src/sim/network/tasking.js#L186)):
 
 - the track's estimate is between its minimum range and its range, and the track is not leaving;
-- a flying round (interceptor or missile) could meet the track at its estimated speed within the round's range ([`tasking.js:171`](../frontend/src/sim/network/tasking.js#L171));
+- the track is not on kill watch (a kill has been reported and the sensors have not yet had their say);
+- a flying round (interceptor or missile) could meet the track at its estimated speed within the round's range ([`tasking.js:175`](../frontend/src/sim/network/tasking.js#L175));
 - the effector has not been refused that track by the operator, has no approval request waiting, is not in its 3 s back-off after a rejection for that track (`rejectBackoff`), and the track is not on a 10 s hold after an effector found nothing there (`emptyHold`);
 - the airframe is one it engages (an unnamed track is always offered, and the effector can refuse it);
 - for an interceptor or missile, the track is not being left to the jammers;
-- for a launcher with `engagePolicy: 'fixed-wing'` (the missile in these laydowns): a fixed-wing track, or an unnamed track inside the critical zone that nothing else is engaging. A known multirotor is never worth the round ([`tasking.js:185`](../frontend/src/sim/network/tasking.js#L185));
+- for a launcher with `engagePolicy: 'fixed-wing'` (the missile in these laydowns): a fixed-wing track, or an unnamed track inside the critical zone that nothing else is engaging. A known multirotor is never worth the round ([`tasking.js:194`](../frontend/src/sim/network/tasking.js#L194));
 - rounds already in the air at the target are not enough on their own.
 
-**Engagement authority.** With authority `auto` the fusion node engages by itself. With `costly` it asks the operator first for a shot costing at least $50,000 (£37,500), and with `all` for every engagement. The request is a SAPIENT alert and the answer an alert acknowledgement; it lapses after 20 s, after which that effector may ask again about that track 10 s later. An operator's rejection rules that effector out for that track for good ([`authority.js:33`](../frontend/src/sim/network/authority.js#L33)). An approval is acted on only if the engagement still makes sense ([`tasking.js:314`](../frontend/src/sim/network/tasking.js#L314)). How this sits outside the standard is in [SAPIENT.md](SAPIENT.md#where-the-game-departs-from-the-standard).
+**Engagement authority.** With authority `auto` the fusion node engages by itself. With `costly` it asks the operator first for a shot costing at least $50,000 (£37,500), and with `all` for every engagement. The request is a SAPIENT alert and the answer an alert acknowledgement; it lapses after 20 s, after which that effector may ask again about that track 10 s later. An operator's rejection rules that effector out for that track for good ([`authority.js:33`](../frontend/src/sim/network/authority.js#L33)). An approval is acted on only if the engagement still makes sense ([`tasking.js:326`](../frontend/src/sim/network/tasking.js#L326)). How this sits outside the standard is in [SAPIENT.md](SAPIENT.md#where-the-game-departs-from-the-standard).
 
-**The effector's answer.** The `Engage` task names the track. The effector looks for a real drone within 300 m of the track's estimate (`acquireRadius`); with none it rejects the task with "nothing found at the cued position" and the track goes on its 10 s hold ([`tasking.js:139`](../frontend/src/sim/network/tasking.js#L139)). It also rejects a target out of range or out of sight (measured to the real drone), a type it cannot engage (permanently), and a shot the budget cannot pay for or a launcher that is reloading ([`simulation.js:70`](../frontend/src/sim/simulation.js#L70)). Once it accepts, it acts when the task arrives over the network, and it then fires at the real drone it found.
+**The effector's answer.** The `Engage` task names the track. The effector looks for a real drone within 300 m of the track's estimate (`acquireRadius`); with none it rejects the task with "nothing found at the cued position" and the track goes on its 10 s hold ([`tasking.js:142`](../frontend/src/sim/network/tasking.js#L142)). It also rejects a target out of range or out of sight (measured to the real drone), a type it cannot engage (permanently), and a shot the budget cannot pay for or a launcher that is reloading ([`simulation.js:70`](../frontend/src/sim/simulation.js#L70)). Once it accepts, it acts when the task arrives over the network, and it then fires at the real drone it found.
 
 ## Reloads, salvoes and deconfliction
 
-- **Reloads.** A launcher that cannot fire (reloading, or out of rounds) gives up its task with `TASK_STATUS_FAILED` and is offered nothing until it can fire again. The fusion node reads the magazine directly rather than from a status report (a recorded shortcut at [`tasking.js:243`](../frontend/src/sim/network/tasking.js#L243)). Large systems reload only after the wave ([`magazine.js:11`](../frontend/src/sim/magazine.js#L11)); magazines are in [EFFECTORS.md](EFFECTORS.md).
+- **Reloads.** A launcher that cannot fire (reloading, or out of rounds) gives up its task with `TASK_STATUS_FAILED` and is offered nothing until it can fire again. The fusion node reads the magazine directly rather than from a status report (a recorded shortcut at [`tasking.js:253`](../frontend/src/sim/network/tasking.js#L253)). Large systems reload only after the wave ([`magazine.js:11`](../frontend/src/sim/magazine.js#L11)); magazines are in [EFFECTORS.md](EFFECTORS.md).
 - **Salvoes.** A guided launcher holds fire while the rounds already flying at its target could kill it and there is time to see the result and fire again (the drone needs more than twice the round's flight time plus the launcher's cooldown to reach the site). When there is not, it keeps firing until the rounds in the air have an 80% chance that one works (`SALVO_ASSURANCE`, an assumption, [`effectors.js:48`](../frontend/src/sim/effectors.js#L48)). While enough rounds are on their way, the launcher may look for another target.
-- **Deconfliction.** One effector per track outside the critical zone; all comers inside it. One approval request per effector at a time. An effector that gave up a task while its rounds may still be flying is credited with a kill they make for 30 s (`RELEASED_FOR`, [`tasking.js:22`](../frontend/src/sim/network/tasking.js#L22)), so the fusion node waits for the sensors instead of cueing another effector at a dead track.
+- **Deconfliction.** One effector per track outside the critical zone, for a free effector being paired and for an engaged one switching target alike; all comers inside it. One approval request per effector at a time. An effector that gave up a task while its rounds may still be flying is credited with a kill they make for 30 s (`RELEASED_FOR`, [`tasking.js:22`](../frontend/src/sim/network/tasking.js#L22)), so the fusion node waits for the sensors instead of cueing another effector at a dead track.
 
 ## Kill reports and kill confirmation
 
-SAPIENT has no kill message. When an effector's target dies, the effector reports its task `COMPLETED` with "target destroyed or removed", the fusion node raises a "Kill reported" alert and puts the track on a kill watch, which takes it out of tasking ([`tasking.js:124`](../frontend/src/sim/network/tasking.js#L124)). After 2.5 s (`killConfirmDelay`) times the slowest sensor's stretch, the fusion node checks whether any sensor has updated the track since. If none has, it raises "Kill confirmed" and deletes the track; if one has, it warns "Kill NOT confirmed" and the track returns to play ([`fusion.js:79`](../frontend/src/sim/network/fusion.js#L79)). A drone brought down by jamming produces no kill report: its track simply goes quiet and drops.
+SAPIENT has no kill message. When an effector's target dies, the effector reports its task `COMPLETED` with "target destroyed or removed", the fusion node raises a "Kill reported" alert and puts the track on a kill watch, which takes it out of tasking ([`tasking.js:126`](../frontend/src/sim/network/tasking.js#L126)). No effector is offered a track on kill watch, even when the kill was reported earlier in the same tasking pass (`eligible()` refuses it); cameras and jammers leave it out from the next pass. After 2.5 s (`killConfirmDelay`) times the slowest sensor's stretch, the fusion node checks whether any sensor has updated the track since. If none has, it raises "Kill confirmed" and deletes the track; if one has, it warns "Kill NOT confirmed" and the track returns to play ([`fusion.js:79`](../frontend/src/sim/network/fusion.js#L79)). A drone brought down by jamming produces no kill report: its track simply goes quiet and drops.
 
 ## Truth and belief
 
@@ -255,7 +257,7 @@ Where the truth is used, and where it is not:
 
 ### Method
 
-A Node script, [`tools/measure-fusion.js`](../frontend/tools/measure-fusion.js) (`npm run measure` from `frontend/`), plays each run headless, one 0.05 s step at a time, and observes the state after every step without changing it. It stops if a reference scenario does not end on its digest in `frontend/tests/support/reference-digests.json`, so the observed runs are the reference runs. The figures below were measured on 10 November 2026, at game version 0.19.3.
+A Node script, [`tools/measure-fusion.js`](../frontend/tools/measure-fusion.js) (`npm run measure` from `frontend/`), plays each run headless, one 0.05 s step at a time, and observes the state after every step without changing it. It stops if a reference scenario does not end on its digest in `frontend/tests/support/reference-digests.json`, so the observed runs are the reference runs. The figures below were measured on 10 November 2026, at game version 0.20.0.
 
 **Scenarios.** The five reference scenarios in [`scenarios.js`](../frontend/tests/support/scenarios.js), set up as `runReferences` sets them up (no resupply between waves), plus the `MIXED` laydown on three more seeds:
 
@@ -267,7 +269,7 @@ A Node script, [`tools/measure-fusion.js`](../frontend/tools/measure-fusion.js) 
 | jammers-seed1 | JAMMERS: 3 small radars, 6 medium jammers, no other effectors | 1 | 4 |
 | mixed-seed2, 3, 4 (not references) | MIXED | 2, 3, 4 | 6 |
 
-All runs: generated terrain seed 1, the "Clear day" conditions, the default attack mix (the four generic types: first-person-view, fixed-wing and fibre-optic strike drones and the fixed-wing spotter), automatic engagement authority, no drawn area. Each run took 1 to 4 s of wall time, one at a time. The definitions below say exactly what each number counts.
+All runs: generated terrain seed 1, the "Clear day" conditions, the default attack mix (the four generic types: first-person-view, fixed-wing and fibre-optic strike drones and the fixed-wing spotter), automatic engagement authority, no drawn area. Each run took 1 to 3 s of wall time, one at a time. The definitions below say exactly what each number counts.
 
 **Definitions.**
 
@@ -286,13 +288,13 @@ All runs: generated terrain seed 1, the "Clear day" conditions, the default atta
 
 | Scenario | Waves played | Launched | Killed | Leaked or struck | Site health at end | Spent on shots |
 |---|---|---|---|---|---|---|
-| mixed-seed1 | 6 | 79 | 58 | 20 | 10 | £1,305,000 |
-| mixed-seed7 | 6 | 79 | 73 | 6 | 100 | £1,155,000 |
-| mixed-gnss-seed42 | 4 | 40 | 39 | 0 | 100 | £262,500 |
-| mixed-seed2 | 6 | 79 | 74 | 5 | 100 | £855,000 |
-| mixed-seed3 | 6 | 79 | 75 | 4 | 100 | £1,155,000 |
-| mixed-seed4 | 6 | 79 | 67 | 12 | 10 | £1,005,000 |
-| lasers-seed42 | 8 | 131 | 126 | 1 | 100 | £5,519 |
+| mixed-seed1 | 6 | 79 | 68 | 10 | 40 | £1,005,000 |
+| mixed-seed7 | 6 | 79 | 71 | 7 | 100 | £1,155,000 |
+| mixed-gnss-seed42 | 4 | 40 | 40 | 0 | 100 | £288,750 |
+| mixed-seed2 | 6 (site lost) | 79 | 65 | 7 | 0 | £555,000 |
+| mixed-seed3 | 6 | 79 | 67 | 12 | 40 | £1,005,000 |
+| mixed-seed4 | 6 | 79 | 72 | 7 | 40 | £1,155,000 |
+| lasers-seed42 | 8 | 131 | 128 | 0 | 100 | £5,723 |
 | jammers-seed1 | 4 (site lost) | 40 | 31 | 6 | 0 | £0 |
 
 "Leaked or struck" counts drones that reached the site and drones that hit one of your systems.
@@ -303,21 +305,21 @@ MIXED (six runs pooled):
 
 | Drone | Launched | Detected | Confirmed track | First seen, median distance from site | First detected bearing-only | Detect to confirm, median / 90th | Same, first seen by radar, median | Error across the ground, median / 90th | Error in 3D, median | Error / claimed | Track ids per drone |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Fibre-optic strike | 32 | 100% | 97% | 4,362 m | 6% | 7.1 / 119.7 s | 7.1 s | 27 / 120 m | 49 m | 0.89 | 2.35 |
-| First-person-view strike | 332 | 331 of 332 | 95% | 4,951 m | 58% | 25.1 / 110.2 s | 12.8 s | 25 / 118 m | 48 m | 0.80 | 1.66 |
-| Fixed-wing strike | 49 | 48 of 49 | 90% | 7,821 m | 21% | 7.1 / 81.1 s | 7.1 s | 35 / 114 m | 76 m | 0.67 | 1.77 |
-| Fixed-wing spotter | 22 | 100% | 95% | 13,190 m | 77% | 116.1 / 237.2 s | 105.1 s | 51 / 157 m | 109 m | 0.65 | 1.86 |
+| Fibre-optic strike | 32 | 30 of 32 | 91% | 4,589 m | 3% | 8.1 / 143.1 s | 10.1 s | 33 / 149 m | 70 m | 0.80 | 1.86 |
+| First-person-view strike | 332 | 330 of 332 | 97% | 4,955 m | 53% | 23.1 / 112.5 s | 8.9 s | 27 / 120 m | 49 m | 0.81 | 1.76 |
+| Fixed-wing strike | 49 | 100% | 98% | 7,780 m | 18% | 9.1 / 85.1 s | 6.0 s | 43 / 137 m | 91 m | 0.66 | 1.79 |
+| Fixed-wing spotter | 22 | 100% | 100% | 13,124 m | 86% | 128.1 / 226.4 s | 128.1 s | 54 / 166 m | 120 m | 0.67 | 1.59 |
 
 LASERS (lasers-seed42; only radars, so every first detection is by radar):
 
 | Drone | Launched | Detected | Confirmed track | First seen, median distance from site | Detect to confirm, median / 90th | Error across the ground, median / 90th | Error in 3D, median | Error / claimed | Track ids per drone |
 |---|---|---|---|---|---|---|---|---|---|
-| Fibre-optic strike | 12 | 100% | 100% | 4,758 m | 32.1 / 76.1 s | 48 / 132 m | 91 m | 0.67 | 2.17 |
-| First-person-view strike | 96 | 100% | 100% | 4,652 m | 13.1 / 85.2 s | 48 / 120 m | 95 m | 0.69 | 1.70 |
-| Fixed-wing strike | 16 | 100% | 100% | 9,790 m | 18.1 / 87.1 s | 40 / 124 m | 83 m | 0.69 | 2.63 |
-| Fixed-wing spotter | 7 | 100% | 100% | 12,786 m | 145.1 / 148.1 s | 46 / 139 m | 95 m | 0.72 | 5.14 |
+| Fibre-optic strike | 12 | 100% | 100% | 4,640 m | 19.1 / 49.1 s | 53 / 130 m | 101 m | 0.65 | 2.67 |
+| First-person-view strike | 96 | 100% | 100% | 4,666 m | 14.1 / 86.1 s | 47 / 133 m | 96 m | 0.71 | 1.69 |
+| Fixed-wing strike | 16 | 100% | 100% | 9,820 m | 8.1 / 87.1 s | 39 / 140 m | 88 m | 0.67 | 2.88 |
+| Fixed-wing spotter | 7 | 100% | 100% | 12,495 m | 153.1 / 168.1 s | 50 / 135 m | 103 m | 0.66 | 3.29 |
 
-JAMMERS (jammers-seed1, three small radars): 24 of 32 first-person-view drones, 2 of 4 fixed-wing strikes and both spotters were detected; neither fibre-optic drone was. Detect to confirm was 19.1 s median for the first-person-view drones and track error across the ground 35 m median (112 m at the 90th percentile), 62 m in 3D.
+JAMMERS (jammers-seed1, three small radars): 24 of 32 first-person-view drones, 2 of 4 fixed-wing strikes, both spotters and 1 of the 2 fibre-optic drones were detected; that fibre-optic drone never got a confirmed track. Detect to confirm was 17.1 s median for the first-person-view drones and their track error across the ground 33 m median (96 m at the 90th percentile), 58 m in 3D.
 
 ### Engagement, by drone type
 
@@ -325,53 +327,57 @@ MIXED (six runs pooled):
 
 | Drone | Detect to first shot, median | Killed | by rounds / beam / jamming | Leaked or struck | Rounds per round kill | Shot cost per kill |
 |---|---|---|---|---|---|---|
-| Fibre-optic strike | 17.4 s | 21 of 32 (66%) | 21 / 0 / 0 | 11 | 1.19 | £11,429 |
-| First-person-view strike | 36.2 s | 302 of 332 (91%) | 222 / 0 / 80 | 30 | 2.03 | £7,041 |
-| Fixed-wing strike | 56.3 s | 43 of 49 (88%) | 43 / 0 / 0 | 6 | 2.88 | £58,430 |
-| Fixed-wing spotter | 180.3 s | 20 of 22 (91%) | 20 / 0 / 0 | 0 (2 airborne at the end) | 1.70 | £42,938 |
+| Fibre-optic strike | 7.1 s | 22 of 32 (69%) | 22 / 0 / 0 | 8 (2 airborne at the end) | 1.09 | £17,386 |
+| First-person-view strike | 36.6 s | 302 of 332 (91%) | 220 / 0 / 82 | 26 (4 airborne at the end) | 2.08 | £6,171 |
+| Fixed-wing strike | 26.0 s | 40 of 49 (82%) | 40 / 0 / 0 | 9 | 2.95 | £51,281 |
+| Fixed-wing spotter | 156.6 s | 19 of 22 (86%) | 19 / 0 / 0 | 0 (2 left, 1 airborne at the end) | 1.89 | £45,592 |
 
-LASERS (lasers-seed42): the lasers killed every fibre-optic (12) and fixed-wing (16) strike drone, 95 of 96 first-person-view drones (one got through) and 3 of 7 spotters (3 left, 1 was airborne at the end). Beam seconds per beam kill were 3.0, 3.7, 9.1 and 9.7, and shot cost per kill £29, £36, £89 and £94. Median detect to first shot was 64 s for first-person-view drones and 151 s for fixed-wing strikes, which are seen far out.
+LASERS (lasers-seed42): the lasers killed every fibre-optic (12), first-person-view (96) and fixed-wing (16) strike drone and 4 of 7 spotters (the other 3 left), so nothing got through. Beam seconds per beam kill were 3.3, 3.8, 9.3 and 7.8, and shot cost per kill £32, £37, £90 and £76. Median detect to first shot was 60 s for first-person-view drones and 148 s for fixed-wing strikes, which are seen far out.
 
-JAMMERS (jammers-seed1): 31 of 32 first-person-view drones were brought down by jamming, at no shot cost. All 4 fixed-wing strikes and a fibre-optic drone got through, and the site fell in wave 4.
+JAMMERS (jammers-seed1): 31 of 32 first-person-view drones were brought down by jamming, at no shot cost. All 4 fixed-wing strikes, a fibre-optic drone and a first-person-view drone got through, and the site fell in wave 4.
 
 ### The picture and the tasking, per run
 
 | Scenario | Confirmed tracks | Ghosts | Ghosts with a false alarm among their latest reports | Ghosts with a drone within 300 m across the ground | Confirmed-track time with no drone linked | of which after a drone had been linked | False alarms raised | Engage tasks | at a linked drone | at a dead drone's track (already under kill watch) | at a track that had drifted off its live drone | at a track never linked so far | Rejected: "nothing found" | "Kill NOT confirmed" alerts |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| mixed-seed1 | 128 | 31 (24%) | 23 | 12 | 42% | 19% | 1,164 | 307 | 107 | 42 (23) | 60 | 98 | 167 | 5 |
-| mixed-seed7 | 164 | 27 (16%) | 24 | 4 | 35% | 20% | 1,332 | 315 | 124 | 63 (28) | 38 | 90 | 159 | 6 |
-| mixed-gnss-seed42 | 78 | 11 (14%) | 8 | 2 | 35% | 24% | 698 | 193 | 67 | 40 (20) | 40 | 46 | 110 | 7 |
-| mixed-seed2 | 175 | 47 (27%) | 30 | 14 | 38% | 19% | 1,214 | 372 | 121 | 61 (32) | 85 | 105 | 220 | 10 |
-| mixed-seed3 | 170 | 37 (22%) | 26 | 14 | 36% | 16% | 1,274 | 316 | 117 | 51 (35) | 49 | 99 | 175 | 6 |
-| mixed-seed4 | 152 | 46 (30%) | 34 | 11 | 33% | 17% | 1,134 | 288 | 114 | 55 (36) | 40 | 79 | 148 | 11 |
-| lasers-seed42 | 294 | 31 (11%) | 1 | 20 | 18% | 13% | 2,080 | 801 | 695 | 98 (96) | 7 | 1 | 93 | 0 |
-| jammers-seed1 | 35 | 3 (9%) | 0 | 2 | 20% | 17% | 1,154 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mixed-seed1 | 173 | 32 (18%) | 23 | 9 | 33% | 18% | 1,178 | 304 | 121 | 27 (0) | 61 | 95 | 160 | 8 |
+| mixed-seed7 | 165 | 34 (21%) | 26 | 8 | 34% | 23% | 1,214 | 276 | 117 | 42 (0) | 42 | 75 | 140 | 10 |
+| mixed-gnss-seed42 | 100 | 28 (28%) | 20 | 7 | 33% | 17% | 698 | 183 | 80 | 7 (0) | 36 | 60 | 91 | 4 |
+| mixed-seed2 | 160 | 45 (28%) | 34 | 13 | 42% | 23% | 1,207 | 327 | 113 | 23 (0) | 78 | 113 | 183 | 9 |
+| mixed-seed3 | 154 | 33 (21%) | 23 | 4 | 35% | 18% | 1,261 | 289 | 116 | 22 (0) | 59 | 92 | 145 | 6 |
+| mixed-seed4 | 178 | 52 (29%) | 39 | 13 | 33% | 14% | 1,190 | 304 | 122 | 21 (0) | 44 | 117 | 156 | 5 |
+| lasers-seed42 | 282 | 26 (9%) | 2 | 18 | 16% | 13% | 2,126 | 616 | 611 | 1 (0) | 2 | 2 | 5 | 1 |
+| jammers-seed1 | 35 | 3 (9%) | 1 | 2 | 22% | 18% | 1,227 | 0 | 0 | 0 (0) | 0 | 0 | 0 | 0 |
 
-"A false alarm among their latest reports" checks the last report the track kept from each sensor, so it is a lower bound. The sensors that fed the 233 ghosts across all runs: radar, RF and camera 92; radar and RF 70; radar alone 47; camera and RF (bearings only) 20; radar and camera 4.
+"A false alarm among their latest reports" checks the last report the track kept from each sensor, so it is a lower bound. The sensors that fed the 253 ghosts across all runs: radar, RF and camera 89; radar and RF 86; radar alone 38; camera and RF (bearings only) 36; radar and camera 4.
 
-Engage tasks across all runs: 2,592 were sent. 346 were lost on the network and drew no answer (the fusion node then backs that effector off the track for 3 s, [`tasking.js:151`](../frontend/src/sim/network/tasking.js#L151)). The other 2,246 were answered: rejected, nothing found at the cued position 1,072; accepted 843; rejected, no line of sight (lasers) 317; rejected, out of range 14. Accepted tasks later ended as: completed on re-tasking 517, completed with the target destroyed 222, failed as the track was lost 48, failed while reloading 38, failed out of rounds 16, completed as the target was leaving 1, completed as the target left the engagement envelope 1.
+Engage tasks across all runs: 2,299 were sent. 301 were lost on the network and drew no answer (the fusion node then backs that effector off the track for 3 s, [`tasking.js:154`](../frontend/src/sim/network/tasking.js#L154)). The other 1,998 were answered: rejected, nothing found at the cued position 880; accepted 794; rejected, no line of sight (lasers) 310; rejected, out of range 14. Accepted tasks later ended as: completed on re-tasking 461, completed with the target destroyed 215, failed as the track was lost 62, failed while reloading 40, failed out of rounds 15, completed as the target was leaving 1.
 
 ### What the numbers say
 
 What works:
 
-- Detection and tracking are reliable in these laydowns. All but 2 of the 566 drones in the MIXED and LASERS runs were detected (one first-person-view drone and one fixed-wing strike in MIXED never were), and 90% to 100% of each type got a confirmed track.
-- Positions across the ground are good enough to cue a seeker: in the MIXED and LASERS runs, median errors of 25 to 51 m, and 90th percentiles of 114 to 157 m, against the 300 m a seeker searches. These count only tracks within 300 m of their drone; the time tracks spent further off is in the per-run table.
-- The filter's stated error is cautious. In the median the real error across the ground is 0.65 to 0.89 of what the track claims, so for a track that is on its drone the error ring is a fair upper guide, not an understatement. (The same 300 m cap applies, so badly placed tracks are not in this figure.)
-- The cost-aware pairing does what it is meant to. The rules keep the missile for fixed-wing tracks, and the cost per kill shows it: £58,430 per fixed-wing kill against £7,041 per first-person-view kill in MIXED, where jammers took 80 of the 302 first-person-view kills for nothing. Lasers kill everything they reach for tens of pounds a kill.
+- Detection and tracking are reliable in these laydowns. All but 4 of the 566 drones in the MIXED and LASERS runs were detected (two fibre-optic and two first-person-view drones in MIXED never were), and 91% to 100% of each type got a confirmed track.
+- Positions across the ground are good enough to cue a seeker: in the MIXED and LASERS runs, median errors of 27 to 54 m, and 90th percentiles of 120 to 166 m, against the 300 m a seeker searches. These count only tracks within 300 m of their drone; the time tracks spent further off is in the per-run table.
+- The filter's stated error is cautious. In the median the real error across the ground is 0.65 to 0.81 of what the track claims, so for a track that is on its drone the error ring is a fair upper guide, not an understatement. (The same 300 m cap applies, so badly placed tracks are not in this figure.)
+- The cost-aware pairing does what it is meant to. The rules keep the missile for fixed-wing tracks, and the cost per kill shows it: £51,281 per fixed-wing strike kill against £6,171 per first-person-view kill in MIXED, where jammers took 82 of the 302 first-person-view kills for nothing. Lasers kill everything they reach for tens of pounds a kill.
 
 Weaknesses:
 
-- **Height is poor.** The median error in 3D is 1.8 to 2.2 times the median across the ground (48 to 109 m; the 3D figure covers only tracks with a measured height). The likely cause is radar elevation noise, which grows with range. In the LASERS run, 20 of the 31 "ghosts" had a real drone within 300 m across the ground: they were real drones whose height was far enough off that the 3D link test failed. For an effector the effect is the same as a ghost: "nothing found".
-- **Ghosts in mixed networks.** In the MIXED runs 14% to 30% of confirmed tracks never had a drone near them. 162 of those 199 ghosts were fed by the radar together with RF bearings, and 145 (nearly three quarters) had a false alarm among their latest reports. A likely mechanism (an interpretation, not traced report by report): a radar false alarm opens a tentative track, and RF bearings, whose errors are several degrees wide and 4 km long along the line, fall inside its gate and supply the extra hits that confirm it.
-- **Slow confirmation from first detection.** First-person-view drones in MIXED took 25 s median from first detection to a confirmed track (110 s at the 90th percentile). 58% were first detected by a bearing-only sensor (an RF detector or a camera); with two RF detectors and two cameras, a bearing-only track needs a third sensor or the radar. When the radar saw them first the median was 13 s. Even radar-first, a far target's detections are intermittent and a tentative track that goes 2.5 s without an update is dropped, so the 3 hits often take longer than 3 s. The spotter is the extreme case: an RF detector hears its 900 MHz link far beyond the radar, so 77% were first detected bearing-only, at a median 13.2 km, and then waited 116 s in the median (237 s at the 90th percentile) for a confirmed track.
-- **Wasted tasking.** In the MIXED runs only 36% of Engage tasks (650 of 1,791) were sent to a track with a real drone at it, and 55% (979) were rejected with "nothing found". The rest went to tracks whose drone was dead, tracks that had drifted more than 300 m off their drone, and ghosts. A rejection costs no round, but it puts the track on a 10 s hold for every effector, gives that effector a 3 s back-off from it, and leaves the effector unpaired until the next pass.
-- **A same-pass kill-watch gap.** Many tasks to dead drones' tracks went to tracks already under kill watch: 96 of 801 Engage tasks in lasers-seed42. The tasking pass builds its list of confirmed tracks once, at the start (`const live = confirmedTracks()`, [`tasking.js:230`](../frontend/src/sim/network/tasking.js#L230)); a kill reported earlier in the same pass puts the track on kill watch, but the pairing at the end still uses the old list ([`tasking.js:277`](../frontend/src/sim/network/tasking.js#L277)). Each such task is rejected at once and wastes the effector's turn for up to a second. From reading the code, the re-task loop at [`tasking.js:267`](../frontend/src/sim/network/tasking.js#L267) uses the same list, so an engaged effector can also be stopped and switched to a track that was put on kill watch earlier in that pass.
-- **Tracks lose their drones.** 13% to 24% of all confirmed-track time was spent on tracks that had been linked to a drone and no longer were: the drone was dead, or the track had drifted more than 300 m off it. MIXED runs also raised 5 to 11 "Kill NOT confirmed" alerts each, where some sensor report kept a dead drone's track alive.
-- **Fragmented tracks.** A drone was covered by 1.7 to 2.4 confirmed tracks on average in MIXED and up to 5.1 for spotters in LASERS: tracks break and restart, or two tracks follow one drone.
-- **Fibre-optic drones are the hardest.** With no radio link to hear or jam, they were first seen, nearly always by radar, at about 4.4 km, and in MIXED 11 of 32 got through, the worst share of any type. In the JAMMERS laydown neither was even detected.
+- **Height is poor.** The median error in 3D is 1.8 to 2.3 times the median across the ground (49 to 120 m; the 3D figure covers only tracks with a measured height). The likely cause is radar elevation noise, which grows with range. In the LASERS run, 18 of the 26 "ghosts" had a real drone within 300 m across the ground: they were real drones whose height was far enough off that the 3D link test failed. For an effector the effect is the same as a ghost: "nothing found".
+- **Ghosts in mixed networks.** In the MIXED runs 18% to 29% of confirmed tracks never had a drone near them. 175 of those 224 ghosts were fed by the radar together with RF bearings, and 165 (nearly three quarters) had a false alarm among their latest reports. A likely mechanism (an interpretation, not traced report by report): a radar false alarm opens a tentative track, and RF bearings, whose errors are several degrees wide and 4 km long along the line, fall inside its gate and supply the extra hits that confirm it.
+- **Slow confirmation from first detection.** First-person-view drones in MIXED took 23 s median from first detection to a confirmed track (112.5 s at the 90th percentile). 53% were first detected by a bearing-only sensor (an RF detector or a camera); with two RF detectors and two cameras, a bearing-only track needs a third sensor or the radar. When the radar saw them first the median was 9 s. Even radar-first, a far target's detections are intermittent and a tentative track that goes 2.5 s without an update is dropped, so the 3 hits often take longer than 3 s. The spotter is the extreme case: an RF detector hears its 900 MHz link far beyond the radar, so 86% were first detected bearing-only, at a median 13.1 km, and then waited 128 s in the median (226 s at the 90th percentile) for a confirmed track.
+- **Wasted tasking.** In the MIXED runs only 40% of Engage tasks (669 of 1,683) were sent to a track with a real drone at it, and 52% (875) were rejected with "nothing found". The rest went to tracks whose drone was dead, tracks that had drifted more than 300 m off their drone, and ghosts. A rejection costs no round, but it puts the track on a 10 s hold for every effector and gives that effector a 3 s back-off from it. A free effector that is refused may be paired with another track in the same pass; an engaged effector that gave up its target to switch and was then refused waits for the next pass.
+- **The same-pass kill-watch gap is closed.** Until 10 November 2026 a track put on kill watch earlier in a tasking pass could still be offered to an effector in that pass. `eligible()` now refuses any track on kill watch, and the column "at a dead drone's track (already under kill watch)" shows 0 under kill watch in every run (it was 96 of 801 Engage tasks in lasers-seed42). 143 Engage tasks across all runs still went to a track whose last linked drone was dead and which was not on kill watch.
+- **Tracks lose their drones.** 13% to 23% of all confirmed-track time was spent on tracks that had been linked to a drone and no longer were: the drone was dead, or the track had drifted more than 300 m off it. MIXED runs also raised 4 to 10 "Kill NOT confirmed" alerts each, where some sensor report kept a dead drone's track alive.
+- **Fragmented tracks.** A drone was covered by 1.6 to 1.9 confirmed tracks on average in MIXED and up to 3.3 for spotters in LASERS: tracks break and restart, or two tracks follow one drone.
+- **Fibre-optic drones are the hardest.** With no radio link to hear or jam, they were first seen, nearly always by radar, at about 4.6 km. In MIXED 2 of 32 were never detected and 8 of 32 got through, the worst share of any type. In the JAMMERS laydown one of the two was detected and neither got a confirmed track.
 
-Against the first measurement, taken before RF detector reach went by band and radio paths were sampled more finely (see [PHYSICS_AND_PROPAGATION.md](PHYSICS_AND_PROPAGATION.md)): the MIXED runs confirmed fewer tracks (867, was 951) and fewer ghosts (199, was 235). A likely cause, not traced: the radar no longer sees through ground its samples used to step over, so it reports less from far out. Spotters are heard sooner and confirmed later: first detected bearing-only 77% of the time (was 45%), with 116 s to a confirmed track (was 103 s). Engage tasks sent to a track never linked to a drone rose from 444 to 517. These compare the same eight runs, so some of each difference is one seed's luck.
+Against the two earlier measurements of the same eight runs. Their figures come from earlier versions of this document; the tool cannot print them again at this version.
+
+The first was taken before RF detector reach went by band and radio paths were sampled more finely (see [PHYSICS_AND_PROPAGATION.md](PHYSICS_AND_PROPAGATION.md)). The second was taken at game version 0.19.3, before the tasking changes of 10 November 2026 (kill watch, switching target, refusals and jammers on coasting tracks, all described above). From the first to the second, both measured before those changes, the MIXED runs confirmed fewer tracks (867, was 951) and fewer ghosts (199, was 235). A likely cause, not traced: the radar no longer sees through ground its samples used to step over, so it reports less from far out. Spotters were heard sooner and confirmed later: first detected bearing-only 77% of the time (was 45%), with 116 s to a confirmed track (was 103 s). Engage tasks sent to a track never linked to a drone rose from 444 to 517.
+
+From the second to this one: fewer Engage tasks were sent (2,299, was 2,592), fewer were rejected with "nothing found" (880, was 1,072; in lasers-seed42 5, was 93) and fewer went to a dead drone's track (143, was 410, of which 270 were under kill watch). In the MIXED runs confirmed tracks rose to 930 and ghosts to 224, spotters were first detected bearing-only 86% of the time with 128 s to a confirmed track, and Engage tasks sent to a track never linked to a drone rose to 552. Outcomes moved both ways. The MIXED runs killed 383 drones (was 386) and let 43 through (was 47). Site health at the end rose from 10 to 40 in mixed-seed1 and mixed-seed4, fell from 100 to 40 in mixed-seed3, and mixed-seed2 lost the site in wave 6 where it had ended on 100. lasers-seed42 killed 128 (was 126) and let nothing through (was 1). These compare the same eight runs, so some of each difference is one seed's luck.
 
 How far to trust these numbers: they come from one generated terrain, a clear day, three laydowns, eight runs and 606 drones, with only 32 to 49 fibre-optic and fixed-wing strikes in MIXED and a single run each for LASERS and JAMMERS. They measure this model against its own truth. They say nothing about any real system's tracker, whose association, gating and sensor errors will differ.
 

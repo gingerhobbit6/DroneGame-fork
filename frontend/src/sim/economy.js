@@ -26,8 +26,10 @@ export const enemyCost = (counts) => Object.entries(counts).reduce((sum, [type, 
 const GBP_PER_USD = 0.75;
 export const pounds = (usd) => `£${Math.round(usd * GBP_PER_USD).toLocaleString('en-GB')}`;
 export const money = (usd) => {
-  const v = usd * GBP_PER_USD;
-  return v >= 1e6 ? `£${(v / 1e6).toFixed(v >= 1e7 ? 1 : 2).replace(/\.?0+$/, '')}M` : v >= 1e4 ? `£${Math.round(v / 1e3)}k` : pounds(usd);
+  // The size is judged after rounding, so £999,999.75 reads £1M and not £1000k. A debt has its minus before the pound sign.
+  const v = Math.abs(usd) * GBP_PER_USD, k = Math.round(v / 1e3);
+  const text = k >= 1000 ? `£${(v / 1e6).toFixed(v >= 1e7 ? 1 : 2).replace(/\.?0+$/, '')}M` : v >= 1e4 ? `£${k}k` : pounds(Math.abs(usd));
+  return usd < 0 && Math.round(v) ? `-${text}` : text;
 };
 
 // In the sandbox shots are free, and a round bought in a resupply is already paid for. With a deployment pack the budget

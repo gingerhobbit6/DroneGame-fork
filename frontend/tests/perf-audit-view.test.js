@@ -6,7 +6,9 @@ import { paintPictures } from '../src/render/map-texture.js';
 import { groundHit } from '../src/render/placement.js';
 import { createSimulation } from '../src/sim/simulation.js';
 import { hereU, u } from '../src/sim/units.js';
-import { coverageGrid } from '../src/ui/coverage.js';
+import { BUILD, WORLD } from '../src/sim/config/index.js';
+import { coverageGrid, zoneShare } from '../src/ui/coverage.js';
+import { inZone } from '../src/zone.js';
 
 let sim;
 beforeAll(() => { sim = createSimulation({ seed: '1', terrainSeed: '7' }); sim.commands.deploy('1', '7'); });
@@ -57,5 +59,73 @@ describe('the coverage map', () => {
     const fixed = coverageGrid(sim, 'fpv');
     s.pos.x += u(30);
     expect(coverageGrid(sim, 'fpv')).not.toBe(fixed);
+  });
+
+  it('scores a zone from the cells inside it, with the same answer as counting the whole grid', () => {
+    const own = createSimulation({ seed: '1', terrainSeed: '7' });
+    own.commands.deploy('1', '7');
+    expect(own.commands.place('radar', 10, 10)).toBeNull();
+    const zone = { points: [[-20, -20], [60, -20], [60, 60], [-20, 60]], closed: true }, m = WORLD.metresPerUnit;
+    const probed = vi.spyOn(own.net, 'coverageAt');
+    const drawn = zoneShare(own, 'fpv', zone), open = zoneShare(own, 'fpv', null);
+    const asked = probed.mock.calls.length;
+    const g = coverageGrid(own, 'fpv');
+    expect(asked).toBeLessThan((g.n * g.n) / 20); // a few hundred cells, not all 45,000
+    const counted = (inside) => {
+      let cells = 0, seen = 0;
+      for (let j = 0; j < g.n; j++) for (let i = 0; i < g.n; i++) {
+        if (!inside(-g.half + (i + 0.5) * g.cell, -g.half + (j + 0.5) * g.cell)) continue;
+        cells++;
+        if (g.counts[j * g.n + i] > 0) seen++;
+      }
+      return seen / cells;
+    };
+    expect(drawn).toBeGreaterThan(0);
+    expect(drawn).toBe(counted((xm, zm) => inZone(zone.points, xm / m, zm / m)));
+    expect(open).toBe(counted((xm, zm) => Math.hypot(xm, zm) <= BUILD.maxDist));
+  });
+
+  it('can be worked out a few rows at a time, with the same counts and the same zone score as all at once', () => {
+    const laid = () => {
+      const made = createSimulation({ seed: '1', terrainSeed: '7' });
+      made.commands.deploy('1', '7');
+      expect(made.commands.place('radar', 10, 10)).toBeNull();
+      expect(made.commands.place('rf', 30, 10)).toBeNull();
+      return made;
+    };
+    const first = laid(), whole = coverageGrid(first, 'fpv'), share = zoneShare(first, 'fpv', null), own = laid();
+    expect(whole.rows).toBe(whole.n);
+    expect(share).toBeGreaterThan(0);
+    const part = coverageGrid(own, 'fpv', 0); // no time at all still works one row out
+    expect(part.rows).toBe(1);
+    expect(zoneShare(own, 'fpv', null)).toBe(share); // rows not worked out yet are not read as unseen
+    let calls = 1;
+    while (part.rows < part.n) { coverageGrid(own, 'fpv', 0); calls++; }
+    expect(calls).toBe(part.n); // a row a call
+    expect(coverageGrid(own, 'fpv', 0)).toBe(part); // the same grid, filled in place
+    expect(part.counts).toEqual(whole.counts);
+    expect(whole.counts.some((c) => c > 0)).toBe(true);
+  });
+
+  it('is worked out again when a jammer starts or stops deafening a radio detector, but not when an effector is sold', () => {
+    const own = createSimulation({ seed: '1', terrainSeed: '7' });
+    own.commands.deploy('1', '7');
+    expect(own.commands.place('rf', 10, 10)).toBeNull();
+    expect(own.commands.place('jammer', 30, 10)).toBeNull();
+    const jammer = own.structures.at(-1), seen = (g) => g.counts.reduce((a, b) => a + b, 0);
+    const heard = coverageGrid(own, 'fpv');
+    expect(seen(heard)).toBeGreaterThan(0);
+    expect(own.commands.place('interceptor', 50, 10)).toBeNull();
+    own.commands.sell(50, 10);
+    expect(coverageGrid(own, 'fpv')).toBe(heard);
+    expect(own.commands.place('jammer', -100, 10)).toBeNull();
+    own.structures.at(-1).mode = 'Jam'; // 2 km off, beyond its own reach: the detector still hears
+    expect(coverageGrid(own, 'fpv')).toBe(heard);
+    jammer.mode = 'Jam';
+    const deaf = coverageGrid(own, 'fpv');
+    expect(deaf).not.toBe(heard);
+    expect(seen(deaf)).toBeLessThan(seen(heard));
+    jammer.jamBands = new Set();
+    expect(seen(coverageGrid(own, 'fpv'))).toBe(seen(heard));
   });
 });

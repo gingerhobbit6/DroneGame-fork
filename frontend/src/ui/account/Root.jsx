@@ -68,8 +68,18 @@ export function Root({ game }) {
     return () => { live = false; };
   }, [user?.id, api, game, storage]);
   useEffect(() => { // with a pack, the budget only counts the cost and only the pack's kit can be placed, with its settings
-    game.commands.setPacked(activeUnit ? kitOf(activeUnit.assets) : false);
-    game.usePackLoadouts(activeUnit ? activeUnit.assets.systems : null); // withdrawn: its settings go too
+    // A run under way keeps the pack it began with: taking it away would leave a budget below zero, and nothing could fire.
+    let waiting = false;
+    const apply = () => {
+      waiting = game.sim.designLocked();
+      if (waiting) return;
+      game.commands.setPacked(activeUnit ? kitOf(activeUnit.assets) : false);
+      game.usePackLoadouts(activeUnit ? activeUnit.assets.systems : null); // withdrawn: its settings go too
+    };
+    const onReset = () => { if (waiting) apply(); }; // the change is made once the run is reset
+    apply();
+    game.sim.on('reset', onReset);
+    return () => game.sim.off('reset', onReset);
   }, [game, activeUnit]);
   useEffect(() => {
     const lost = () => { // a wave waits under the login page; the same account can restore its pack after signing in again

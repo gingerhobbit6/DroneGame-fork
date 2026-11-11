@@ -12,6 +12,8 @@ import { safeHref, SourceLinks } from '../src/ui/dock/SourceLinks.jsx';
 import { basisOf } from '../src/ui/dock/SourcesTab.jsx';
 import { followMessages } from '../src/ui/dock/LearnTab.jsx';
 import { drawSpectrum, jamConflicts } from '../src/ui/dock/spectrum-canvas.js';
+import { createPlanCanvas } from '../src/ui/dock/plan-canvas.js';
+import { createNetworkCanvas } from '../src/ui/dock/network-canvas.js';
 import { createMinimap } from '../src/ui/minimap.js';
 import { MIXED, setUp, play } from './support/scenarios.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
@@ -60,6 +62,27 @@ describe('spectrum tab', () => {
     refresh();
     expect($('#spec-notes b').textContent).toContain('JAM');
     drawSpectrum(document.createElement('canvas'), game.sim.net);
+  });
+});
+
+describe('on a scaled display', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('gives the plan, network and spectrum canvases the display\'s pixels, and still draws and takes clicks in CSS pixels', () => {
+    vi.stubGlobal('devicePixelRatio', 2.5);
+    setUp(game.sim, { seed: '1', laydown: MIXED });
+    const scaled = () => { const cv = newCanvas(), g = Object.assign(fakeContext(), { setTransform: vi.fn() }); cv.getContext = () => g; return { cv, g }; };
+    const map = scaled(), wires = scaled(), bands = scaled();
+    const plan = createPlanCanvas(map.cv, game.sim);
+    plan.draw(null);
+    const diagram = createNetworkCanvas(wires.cv, game.sim.net, { getSel: () => null, isVisible: () => true, getPace: () => 1 });
+    diagram.draw();
+    drawSpectrum(bands.cv, game.sim.net);
+    for (const { cv, g } of [map, wires, bands]) {
+      expect([cv.width, cv.height]).toEqual([1500, 1000]); // 600 by 400 on the page
+      expect(g.setTransform).toHaveBeenLastCalledWith(2.5, 0, 0, 2.5, 0, 0);
+    }
+    expect(diagram.hitTest({ x: 300, y: 130 }).box.kind).toBe('fusion'); // found where it is on the page, not in the canvas's own pixels
+    plan.dispose(); diagram.dispose();
   });
 });
 
@@ -130,6 +153,15 @@ describe('sources tab', () => {
     fireEvent.change(range, { target: { value: '-5' } });
     expect(STRUCTURES.radar.published).toBe(base);
     expect(range.value).toBe(String(base));
+  });
+
+  it('holds a share at 1 on screen, as the game does', () => {
+    openDock('systems');
+    const chance = $('#systems input[data-key="pk"]'), loss = $('#systems input[data-key="loss"]');
+    fireEvent.change(chance, { target: { value: '1.5' } });
+    expect(chance.value).toBe('1'); // it stayed at 1.5 while the game used 1
+    expect(loss.max).toBe('1');
+    expect($('#systems input[data-key="published"]').max).toBe(''); // a range has no such limit
   });
 
   it('scales ranges, sets the gap, resets all and exports', () => {

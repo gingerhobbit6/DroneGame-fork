@@ -5,13 +5,17 @@ import { DEFAULT_MIX, slotsFor } from './attack-mix.js';
 import { waveStream } from './rng.js';
 import { spawnDrone } from './drones.js';
 import { money } from './economy.js';
-import { unwired } from './laydown.js';
+import { captureLaydown, costProblem, unwired } from './laydown.js';
 
 // beginRun rebuilds the run when the first wave starts, so nothing from the build phase can affect it.
 export function startWave(w, beginRun) {
   const { state, net } = w;
   if (state.waveActive || state.over || !state.started) return;
   if (state.sandbox) { w.emit('toast', 'Exit the sandbox first: it resets the run and keeps your laydown'); return; }
+  if (state.wave === 0 && !state.packed) { // the first wave buys the laydown again at today's prices: one raised since would leave no money to fire with
+    const dear = costProblem(captureLaydown(w));
+    if (dear) { w.emit('toast', `${dear}. Sell something, or lower the price in Sources`); return; }
+  }
   const loose = unwired(w).length;
   if ((loose || !net.fusion.uplinks.size) && !state.warnedWire) { // nodes with no link are offline: warn once
     state.warnedWire = true;

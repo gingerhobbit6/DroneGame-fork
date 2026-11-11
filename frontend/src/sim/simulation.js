@@ -214,7 +214,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     resupply: () => resupply(w),
     startWave: () => startWave(w, beginRun),
     reset: (mode) => resetRun(mode),
-    setAutoStart: (on) => { state.autoStart = on; },
+    setAutoStart: (on) => { state.autoStart = on; if (!on) state.autoTimer = -1; }, // unticked during the countdown: the next wave waits
     setPacked: (kit) => laydown.setPacked(w, kit),
     endDeployment,
     setAuthority: (mode) => { FUSION.authority = mode; },
