@@ -107,12 +107,28 @@ describe('the hotkeys', () => {
     expect(game.getTool()).toBe('radar');
   });
 
-  it('leave Space to a focused button, and typing to a text area', () => {
+  it('pause on Space after a click left a button focused, and do not press that button again', () => {
+    show();
+    for (const tag of ['button', 'summary']) {
+      const el = document.body.appendChild(document.createElement(tag));
+      fireEvent.pointerDown(el.appendChild(document.createElement('span'))); // a click on the button's icon or text
+      act(() => game.setSpeed(1));
+      expect(fireEvent.keyDown(el, { key: ' ' })).toBe(false); // false: the key's own action, pressing the button, was stopped
+      expect(game.clock.speed).toBe(0);
+      expect(fireEvent.keyUp(el, { key: ' ' })).toBe(false);
+      fireEvent.keyDown(el, { key: 'Tab' }); // from here the focus is the keyboard's, and Space is the button's again
+      expect(fireEvent.keyDown(el, { key: ' ' })).toBe(true);
+      expect(game.clock.speed).toBe(0);
+      el.remove();
+    }
+  });
+
+  it('leave Space to a button reached with the keyboard, and typing to a text area', () => {
     show();
     const speed = game.clock.speed;
     for (const tag of ['button', 'summary']) {
       const el = document.body.appendChild(document.createElement(tag));
-      fireEvent.keyDown(el, { key: ' ' });
+      expect(fireEvent.keyDown(el, { key: ' ' })).toBe(true); // no click put the focus here
       el.remove();
     }
     expect(game.clock.speed).toBe(speed);

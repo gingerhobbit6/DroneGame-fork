@@ -47,6 +47,13 @@ def _check_power(window: Window, power) -> None:
             raise ValueError("power lines need more pylons than a map pack can hold")
 
 
+def check_counts(window: Window, power, roads, names) -> None:
+    """Every refusal for too many shapes, so a build can make them before its slow steps as well as where the shapes are used."""
+    _check_power(window, power)
+    _check_shapes(window, roads, max_shapes=MAX_SOURCE_ROADS, max_vertices=MAX_ROAD_VERTICES, description="roads")
+    _check_shapes(window, names, max_shapes=MAX_NAMES, max_vertices=MAX_NAMES, description="place names")
+
+
 class OpenMap:
     def __init__(self, data_root: str, window: Window):
         self.window = window
@@ -99,6 +106,8 @@ def to_scene(window: Window, x, y) -> list[float]:
 
 
 def building_box(window: Window, envelope) -> list[float] | None:
+    if not isinstance(envelope, shapely.Polygon):  # a building with no area has a line or a point for its envelope
+        return None
     corners = np.array(envelope.exterior.coords)[:4]
     if len(corners) < 4:
         return None
@@ -121,9 +130,7 @@ def roads_kept(window: Window, roads) -> np.ndarray:
 
 
 def feature_lists(window: Window, houses, power, roads, road_fields, names, name_fields, bldg: np.ndarray) -> dict:
-    _check_power(window, power)
-    _check_shapes(window, roads, max_shapes=MAX_SOURCE_ROADS, max_vertices=MAX_ROAD_VERTICES, description="roads")
-    _check_shapes(window, names, max_shapes=MAX_NAMES, max_vertices=MAX_NAMES, description="place names")
+    check_counts(window, power, roads, names)
     rows = []
     for row in map(lambda e: building_box(window, e), shapely.oriented_envelope(houses)):
         if row:

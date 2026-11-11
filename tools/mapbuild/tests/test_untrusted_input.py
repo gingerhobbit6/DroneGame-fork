@@ -1,6 +1,9 @@
 """Limits on what the builder reads and writes, so damaged downloads or a dense area cannot run it out of memory or make a pack the game refuses."""
 
 import io
+import tempfile
+import urllib.error
+import urllib.request
 import zipfile
 
 import numpy as np
@@ -280,6 +283,28 @@ def test_satellite_scene_retention_has_a_hard_limit(monkeypatch):
     assert found == [] and year is None
 
 
+def test_a_network_fault_leaves_out_the_satellite_picture_rather_than_stopping_the_build(monkeypatch):
+    window, said = Window(1000, 1000, 20), []
+
+    def no_network(*_a, **_k):
+        raise urllib.error.URLError("no route to host")
+
+    monkeypatch.setattr(pictures.urllib.request, "urlopen", no_network)
+    assert pictures.satellite(window, [2026], said.append) == ([], None)
+    item = {"id": "1", "assets": {"visual": {"href": pictures.SCENE_HOST + "1.tif"}}, "properties": {"datetime": "2026-05-01", "eo:cloud_cover": 1}}
+    monkeypatch.setattr(pictures, "scenes_for", lambda *_a: [item])
+    monkeypatch.setattr(pictures.rasterio, "open", lambda *_a, **_k: (_ for _ in ()).throw(rasterio.errors.RasterioIOError("HTTP response code: 503")))
+    assert pictures.satellite(window, [2026], said.append) == ([], None)
+    assert len(said) == 2 and all("no satellite layer" in text for text in said)
+
+
+def test_a_redirect_may_change_host_but_not_leave_https():
+    handler, request = source_limits.HttpsRedirects(), urllib.request.Request("https://api.os.uk/file")
+    with pytest.raises(urllib.error.HTTPError, match="leaves https"):
+        handler.redirect_request(request, None, 302, "Found", {}, "http://127.0.0.1/x")
+    assert handler.redirect_request(request, None, 302, "Found", {}, "https://files.example/x").full_url == "https://files.example/x"
+
+
 def test_pack_write_is_atomic_and_matches_picture_budget(tmp_path, monkeypatch):
     empty = np.zeros((3, 3), "uint8")
     grids = packfile.Grids(np.zeros((3, 3), "float32"), empty, empty, empty)
@@ -295,6 +320,18 @@ def test_pack_write_is_atomic_and_matches_picture_budget(tmp_path, monkeypatch):
     monkeypatch.setattr(packfile, "MAX_PICTURE_BYTES", 1)
     with pytest.raises(ValueError, match="pictures"):
         packfile.write_pack(str(path), {}, grids, {}, [{"data": b"ab"}])
+
+
+def test_a_killed_builds_leftover_is_removed_by_the_next_write_of_that_pack(tmp_path):
+    empty = np.zeros((3, 3), "uint8")
+    grids = packfile.Grids(np.zeros((3, 3), "float32"), empty, empty, empty)
+    with tempfile.NamedTemporaryFile(dir=tmp_path, prefix=".pack.sgmap.", suffix=".part", delete=False) as stale:  # named as write_pack names its own
+        stale.write(b"left by a build killed at its limit")
+    others = [tmp_path / ".other.sgmap.abcd1234.part", tmp_path / ".pack.sgmap.notes.part", tmp_path / "pack.sgmap.part", tmp_path / "notes.txt"]
+    for other in others:
+        other.write_bytes(b"not this pack's leftover")
+    packfile.write_pack(str(tmp_path / "pack.sgmap"), {}, grids, {}, [])
+    assert sorted(p.name for p in tmp_path.iterdir()) == sorted(["pack.sgmap", *(other.name for other in others)])
 
 
 def test_downloads_stop_before_the_free_disk_reserve(tmp_path, monkeypatch):

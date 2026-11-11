@@ -14,7 +14,8 @@ export function Tuning({ open }) {
   return (
     <Movable id="tuning" title="Tuning" className={`panel${open ? '' : ' hidden'}`}>
       <div className="label">GAME</div>
-      <label>Time scale (x)<NumberInput value={WORLD.timeScale} step={0.5} min={0.5} onCommit={(v) => { WORLD.timeScale = v; }} /></label>
+      {/* 20 at most: a slip such as 1000 had the frame loop run its cap of steps on every frame, and the page crawled */}
+      <label>Time scale (x)<NumberInput value={WORLD.timeScale} step={0.5} min={0.5} max={20} onCommit={(v) => { WORLD.timeScale = v; }} /></label>
       <div className="muted" style={{ margin: '6px 0' }}>Ranges, prices and drone figures are in the SAPIENT panel, Sources tab.</div>
       <div className="label">ENEMY LEARNING (per wave)</div>
       {adaptField('Evade gain', 'evadePerWave', 0.01)}
@@ -51,7 +52,7 @@ export function Toast() {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), 2600);
   }), [game]);
-  return <div id="toast" className={show ? 'show' : ''}>{text}</div>;
+  return <div id="toast" role="status" aria-live="polite" className={show ? 'show' : ''}>{text}</div>;
 }
 
 export function Approvals() {

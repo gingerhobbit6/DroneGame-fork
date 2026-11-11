@@ -416,6 +416,19 @@ describe('the panel', () => {
     expect(panel().querySelector('img')).toBe(null);
     expect(panel().textContent).toContain('<img src=x>');
   });
+
+  it('stays where it was dragged when another system is selected, and opens that one on its details', () => {
+    lay();
+    show();
+    pick(unit('radar'));
+    fireEvent.click($('#unit-configure'));
+    fireEvent.keyDown($('#unit-panel .mv-min'), { key: 'ArrowRight' });
+    expect(panel().style.left).toBe('16px');
+    pick(unit('camera'));
+    expect(panel().style.left).toBe('16px');
+    expect(panel().getAttribute('aria-label')).toBe(`Selected system: ${unit('camera').short}`);
+    expect($('#unit-editor')).toBeNull();
+  });
 });
 
 describe('selecting without the map', () => {

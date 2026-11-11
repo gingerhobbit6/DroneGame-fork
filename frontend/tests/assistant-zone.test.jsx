@@ -10,6 +10,7 @@ import { App } from '../src/ui/App.jsx';
 import { placed } from '../src/ui/useMovable.js';
 import { GameContext } from '../src/ui/hooks.js';
 import { Overlay } from '../src/ui/Overlay.jsx';
+import { Debrief } from '../src/ui/assistant/Debrief.jsx';
 import { MIXED, play, setUp } from './support/scenarios.js';
 import { createFakeApi, createFakeStorage } from './support/fake-api.js';
 
@@ -244,6 +245,16 @@ describe('the debrief', () => {
     expect($('#debrief tr.gap')).not.toBeNull();
     expect($('#debrief').textContent).toContain('did the most damage');
     expect($('#btn-first-leak')).toBeNull(); // nothing to review with, without a 3D view
+  });
+  it('counts a drone that came down on one of your systems as one that hit you', () => {
+    setUp(game.sim, { seed: '1', laydown: [['rf', 900, 0]] });
+    const { ledger } = game.sim, flight = (end) => ({ type: 'fpv', wave: 1, seen: {}, shots: {}, engaged: null, end });
+    ledger.launched.fpv = 3;
+    ledger.flights.push(flight('struck'), flight('struck'), flight('leaked'));
+    render(<GameContext.Provider value={game}><Debrief onReview={() => {}} /></GameContext.Provider>);
+    const row = [...document.querySelectorAll('#debrief tbody tr')].find((r) => r.textContent.includes('First-person-view'));
+    expect([...row.querySelectorAll('td')].map((c) => c.textContent)).toEqual(['3', '0', '3']); // launched, killed, hit you
+    expect(row.className).toBe('gap');
   });
   it('goes back to the first leak, then back to the results', () => {
     lost();

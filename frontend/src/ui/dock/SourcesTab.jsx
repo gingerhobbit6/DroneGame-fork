@@ -11,6 +11,7 @@ import { FigureSets } from './FigureSets.jsx';
 
 const BASIS_LABEL = { research: 'published', price: 'price', assumption: 'ASSUMPTION', rule: 'game rule' };
 const isAssumption = (text) => /ASSUMPTION/i.test(text || '');
+const SHARE_UNITS = ['0–1', 'fraction']; // the game holds these at 1 (bounded() in sim/config/figures.js), so the field must not show more
 
 export function basisOf(kind, def, key) {
   const meta = FIGURE_FIELDS[key];
@@ -34,7 +35,7 @@ function Figures({ kind, id, def, onChange }) {
         return (
           <label className={`fig ${basis}`} key={key}>
             <span className="fl">{meta.label}</span>
-            <NumberInput data-key={key} value={def[key]} step={meta.step} onCommit={(v) => { commands.setFigure(kind, id, key, v); onChange(); }} />
+            <NumberInput data-key={key} value={def[key]} step={meta.step} max={SHARE_UNITS.includes(meta.unit) ? 1 : undefined} onCommit={(v) => { commands.setFigure(kind, id, key, v); onChange(); }} />
             <span className="fu">{meta.unit}</span>
             <span className={`fb ${basis}`}>{BASIS_LABEL[basis]}</span>
             <button className={`fr${def[key] === base ? ' hidden' : ''}`} title={`Reset to ${base}`} onClick={(e) => { e.preventDefault(); commands.resetFigure(kind, id, key); onChange(); }}>↺</button>

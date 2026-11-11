@@ -74,6 +74,11 @@ export function TextField({ label, value, onChange, hint, ...input }) {
 export function RecoveryCode({ code, title, children, onDone, doneLabel }) {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  useEffect(() => { // a reload now would lose the code for good, so the browser asks before leaving the page
+    const ask = (e) => e.preventDefault();
+    addEventListener('beforeunload', ask);
+    return () => removeEventListener('beforeunload', ask);
+  }, []);
   const copy = () => navigator.clipboard?.writeText(code).then(() => setCopied(true), () => setCopied(false));
   return (
     <div className="acct-form">

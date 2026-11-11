@@ -107,7 +107,7 @@ export function UnitEditor({ s, game }) {
           {def.trigger === 'manual' && <label><input id="unit-jam-on" type="checkbox" checked={!!s.jamOn} onChange={(e) => commands.setJamming(s, e.target.checked)} /> <b>Jamming on</b></label>}
         </fieldset>
       )}
-      {!locked && <button id="unit-sell" onClick={sell.confirm('sell', () => commands.sell(s.pos.x, s.pos.z))}>{sell.armed ? 'Sure? Click again' : sim.state.packed ? 'Remove from the map' : `Remove, ${money(refund)} back`}</button>}
+      {!locked && !s.escort && <button id="unit-sell" onClick={sell.confirm('sell', () => commands.sell(s.pos.x, s.pos.z))}>{sell.armed ? 'Sure? Click again' : sim.state.packed ? 'Remove from the map' : `Remove, ${money(refund)} back`}</button>}
     </div>
   );
 }

@@ -180,6 +180,15 @@ def test_a_city_keeps_the_buildings_nearest_the_middle(monkeypatch):
     assert [row[0] for row in lists["buildings"]] == [12.5, -27.5]
 
 
+def test_a_building_with_no_area_is_left_out_and_the_rest_are_kept():
+    window = Window(1000, 2000, 100)
+    flat = shapely.Polygon([(1000, 2000), (1005, 2000), (1010, 2000)])  # every point on one line, so its envelope is a line and not a box
+    houses = np.array([shapely.box(1010, 2000, 1015, 2005), flat, shapely.box(970, 2000, 975, 2005)])
+    bldg = np.zeros((window.side, window.side), "uint8")
+    lists = features.feature_lists(window, houses, np.array([]), np.array([]), {"CLASSIFICA": np.array([])}, np.array([]), {"DISTNAME": [], "CLASSIFICA": [], "FONTHEIGHT": []}, bldg)
+    assert [row[0] for row in lists["buildings"]] == [12.5, -27.5]
+
+
 def test_the_fit_is_accurate_on_a_smooth_surface():
     window = Window(400000, 200000, 15000)
     grid = np.linspace(-15000, 15000, 21)
@@ -190,6 +199,14 @@ def test_the_fit_is_accurate_on_a_smooth_surface():
     lon_fit, lat_fit, error = fit.fit_to_coefficients(east, north, lon, lat, window)
     assert error < 0.01
     assert lon_fit[0] == pytest.approx(-2) and lat_fit[2] == pytest.approx(0.09)
+
+
+def test_a_fit_error_that_is_not_a_number_is_refused(monkeypatch):
+    monkeypatch.setattr(fit, "best_transformer", lambda *_a: type("Still", (), {"transform": staticmethod(lambda east, north: (east, north))})())
+    monkeypatch.setattr(fit, "fit_to_coefficients", lambda *_a: ([0.0] * 6, [0.0] * 6, float("nan")))
+    monkeypatch.setattr(fit, "geoid_separation", lambda *_a: pytest.fail("a fit with no error figure was accepted"))
+    with pytest.raises(SystemExit, match="position fit"):
+        fit.geo_fit(Window(400000, 200000, 15000))
 
 
 def test_the_composite_ignores_missing_data_and_outliers():

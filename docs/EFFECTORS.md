@@ -36,8 +36,8 @@ The tables below were generated from the config modules by a script, and the hit
 Everything comes out of one budget of £11,250,000 (`ECONOMY.budget`, $15,000,000 in config, [`world.js:68`](../frontend/src/sim/config/world.js#L68)). Nothing is earned back: there are no rewards for kills or for surviving a wave.
 
 - **Buying a system** charges its price, adjusted by any unit settings, at once ([`laydown.js:85`](../frontend/src/sim/laydown.js#L85)).
-- **Every shot** charges `shotCost` as it is fired ([`economy.js:38`](../frontend/src/sim/economy.js#L38)). A launcher comes with a full magazine and storage, but those rounds are paid for only as they are fired. A laser is charged once when its beam comes on and again for every further second it stays on ([`effectors.js:66`](../frontend/src/sim/effectors.js#L66)). Jammers cost nothing to use.
-- **A shot the budget cannot pay for is not fired.** The effector refuses the task ([`economy.js:35`](../frontend/src/sim/economy.js#L35)).
+- **Every shot** charges `shotCost` as it is fired ([`economy.js:40`](../frontend/src/sim/economy.js#L40)). A launcher comes with a full magazine and storage, but those rounds are paid for only as they are fired. A laser is charged once when its beam comes on and again for every further second it stays on ([`effectors.js:66`](../frontend/src/sim/effectors.js#L66)). Jammers cost nothing to use.
+- **A shot the budget cannot pay for is not fired.** The effector refuses the task ([`economy.js:37`](../frontend/src/sim/economy.js#L37)).
 - **Network terminals** are bought too: to report or be tasked, a networked system needs a Starlink terminal (£262) or a cellular modem (£450), and the fusion node needs its own ([`comms.js:28`](../frontend/src/sim/config/comms.js#L28)). Crewed systems off the network need none.
 - **Selling** a system before the first wave refunds its full price and its terminal ([`world.js:39`](../frontend/src/sim/config/world.js#L39), `sellRefund: 1`). Once the first wave starts the laydown is locked, so nothing can be bought or sold ([`lock.js:5`](../frontend/src/sim/lock.js#L5)).
 - **Resupply** between waves buys rounds at their shot price (below).
@@ -63,16 +63,16 @@ flowchart LR
   C -- no --> R[Rejected; tried again later]
 ```
 
-An effector is offered a track only if all of these hold ([`tasking.js:178`](../frontend/src/sim/network/tasking.js#L178), [`tasking.js:280`](../frontend/src/sim/network/tasking.js#L280)):
+An effector is offered a track only if all of these hold ([`tasking.js:186`](../frontend/src/sim/network/tasking.js#L186), [`tasking.js:291`](../frontend/src/sim/network/tasking.js#L291)):
 
-- the track is between its minimum range and its range ([`tasking.js:167`](../frontend/src/sim/network/tasking.js#L167)), and is not flying away from the site and every system ([`tasking.js:48`](../frontend/src/sim/network/tasking.js#L48));
-- its round can meet the track inside its range, flying at where the track will be. A round slower than its target only catches one coming towards it ([`tasking.js:171`](../frontend/src/sim/network/tasking.js#L171), [`hit-chance.js:18`](../frontend/src/sim/hit-chance.js#L18));
+- the track is between its minimum range and its range ([`tasking.js:171`](../frontend/src/sim/network/tasking.js#L171)), and is not flying away from the site and every system ([`tasking.js:50`](../frontend/src/sim/network/tasking.js#L50));
+- its round can meet the track inside its range, flying at where the track will be. A round slower than its target only catches one coming towards it ([`tasking.js:175`](../frontend/src/sim/network/tasking.js#L175), [`hit-chance.js:18`](../frontend/src/sim/hit-chance.js#L18));
 - its `engages` list, if it has one, allows that airframe ([`tasking.js:26`](../frontend/src/sim/network/tasking.js#L26)). Only the DroneHunter has one: first-person-view and fibre-optic drones;
 - for a missile marked `engagePolicy: 'fixed-wing'`, the track is classified fixed wing. A known multirotor is never offered; an unclassified track is offered only inside 800 m of the site (`FUSION.critZone`, [`world.js:90`](../frontend/src/sim/config/world.js#L90)) and when nothing else is on it;
-- soft kill first: a weapon that fires rounds holds off while a jammer that could break the drone's control link covers enough of its way in. It stops holding once the drone is inside 800 m, once a jammer has had it for 10 s (`softKillWait`, [`world.js:95`](../frontend/src/sim/config/world.js#L95)) and it still flies, or once jamming has failed on more than half of three or more tries against that model ([`tasking.js:91`](../frontend/src/sim/network/tasking.js#L91));
+- soft kill first: a weapon that fires rounds holds off while a jammer that could break the drone's control link covers enough of its way in. It stops holding once the drone is inside 800 m, once a jammer has had it for 10 s (`softKillWait`, [`world.js:95`](../frontend/src/sim/config/world.js#L95)) and it still flies, or once jamming has failed on more than half of three or more tries against that model ([`tasking.js:93`](../frontend/src/sim/network/tasking.js#L93));
 - enough rounds are not already in the air at it (below).
 
-Free effectors are then paired with tracks, most urgent first. Each track goes to the free effector with the lowest expected cost per kill (shot price over chance, or price per second times seconds to burn) among those with at least half the best chance at it ([`tasking.js:20`](../frontend/src/sim/network/tasking.js#L20), [`tasking.js:292`](../frontend/src/sim/network/tasking.js#L292)). So a gun or laser takes a quadcopter before a missile does. Inside 800 m of the site every free effector that can may take a track already engaged.
+Free effectors are then paired with tracks, most urgent first. Each track goes to the free effector with the lowest expected cost per kill (shot price over chance, or price per second times seconds to burn) among those with at least half the best chance at it ([`tasking.js:20`](../frontend/src/sim/network/tasking.js#L20), [`tasking.js:303`](../frontend/src/sim/network/tasking.js#L303)). So a gun or laser takes a quadcopter before a missile does. Inside 800 m of the site every free effector that can may take a track already engaged.
 
 **Engagement authority** ([`world.js:99`](../frontend/src/sim/config/world.js#L99)): automatic by default; "costly" asks the operator before any shot priced at $50,000 (£37,500) or more; "all" asks every time. A request lapses after 20 s. Jammers are switched without asking.
 
@@ -101,7 +101,7 @@ Every weapon that fires rounds has three numbers ([`magazine.js:1`](../frontend/
 
 - **Magazine:** rounds ready to fire. A system starts each run full ([`magazine.js:15`](../frontend/src/sim/magazine.js#L15)).
 - **Storage:** further rounds held in reserve.
-- **Reload:** seconds to move rounds from storage to the magazine once it is empty ([`magazine.js:30`](../frontend/src/sim/magazine.js#L30)). With nothing left in storage, the system is out of rounds and the fusion node gives its target up so another can take it ([`tasking.js:244`](../frontend/src/sim/network/tasking.js#L244)).
+- **Reload:** seconds to move rounds from storage to the magazine once it is empty ([`magazine.js:30`](../frontend/src/sim/magazine.js#L30)). With nothing left in storage, the system is out of rounds and the fusion node gives its target up so another can take it ([`tasking.js:254`](../frontend/src/sim/network/tasking.js#L254)).
 
 A large system (Merops, NASAMS, Sky Sabre, Skyranger 30, Gepard, Skynex) reloads from storage only once the wave is over, as in the field that takes a reload vehicle and its crew. Small and medium ones reload as they fight ([`magazine.js:11`](../frontend/src/sim/magazine.js#L11)). The Unit panel shows a magazine as LOW at a quarter or less ([`magazine.js:24`](../frontend/src/sim/magazine.js#L24)).
 
@@ -111,7 +111,7 @@ A laser's magazine is seconds of stored beam. It recharges at magazine / reload 
 
 ## RF jammers
 
-A jammer transmits noise on drone radio bands. It costs nothing per use, but it is loud while on, it cannot touch a drone with no radio link, and it deafens your own RF detectors and network links on the bands it fills (see [PHYSICS_AND_PROPAGATION.md](PHYSICS_AND_PROPAGATION.md)). A networked jammer is switched on by the fusion node only while a track it reaches and faces is believed to use a band it jams ([`tasking.js:204`](../frontend/src/sim/network/tasking.js#L204)); off, it is a tenth as loud to emitter-seeking drones ([`targeting.js:58`](../frontend/src/sim/targeting.js#L58)).
+A jammer transmits noise on drone radio bands. It costs nothing per use, but it is loud while on, it cannot touch a drone with no radio link, and it deafens your own RF detectors and network links on the bands it fills (see [PHYSICS_AND_PROPAGATION.md](PHYSICS_AND_PROPAGATION.md)). A networked jammer is switched on by the fusion node only while a track it reaches and faces is believed to use a band it jams ([`tasking.js:212`](../frontend/src/sim/network/tasking.js#L212)); off, it is a tenth as loud to emitter-seeking drones ([`targeting.js:58`](../frontend/src/sim/targeting.js#L58)).
 
 **Reach.** A jammer needs a radio path to where the link is received, worked out on that band over the terrain, the same as a detector ([`jamming.js:19`](../frontend/src/sim/jamming.js#L19)). A control link is easier to jam the further the drone is from its operator, so its reach is scaled by the drone's distance from its launch point over 4.5 km ([`jamming.js:36`](../frontend/src/sim/jamming.js#L36)): a drone 9 km from its operator is jammed at twice the quoted range, one 2 km out at under half. A video link is received by the operator, so it is jammed only if the jammer reaches the launch point, with the same scaling ([`jamming.js:28`](../frontend/src/sim/jamming.js#L28)); a jammer by the site rarely does. GNSS is jammed at the drone, at the quoted range.
 
@@ -174,7 +174,7 @@ Real drones have their own links, protocols and resistance: see [DRONES.md](DRON
 | [`jammer_l`](../frontend/src/sim/config/effectors.js#L54) | 50% speed | 5 | 2.5 | 30 | Assessed: low end of stationary-jammer claims | ASSUMPTION: tune this yourself | [EverythingRF: Aaronia jammers](https://www.everythingrf.com/news/details/14983-aaronia-offers-portable-stationary-and-fully-integrated-counter-drone-jammers-with-10-km-range) |
 | [`jammer_sf`](../frontend/src/sim/config/eu-systems.js#L28) | 50% speed | 5 | 3 | 30 | Assessed from its 800 W output | Maker’s power figure; range is an assessment | [Sensofusion: Military Edition](https://sensofusion.com/military/); [EverythingRF: Aaronia jammers, 40 W handheld at 2 km](https://www.everythingrf.com/news/details/14983-aaronia-offers-portable-stationary-and-fully-integrated-counter-drone-jammers-with-10-km-range) |
 
-The handheld jammers (DroneGun Mk4, MkIII and Tactical, SkyWiper, Kvertus) are crewed and off the network: see [Crewed systems](#crewed-systems-off-the-network). The AUDS turns onto the most urgent drone when fitted with a sector antenna ([`tasking.js:214`](../frontend/src/sim/network/tasking.js#L214)).
+The handheld jammers (DroneGun Mk4, MkIII and Tactical, SkyWiper, Kvertus) are crewed and off the network: see [Crewed systems](#crewed-systems-off-the-network). The AUDS turns onto the most urgent drone when fitted with a sector antenna ([`tasking.js:222`](../frontend/src/sim/network/tasking.js#L222)).
 
 ## Interceptor drones
 

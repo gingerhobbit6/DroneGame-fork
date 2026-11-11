@@ -81,12 +81,20 @@ describe('messages tab', () => {
     running();
     openDock('messages');
     const rows = () => document.querySelectorAll('#msg-list .row');
+    const has = (type) => [...rows()].some((r) => r.className.includes(`t-${type}`));
+    const status = $('.chip[data-type="status_report"]');
     expect(rows().length).toBeGreaterThan(0);
     expect(rows().length).toBeLessThanOrEqual(150);
-    fireEvent.click($('.chip[data-type="status_report"]'));
-    expect($('.chip[data-type="status_report"]').className).toContain('off');
-    expect([...rows()].some((r) => r.className.includes('t-status_report'))).toBe(false);
-    fireEvent.click($('.chip[data-type="status_report"]'));
+    // heartbeats and raw detections start hidden: they are most of the log, and bury the tasks, answers and alerts
+    expect([status.className, status.getAttribute('aria-pressed')]).toEqual(['chip t-status_report off', 'false']);
+    expect($('.chip[data-type="detection_report"]').className).toContain('off');
+    expect(has('status_report') || has('detection_report')).toBe(false);
+    expect(has('task') || has('alert') || has('registration')).toBe(true);
+    fireEvent.click(status);
+    expect(has('status_report')).toBe(true);
+    fireEvent.click(status);
+    expect(has('status_report')).toBe(false);
+    fireEvent.click(status);
     fireEvent.click(rows()[rows().length - 1]);
     expect($('#msg-detail').textContent).toContain('timestamp');
     fireEvent.click($('#log-explain'));
@@ -105,6 +113,15 @@ describe('messages tab', () => {
     const n = document.querySelectorAll('#msg-list .row').length;
     game.sim.run(100);
     refresh();
+    expect(document.querySelectorAll('#msg-list .row').length).toBe(n);
+    fireEvent.click($('.chip[data-type="status_report"]')); // the filters still work on the frozen list: that is when it is read
+    expect(document.querySelectorAll('#msg-list .row.t-status_report').length).toBeGreaterThan(0);
+    const newest = Math.max(...[...document.querySelectorAll('#msg-list .tm')].map((r) => parseFloat(r.textContent)));
+    game.sim.run(200);
+    refresh();
+    expect(Math.max(...[...document.querySelectorAll('#msg-list .tm')].map((r) => parseFloat(r.textContent)))).toBe(newest); // and nothing new joins it
+    fireEvent.click($('.chip[data-type="status_report"]'));
+    expect(document.querySelectorAll('#msg-list .row.t-status_report').length).toBe(0);
     expect(document.querySelectorAll('#msg-list .row').length).toBe(n);
     fireEvent.click($('#log-freeze'));
     URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn();
@@ -164,7 +181,7 @@ describe('plan tab', () => {
     // This checks cache invalidation; sensor geometry is tested separately.
     let calls = 0;
     net.coverageAt = () => { calls++; return 1; };
-    const redone = () => { calls = 0; plan.draw('fpv'); return calls > 0; };
+    const redone = () => { calls = 0; while (plan.draw('fpv')); return calls > 0; }; // a draw works out some rows, and asks to be run again
 
     commands.loadLaydown(spec(30), '1');
     const ids = [...net.nodes.keys()];
@@ -181,6 +198,48 @@ describe('plan tab', () => {
     commands.setFigure('drones', 'fpv', 'rcs', 0.5);
     expect(redone()).toBe(true);
   }, 120000);
+  it('works the coverage map out a few rows a frame, painting each row once as it is ready', () => {
+    let now = 0;
+    const time = vi.spyOn(performance, 'now').mockImplementation(() => (now += 20)); // one row uses up a frame's share
+    const painted = []; // the row of every cell painted on the coverage picture
+    HTMLCanvasElement.prototype.getContext = () => Object.assign(fakeContext(), { fillRect: (x, y, w, h) => { if (w === 1 && h === 1) painted.push(y); } });
+    game.sim.net.coverageAt = () => 1;
+    const plan = createPlanCanvas(newCanvas(), game.sim);
+    expect(plan.draw('fpv')).toBe(true);
+    const n = painted.length; // one row of the grid
+    expect(new Set(painted)).toEqual(new Set([0]));
+    expect(plan.draw('fpv')).toBe(true);
+    expect(painted.slice(n)).toEqual(Array(n).fill(1));
+    let draws = 2;
+    while (plan.draw('fpv')) draws++;
+    expect(draws + 1).toBe(n);
+    expect(painted).toHaveLength(n * n);
+    expect(plan.draw(null)).toBe(false);
+    plan.dispose();
+    time.mockRestore();
+  });
+  it('keeps the last coverage picture while the same type is worked out again, and starts clear for another type', () => {
+    const seen = [], cleared = []; // seen[0] is the plan's own canvas, seen[1] the coverage picture
+    HTMLCanvasElement.prototype.getContext = function () {
+      if (!seen.includes(this)) seen.push(this);
+      return Object.assign(fakeContext(), { clearRect: (x, y, w, h) => { if (this === seen[1] && h === 1) cleared.push(y); } });
+    };
+    game.sim.net.coverageAt = () => 1;
+    const plan = createPlanCanvas(newCanvas(), game.sim);
+    while (plan.draw('fpv')); // worked out and painted in full
+    const layer = seen[1];
+    let sizings = 0, width = layer.width;
+    Object.defineProperty(layer, 'width', { get: () => width, set: (v) => { sizings++; width = v; } }); // sizing a canvas clears it
+    game.sim.addStructure('acoustic', 20, 0); // a new sensor, so the same type's map is worked out again
+    cleared.length = 0;
+    plan.draw('fpv');
+    expect(sizings).toBe(0); // the last picture is still there
+    expect(cleared[0]).toBe(0); // and goes a row at a time, as each new row is ready
+    while (plan.draw('fpv'));
+    plan.draw('fw');
+    expect(sizings).toBe(1); // another type starts from a clear picture
+    plan.dispose();
+  });
   it('draws a running game, with and without coverage', () => {
     running();
     view.hillshade = document.createElement('canvas');

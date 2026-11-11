@@ -1,7 +1,7 @@
 // Draws the wire diagram: systems, their wires to Starlink or cellular, and packets travelling along them as pulses.
 // Returns { draw, hitTest, dispose }.
 
-import { hex } from '../hooks.js';
+import { hex, sharpCanvas } from '../hooks.js';
 
 const NODE_W = 82, NODE_H = 26;
 const ELEMENT_COLOUR = { starlink: '#b388ff', cellular: '#ffab40', internet: '#90a4ae' };
@@ -82,9 +82,8 @@ export function createNetworkCanvas(cv, net, { getSel, isVisible, getPace }) {
   }
 
   function draw() {
-    const W = cv.clientWidth, H = cv.clientHeight;
-    if (!W || !H) return;
-    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const { w: W, h: H } = sharpCanvas(cv, g) ?? {};
+    if (!W) return;
     refreshLinks();
     const sel = getSel();
     const L = layout(W, H);

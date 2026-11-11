@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
-import { BUILD, COMMS, ECONOMY, FUSION, STRUCTURES } from '../src/sim/config/index.js';
+import { BUILD, COMMS, ECONOMY, FUSION, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { MIXED, setUp, play } from './support/scenarios.js';
 
 const sim = createSimulation();
@@ -223,6 +223,37 @@ describe('auto-start', () => {
     sim.commands.setAutoStart(false);
     expect(sim.state.wave).toBe(2);
   }, 30000);
+
+  it('does not start it when unticked during the countdown', () => {
+    fresh(MIXED);
+    sim.state.warnedWire = true;
+    sim.commands.setAutoStart(true);
+    sim.commands.startWave();
+    for (let i = 0; i < 100 && sim.state.waveActive; i++) sim.run(200);
+    expect(sim.state.autoTimer).toBeGreaterThan(0); // counting down to wave 2
+    sim.commands.setAutoStart(false);
+    sim.run(400); // 20 s, well past the countdown
+    expect(sim.state).toMatchObject({ wave: 1, waveActive: false });
+  }, 30000);
+});
+
+describe('prices raised after buying', () => {
+  afterEach(() => resetAllFigures());
+  it('refuses the first wave while the laydown costs more than the budget, and says so', () => {
+    fresh(MIXED);
+    sim.state.warnedWire = true;
+    const said = [], hear = (text) => said.push(text);
+    sim.on('toast', hear);
+    sim.commands.setFigure('structures', 'radar', 'cost', STRUCTURES.radar.cost * 30);
+    sim.commands.startWave();
+    sim.off('toast', hear);
+    expect(sim.state.wave).toBe(0);
+    expect(said.at(-1)).toMatch(/more than the .* budget at today's prices/);
+    sim.commands.resetAllFigures();
+    sim.commands.startWave();
+    expect(sim.state).toMatchObject({ wave: 1, waveActive: true });
+    expect(sim.state.budget).toBeGreaterThan(0);
+  }, 30000);
 });
 
 describe('sandbox', () => {
@@ -308,6 +339,19 @@ describe('engagement authority', () => {
     const before = engaged();
     expect(s.def.magazine).toBeGreaterThan(0);
     s.rounds = 0; // emptied while the operator decided
+    sim.commands.decide(req.id, true);
+    expect(engaged()).toBe(before);
+    expect(s.task).toBeNull();
+  }, 30000);
+
+  it('does not act on an approval once another effector has the track, outside the critical zone', () => {
+    FUSION.authority = 'all';
+    armed();
+    const req = pendingAfter(6000)[0], s = req.s, other = sim.structures.find((o) => o.def.role === 'effector' && o !== s);
+    const engaged = () => sim.bus.entries.filter((e) => e.type === 'task' && e.to === s.nodeId && e.msg.task.command?.request === 'Engage').length;
+    const before = engaged();
+    expect(sim.net.siteDist(req.tr)).toBeGreaterThanOrEqual(FUSION.critZone);
+    other.task = { id: 'taken', drone: req.tr.drone, trackId: req.tr.id, activeAt: 0 }; // it took the track while the operator decided
     sim.commands.decide(req.id, true);
     expect(engaged()).toBe(before);
     expect(s.task).toBeNull();

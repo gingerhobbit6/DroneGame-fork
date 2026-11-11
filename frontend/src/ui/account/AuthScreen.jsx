@@ -126,6 +126,7 @@ export function AuthScreen({ api, onSignedIn, notice: said = null }) {
   const [code, setCode] = useState(null);
   const [user, setUser] = useState(null);
   const [notice, setNotice] = useState(said);
+  useEffect(() => { setNotice(said); }, [said]); // one given while the page is up (a server too old to open the account) shows too
   const tabs = mode === 'signin' || mode === 'register';
   let body;
   if (mode === 'registered') {

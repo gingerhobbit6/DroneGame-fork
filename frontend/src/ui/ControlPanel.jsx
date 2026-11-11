@@ -21,6 +21,10 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
   const clear = useArmed(); // it throws the laydown away
   const end = useArmed(); // it ends the run
   const [mixOpen, setMixOpen] = useState(false);
+  // Before the first wave: what the first press of Start wave refused over, kept on screen until it is put right or overruled.
+  const building = state.started && state.wave === 0 && !state.sandbox;
+  const loose = building && state.warnedWire ? sim.unwired().length : 0;
+  const deaf = building && state.warnedWire && !sim.net.fusion.uplinks.size;
 
   const toggle = (id, key, label, title) => (
     <label title={title}><input type="checkbox" id={id} checked={view[key]} onChange={(e) => game.setViewOption(key, e.target.checked)} /> {label}</label>
@@ -29,9 +33,18 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox }) {
   return (
     <>
     <Movable id="hud-top-right" title="Controls">
-      <button id="btn-wave" className="primary" disabled={state.waveActive || state.over || state.sandbox} onClick={() => commands.startWave()}>
+      {/* the note is drawn under the button's own text (style.css), so the warning is on the thing that locks */}
+      <button id="btn-wave" className="primary" disabled={state.waveActive || state.over || state.sandbox} onClick={() => commands.startWave()}
+        data-note={building ? 'locks systems and wiring' : undefined} title={building ? 'Starting locks your systems and wiring for the whole run. Jam bands stay live, and Reset run starts again.' : undefined}>
         {state.sandbox ? 'Exit sandbox to start' : state.waveActive ? `Wave ${state.wave} in progress` : `Start wave ${state.wave + 1}`}
       </button>
+      {(loose > 0 || deaf) && (
+        <div id="wire-warning" role="alert">
+          {loose ? `${loose} system${loose > 1 ? 's have' : ' has'} no network link and will be offline.` : 'The fusion node has no network terminal, so it will hear nothing.'}
+          <button id="btn-wire-start" className="primary" onClick={() => { commands.autoWire(); commands.startWave(); }}>Auto-wire and start</button>
+          <button id="btn-start-anyway" onClick={() => commands.startWave()}>Start anyway</button>
+        </div>
+      )}
       <ResupplyButton />
       {state.wave > 0 && !state.over && (
         <button id="btn-end" title="Stand the deployment down now and see its report" onClick={end.confirm('end', () => commands.endDeployment())}>{end.armed ? 'Sure? Click again' : 'End deployment'}</button>

@@ -17,6 +17,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; col
 #tl-events { position: absolute; left: 0; right: 0; top: 2px; height: 20px; pointer-events: none; z-index: 1; }
 #tl-events i { position: absolute; top: 0; width: 3px; height: 20px; border-radius: 1px; opacity: 0.9; }
 #tl-time { font: 12px ui-monospace, Consolas, monospace; color: #9fb2cf; min-width: 38px; text-align: right; }
+#timeline.paused { border-color: #ffb300; }
+#tl-paused { color: #ffb300; font-size: 12px; letter-spacing: 0.06em; }
+#tl-alerts { margin-bottom: 4px; font-size: 12px; line-height: 1.45; }
+#tl-alerts:empty { display: none; }
+#tl-alerts div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tl-alerts .crit { color: #ff8a80; }
+#tl-alerts .warn { color: #ffcf66; }
+#tl-alerts span { font-family: ui-monospace, Consolas, monospace; color: #9fb2cf; }
 #dock.max { left: 262px; right: 214px; width: auto; top: 30px; bottom: 60px; }
 .dock-controls { position: absolute; top: 0; right: 0; display: flex; }
 .dock-controls button { border: 0; background: transparent; padding: 0 6px; line-height: 20px; }
@@ -69,10 +77,6 @@ button.mini { padding: 0 6px; font-size: 10px; margin-left: 6px; }
 .budget-num { color: #ffd54f; float: right; letter-spacing: 0; }
 .budget-bar span { height: 100%; transition: width 0.6s ease-out; }
 .budget-bar .b-left { background: #43a047; flex: 1 1 auto; }
-.bb-legend { font-size: 10px; color: #7f93b2; line-height: 1.5; }
-.bb-legend b { color: #cbd6ea; font-weight: 600; margin-right: 4px; }
-.bb-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; }
-.d-capex { background: #4fc3f7; } .d-shots { background: #ef5350; } .d-left { background: #43a047; }
 #hud-top-left #status { font-size: 10px; line-height: 1.35; }
 #minimap { bottom: 12px; left: 12px; padding: 4px; width: 236px; height: 236px; }
 #minimap-canvas { width: 226px; height: 226px; display: block; border-radius: 4px; cursor: crosshair; }
@@ -110,11 +114,15 @@ button.danger:not(:disabled) { border-color: #e57373; color: #ffab91; }
 #health-fill { height: 100%; width: 100%; background: #4caf50; transition: width 0.2s, background 0.2s; }
 .stats { display: flex; justify-content: space-between; margin-top: 8px; color: #9fb2cf; }
 .stats b { color: #fff; }
+#hud-systems b { color: #ffb74d; }
 .hud-spend { margin-top: 6px; font-size: 11px; color: #7d8fa9; } /* below the counts, and quieter than them */
 
 #hud-top-right { top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; width: 190px; }
 #hud-top-right .row { display: flex; gap: 4px; }
 #hud-top-right label { font-size: 12px; color: #9fb2cf; cursor: pointer; }
+#wire-warning { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid #ffb300; border-radius: 6px; background: rgba(40, 28, 4, 0.94); color: #ffcf66; font-size: 12px; }
+#btn-wave[data-note]::after { content: attr(data-note); display: block; font-size: 10px; font-weight: 400; opacity: 0.85; }
+#wire-warning button { padding: 4px 8px; }
 
 button { font: inherit; color: #dbe4f0; background: #1b2a45; border: 1px solid #2f4468;
   border-radius: 6px; padding: 6px 10px; cursor: pointer; }

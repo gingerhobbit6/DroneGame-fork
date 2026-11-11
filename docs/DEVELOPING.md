@@ -63,9 +63,9 @@ The dev server does not send the backend's security headers, such as the Content
 Useful while developing:
 
 - `?seed=7&terrain=3` in the address sets the scenario seed and the generated ground ([`main.jsx:10`](../frontend/src/main.jsx#L10)).
-- In the dev server the game is on `window.game` ([`main.jsx:17`](../frontend/src/main.jsx#L17)). Setting `game.debug.frozen = true` stops the frame loop stepping the simulation, so a script can drive it ([`game.js:245`](../frontend/src/game.js#L245)).
+- In the dev server the game is on `window.game` ([`main.jsx:17`](../frontend/src/main.jsx#L17)). Setting `game.debug.frozen = true` stops the frame loop stepping the simulation, so a script can drive it ([`game.js:247`](../frontend/src/game.js#L247)).
 - `SITE_GUARD_DB` moves the database file ([`main.py:32`](../backend/app/main.py#L32)), and `SITE_GUARD_MAPS` the maps folder ([`services/packs.py:45`](../backend/app/services/packs.py#L45)). A throwaway database is a quick way to test sign-up from scratch.
-- To build a map pack by hand, see [MAPS.md](MAPS.md). The builder's options are in [`mapbuild/__main__.py:41`](../tools/mapbuild/mapbuild/__main__.py#L41).
+- To build a map pack by hand, see [MAPS.md](MAPS.md). The builder's options are in [`mapbuild/__main__.py:45`](../tools/mapbuild/mapbuild/__main__.py#L45).
 
 ## Tests
 
@@ -240,7 +240,7 @@ A new kind of system, fire mode or generic drone type reaches much further than 
 
 - **A kind of system** needs a new `TOOLBAR` row with its own hotkey, a model shape in `SYSTEM_SHAPES` ([`models.js:17`](../frontend/src/render/models.js#L17)), map symbols, and handling wherever the code branches on `def.kind`: detection and classification in [`network/sensors.js`](../frontend/src/sim/network/sensors.js#L154), [`sensor-model.js`](../frontend/src/sim/sensor-model.js), [`site-range.js`](../frontend/src/sim/site-range.js), [`unit-config.js`](../frontend/src/sim/unit-config.js), tasking, the Unit panel and the wizard. `grep -rn "kind === '" frontend/src` lists them.
 - **A fire mode** needs a handler in `FIRE` ([`effectors.js:57`](../frontend/src/sim/effectors.js#L57)) and changes wherever `def.fire` is read: magazines, tasking, statistics, the Cost tab and the HUD. `grep -rn "fire === '" frontend/src` lists them.
-- **A generic drone type** changes the waves themselves. A wave has four fixed slots, one per generic type ([`attack-mix.js:22`](../frontend/src/sim/attack-mix.js#L22), [`waves.js:58`](../frontend/src/sim/waves.js#L58)), and the default mix is every generic type ([`attack-mix.js:7`](../frontend/src/sim/attack-mix.js#L7)), so it changes every reference digest. `real-drones.test.js` also spells out the four types by name.
+- **A generic drone type** changes the waves themselves. A wave has four fixed slots, one per generic type ([`attack-mix.js:22`](../frontend/src/sim/attack-mix.js#L22), [`waves.js:62`](../frontend/src/sim/waves.js#L62)), and the default mix is every generic type ([`attack-mix.js:7`](../frontend/src/sim/attack-mix.js#L7)), so it changes every reference digest. `real-drones.test.js` also spells out the four types by name.
 
 ## Other tools
 

@@ -56,7 +56,7 @@ def geo_fit(window: Window, crs: int = 27700) -> dict:
     east, north = east.ravel(), north.ravel()
     lon, lat = to_wgs.transform(east, north)
     lon_fit, lat_fit, error = fit_to_coefficients(east, north, np.asarray(lon), np.asarray(lat), window)
-    if error > MAX_ERROR_M:
+    if not np.isfinite(error) or error > MAX_ERROR_M:  # NaN compares False with everything, so it would pass the limit alone
         raise SystemExit(f"The position fit is out by {error:.2f} m, over the {MAX_ERROR_M} m limit.")
     ellipsoid = geoid_separation(window, crs, to_wgs)
     if not np.isfinite(ellipsoid):

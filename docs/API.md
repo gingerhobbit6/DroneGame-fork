@@ -99,7 +99,7 @@ The browser client ([`client.js:21`](../frontend/src/api/client.js#L21)) treats 
 
 ## Auth and accounts
 
-Accounts are local to the machine ([ADR 0004](adr/0004-local-accounts-with-recovery-codes.md)). Passwords and recovery codes are hashed with scrypt (N = 2^14, r = 8, p = 1, [`accounts.py:17`](../backend/app/services/accounts.py#L17)), each with its own salt.
+Accounts are local to the machine ([ADR 0004](adr/0004-local-accounts-with-recovery-codes.md)). Passwords and recovery codes are hashed with scrypt (N = 2^14, r = 8, p = 5, [`accounts.py:17`](../backend/app/services/accounts.py#L17)), each with its own salt.
 
 **Lockout.** Five failed tries lock the account for 300 seconds ([`accounts.py:18`](../backend/app/services/accounts.py#L18)). Password and recovery code tries share the count, and so do the password confirmations on `/auth/password`, `/auth/recovery-code` and `/auth/delete-account`. Each try is counted before the slow hash, so a burst sent at once still locks after five. An unknown username is checked against a dummy hash, so it takes as long to refuse as a wrong password ([`accounts.py:60`](../backend/app/services/accounts.py#L60)). Usernames are unique whatever their case ([`0002_accounts.sql:5`](../backend/app/db/migrations/0002_accounts.sql#L5)).
 
@@ -129,7 +129,7 @@ Sources: [`routes/auth.py`](../backend/app/routes/auth.py#L48), [`account_schema
 
 ## Deployment packs (units)
 
-A deployment pack is a military unit with the systems, vehicles and people assigned to it. Each belongs to the account that made it: every query includes the account's id, so another account's pack is a `404` ([`account_stores.py:154`](../backend/app/db/account_stores.py#L154)). An account may keep 50 packs; the 51st is `409` `You have as many deployment packs as you may keep. Delete one first.` ([`units.py:9`](../backend/app/services/units.py#L9)).
+A deployment pack is a military unit with the systems, vehicles and people assigned to it. Each belongs to the account that made it: every query includes the account's id, so another account's pack is a `404` ([`account_stores.py:150`](../backend/app/db/account_stores.py#L150)). An account may keep 50 packs; the 51st is `409` `You have as many deployment packs as you may keep. Delete one first.` ([`units.py:9`](../backend/app/services/units.py#L9)).
 
 | Route | Body | Response |
 |---|---|---|
@@ -257,7 +257,7 @@ Map packs are files in the maps folder's `packs/` (`~/site-guard-maps`, or `SITE
 
 **Building.** `east` and `north` are metres on the British National Grid, or on the Estonian grid inside eastings 360,000 to 749,999 and northings 6,365,000 to 6,639,999 ([`services/packs.py:23`](../backend/app/services/packs.py#L23)). A position on neither grid is a `422` whose message says it is outside the maps this can build ([`routes/packs.py:21`](../backend/app/routes/packs.py#L21)). Only one build runs at a time; a second is `409` `A map is already being built.` The build runs the map builder as a separate process with fixed arguments: a pack 70 km across named `area_<east km>_<north km>.sgmap`, with lidar across 54 km in Great Britain or the whole 70 km in Estonia when `lidar` is true ([`services/packs.py:166`](../backend/app/services/packs.py#L166)). `202` is returned even when the builder could not start: the status then has `ok: false` and says why. Poll `GET /packs/build` for progress; `message` is the last line the builder printed, cut to 200 characters.
 
-**Build limits** ([`services/packs.py:25`](../backend/app/services/packs.py#L25)). All accounts share one map store and one builder, so builds are bounded on the server. Note: when this page was written (9 November 2026) these limits were work in progress, not yet committed to `main`, where the only limit is one build at a time. Check `services/packs.py` if in doubt.
+**Build limits** ([`services/packs.py:25`](../backend/app/services/packs.py#L25)). All accounts share one map store and one builder, so builds are bounded on the server.
 
 | Limit | Value | Refusal |
 |---|---|---|
@@ -266,7 +266,7 @@ Map packs are files in the maps folder's `packs/` (`~/site-guard-maps`, or `SITE
 | Everything in the maps folder | Under 40,000,000,000 bytes | `409` `The map build stopped at the map storage limit.` |
 | One build's running time | 4 hours | The build is stopped |
 
-The disk checks run before a build starts and again every 30 seconds while it runs; a build that crosses one, or the time limit, is stopped with the builder's child processes, and the status says which limit stopped it ([`services/packs.py:225`](../backend/app/services/packs.py#L225)). If the disk cannot be checked, the build is refused with `409` `The map storage could not be checked.` The start counts are kept in memory, so restarting the server clears them.
+The disk checks run before a build starts and again every second while it runs; a build that crosses one, or the time limit, is stopped with the builder's child processes, and the status says which limit stopped it ([`services/packs.py:225`](../backend/app/services/packs.py#L225)). If the disk cannot be checked, the build is refused with `409` `The map storage could not be checked.` The start counts are kept in memory, so restarting the server clears them.
 
 **Fetching a file.** `name` must match `^[A-Za-z0-9_-]{1,64}\.sgmap$` and be a file in the packs folder; anything else is `404` ([`services/packs.py:18`](../backend/app/services/packs.py#L18)), so a request cannot reach any other file.
 

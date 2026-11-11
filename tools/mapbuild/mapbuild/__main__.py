@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+import urllib.request
 from datetime import date
 
 import numpy as np
@@ -12,6 +13,7 @@ import numpy as np
 from . import beyond, download, estonia, features, fit, packfile, pictures, terrain
 from .estonia import Inputs
 from .grid import Window, parse_grid_ref
+from .source_limits import HttpsRedirects
 
 WORLD_KM = 54  # a world is this wide (WORLD.radius in frontend/src/sim/config/world.js), so a pack must be wider
 
@@ -33,11 +35,13 @@ def british(data_root: str, window: Window, lidar_km: int, say) -> Inputs:
     roads, road_fields = source.read("Road", ["CLASSIFICA"])
     names, name_fields = source.read("NamedPlace", ["DISTNAME", "CLASSIFICA", "FONTHEIGHT"])
     say(f"OpenMap Local: {len(houses)} buildings, {len(wood)} woods, {len(roads)} roads, {len(names)} names")
+    features.check_counts(window, power, roads, names)  # before the lidar, so a refusal does not throw an hour of fetching away
     grids = terrain.lidar(window, lidar_km * 500, houses, say) if lidar_km else None
     return Inputs(t50, no_tile, wood, houses, power, np.concatenate([surface, tidal]), roads, road_fields, names, name_fields, grids)
 
 
 def main(argv: list[str] | None = None) -> int:
+    urllib.request.install_opener(urllib.request.build_opener(HttpsRedirects))  # every urlopen in the builder then refuses a redirect to plain http
     parser = argparse.ArgumentParser(prog="mapbuild", description="Build a Site Guard map pack from open data.")
     parser.add_argument("--centre", required=True, help='the middle of the pack, as a grid reference such as "SU 22 66", or as easting,northing on the British or Estonian grid')
     parser.add_argument("--name", required=True, help="the name shown in the game")

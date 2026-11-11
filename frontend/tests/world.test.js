@@ -253,6 +253,17 @@ describe('small helpers', () => {
     expect(money(50000)).toBe('£38k');
     expect(money(1234)).toBe('£926');
   });
+  it('picks the unit after rounding, and puts a debt\'s minus before the pound sign', () => {
+    expect(money(1333333)).toBe('£1M'); // £999,999.75, which once read £1000k
+    expect(money(1332000)).toBe('£999k');
+    expect(money(13333333)).toBe('£10M');
+    expect(money(13332)).toBe('£9,999');
+    expect(money(-5000000)).toBe('-£3.75M'); // a deployment pack lets the budget go below zero
+    expect(money(-50000)).toBe('-£38k');
+    expect(money(-1234)).toBe('-£926');
+    expect(money(0)).toBe('£0');
+    expect(money(-0.5)).toBe('£0');
+  });
   it('adds up what an attack cost', () => {
     expect(enemyCost({ fpv: 2, fw: 1 })).toBe(2 * DRONES.fpv.cost + DRONES.fw.cost);
   });

@@ -10,9 +10,10 @@ import urllib.request
 from .source_limits import enough_disk_room, read_capped
 
 API = "https://api.os.uk/downloads/v1/products/{}/downloads"
-HOST = "api.os.uk"  # the listing is untrusted input too: a file is only fetched from OS itself, over https
+HOST = "api.os.uk"  # the listing is untrusted input too: a file is only asked for from OS itself, and a redirect may only lead on over https
 MAX_LISTING_BYTES = 5_000_000
 MAX_OS_BYTES = 4_000_000_000
+TRIES = 3
 
 
 def _pick(product: str, area: str, fmt: str, sub: str | None) -> dict | None:
@@ -53,26 +54,31 @@ def _fetch(item: dict, folder: str, say) -> None:
     if _cached_matches(target, item["size"], md5):
         return
     say(f"downloading {name}, {item['size'] / 1e6:.0f} MB")
-    digest, done = hashlib.md5(usedforsecurity=False), 0
     part = target + ".part"
-    no_room = False
-    with urllib.request.urlopen(item["url"], timeout=120) as reply, open(part, "wb") as out:
-        while chunk := reply.read(1 << 20):
-            done += len(chunk)
-            if done > item["size"]:  # never more than OS said, so a bad reply cannot fill the disc
-                break
-            if not enough_disk_room(folder, len(chunk)):
-                no_room = True
-                break
-            out.write(chunk)
-            digest.update(chunk)
-    if no_room:
-        os.remove(part)
-        raise SystemExit(f"not enough free space to download {name}")
-    if done != item["size"] or digest.hexdigest() != md5.lower():
-        os.remove(part)
-        raise SystemExit(f"{name} did not download correctly")
-    os.replace(part, target)
+    for _ in range(TRIES):
+        digest, done, no_room, whole = hashlib.md5(usedforsecurity=False), 0, False, False
+        try:
+            with urllib.request.urlopen(item["url"], timeout=120) as reply, open(part, "wb") as out:
+                while chunk := reply.read(1 << 20):
+                    done += len(chunk)
+                    if done > item["size"]:  # never more than OS said, so a bad reply cannot fill the disc
+                        break
+                    if not enough_disk_room(folder, len(chunk)):
+                        no_room = True
+                        break
+                    out.write(chunk)
+                    digest.update(chunk)
+            whole = not no_room and done == item["size"] and digest.hexdigest() == md5.lower()
+        except OSError as problem:  # a dropped connection is worth another try, and urllib's own errors are OSErrors too
+            say(f"{name} stopped part way: {str(problem)[:100]}")
+        if whole:
+            os.replace(part, target)
+            return
+        if os.path.exists(part):
+            os.remove(part)
+        if no_room:  # trying again cannot make room
+            raise SystemExit(f"not enough free space to download {name}")
+    raise SystemExit(f"{name} did not download correctly")
 
 
 def ensure(data_root: str, squares: list[str], say) -> None:

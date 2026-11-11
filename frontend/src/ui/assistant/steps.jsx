@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useAccount } from '../account/pack.js';
-import { BUILD, DRONES, DRONE_CLASSES, ECONOMY, FUSION, SITE, STRUCTURES } from '../../sim/config/index.js';
+import { BUILD, DRONES, DRONE_CLASSES, ECONOMY, FUSION, STRUCTURES } from '../../sim/config/index.js';
 import { money } from '../../sim/economy.js';
 import { view } from '../../render/view.js';
 import { closeZone, ringZone, undoZonePoint } from '../../zone.js';
@@ -326,10 +326,10 @@ export const STEPS = {
   ] },
   coverage: { title: 'Check what it can see', Body: CoverageStep, why: [
     ['Why is one drone so much lower?', 'Each type flies at its own height. Low flyers are hidden by hills and trees for longer.'],
-    ['What do the colours mean?', 'Red is unseen, green is one sensor, blue is two, and white is three or more.'],
+    ['What do the colours mean?', 'Red is not seen, amber is seen by one sensor, and green by two or more.'],
   ] },
   people: { title: 'Who is on site?', optional: true, Body: PeopleStep, why: [
-    ['Do I need to do this?', 'No. People change nothing about the attack. They only show what a blast near them would do.'],
+    ['Do I need to do this?', 'No. Outside a drawn area people change nothing about the attack: they only show what a blast near them would do. Inside one, a strike may aim at them.'],
     ['Where do the casualty numbers come from?', 'Assumed round figures, marked ASSUMPTION in the Sources tab. They are not weapons-effects data.'],
   ] },
   rehearse: { title: 'Rehearse before it counts', Body: RehearseStep, why: [

@@ -42,36 +42,36 @@ People are placed in groups. Each group has a size, a role and a level of protec
 
 ## Placing people
 
-Use the **People** tool on the toolbar, or key **9** ([`useHotkeys.js:43`](../frontend/src/ui/useHotkeys.js#L43)). Its panel ([`PeoplePicker.jsx`](../frontend/src/ui/PeoplePicker.jsx), the `PeopleChoice` controls) sets the size, role and protection of the next group, which starts as 10 civilians in the open ([`view.js:24`](../frontend/src/render/view.js#L24)). Then click the map. The wizard's optional step 6, "Who is on site?", shows the same controls ([`PeopleStep.jsx`](../frontend/src/ui/assistant/PeopleStep.jsx)).
+Use the **People** tool on the toolbar, or key **9** ([`useHotkeys.js:51`](../frontend/src/ui/useHotkeys.js#L51)). Its panel ([`PeoplePicker.jsx`](../frontend/src/ui/PeoplePicker.jsx), the `PeopleChoice` controls) sets the size, role and protection of the next group, which starts as 10 civilians in the open ([`view.js:24`](../frontend/src/render/view.js#L24)). Then click the map. The wizard's optional step 6, "Who is on site?", shows the same controls ([`PeopleStep.jsx`](../frontend/src/ui/assistant/PeopleStep.jsx)).
 
-A group cannot be placed ([`people.js:59`](../frontend/src/sim/people.js#L59) to [`people.js:72`](../frontend/src/sim/people.js#L72)):
+A group cannot be placed ([`people.js:60`](../frontend/src/sim/people.js#L60) to [`people.js:73`](../frontend/src/sim/people.js#L73)):
 
 - once the laydown is locked at the first wave, or past 50 groups;
 - off the map when you have drawn an area or set a patrol, or otherwise more than 2,500 m from the station ([`attack-area.js:10`](../frontend/src/sim/attack-area.js#L10), [`world.js:39`](../frontend/src/sim/config/world.js#L39));
 - **in a building** anywhere but on a building;
 - **in the open or a bunker** on a building, in water, or on ground steeper than a slope of 0.4.
 
-How the people in a group are laid out ([`people.js:40`](../frontend/src/sim/people.js#L40)). The layout is seeded from the group's position, so the same group always stands the same way.
+How the people in a group are laid out ([`people.js:41`](../frontend/src/sim/people.js#L41)). The layout is seeded from the group's position, so the same group always stands the same way.
 
 - **In the open:** a loose crowd, a sunflower spiral about 1.5 m between people with a little jitter.
 - **In a building:** spread over the building's real outline, turned to match it, 1 m clear of the walls. A marked building cell with no outline counts as a 16 m square.
-- **In a bunker:** spread over a square of side √(1.5 × count) + 2 m, so 1.5 m² each with 1 m clear of each wall ([`people.js:17`](../frontend/src/sim/people.js#L17)).
+- **In a bunker:** spread over a square of side √(1.5 × count) + 2 m, so 1.5 m² each with 1 m clear of each wall ([`people.js:18`](../frontend/src/sim/people.js#L18)).
 
-People cost nothing. They lock with the laydown when the first wave starts and are saved with it, sorted so the order you placed them in cannot change a run; the role is saved only for soldiers ([`people.js:98`](../frontend/src/sim/people.js#L98)). They are drawn at true scale, so each group also has a name tag, and **Look** in the People panel flies the camera down to them.
+People cost nothing. They lock with the laydown when the first wave starts and are saved with it, sorted so the order you placed them in cannot change a run; the role is saved only for soldiers ([`people.js:99`](../frontend/src/sim/people.js#L99)). They are drawn at true scale, so each group also has a name tag, and **Look** in the People panel flies the camera down to them.
 
 ## How a blast hurts people
 
 ### When a blast happens
 
-A drone's warhead goes off, and can hurt people, in these cases. Only a drone with a warhead above 0 makes a blast, and nothing is rolled while no people are placed ([`people.js:134`](../frontend/src/sim/people.js#L134)).
+A drone's warhead goes off, and can hurt people, in these cases. Only a drone with a warhead above 0 makes a blast, and nothing is rolled while no people are placed ([`people.js:135`](../frontend/src/sim/people.js#L135)).
 
 | What happened | Where the blast is | Code |
 |---|---|---|
-| Destroyed in flight by a weapon | Where the drone is, in the air: its height above a group shelters them | [`people.js:137`](../frontend/src/sim/people.js#L137) |
+| Destroyed in flight by a weapon | Where the drone is, in the air: its height above a group shelters them | [`people.js:138`](../frontend/src/sim/people.js#L138) |
 | Brought down by jamming | Where the drone is, in the air | [`drones.js:230`](../frontend/src/sim/drones.js#L230) |
 | Struck one of your systems | On the ground at the system | [`targeting.js:100`](../frontend/src/sim/targeting.js#L100) |
-| Struck the station, with no drawn area | On the ground at a random bearing and a random distance out to 150 m from the middle, so more often near the middle | [`people.js:147`](../frontend/src/sim/people.js#L147) to [`people.js:153`](../frontend/src/sim/people.js#L153) |
-| Struck a drawn area | On the ground at its aim point | [`people.js:149`](../frontend/src/sim/people.js#L149) |
+| Struck the station, with no drawn area | On the ground at a random bearing and a random distance out to 150 m from the middle, so more often near the middle | [`people.js:148`](../frontend/src/sim/people.js#L148) to [`people.js:154`](../frontend/src/sim/people.js#L154) |
+| Struck a drawn area | On the ground at its aim point | [`people.js:150`](../frontend/src/sim/people.js#L150) |
 | Struck the patrol, or where the patrol had been | On the ground at the fix it was flying to | [`drones.js:94`](../frontend/src/sim/drones.js#L94), [`drones.js:100`](../frontend/src/sim/drones.js#L100) |
 
 No blast comes from a drone taken over and landed by a jammer, one that turned for home, or one that left the area. Spotters carry no warhead. Drone behaviour is in [DRONES.md](DRONES.md).
@@ -138,7 +138,7 @@ Lethal / injury radius in metres, for the generic strike types (printed from the
 
 ### Who is hurt
 
-For each person not already hurt, with `d` the straight-line distance in 3D from the blast to them, `L` and `I` the lethal and injury radii after the reach scale, and `p` the casualty chance at the blast ([`people.js:109`](../frontend/src/sim/people.js#L109) to [`people.js:130`](../frontend/src/sim/people.js#L130)):
+For each person not already hurt, with `d` the straight-line distance in 3D from the blast to them, `L` and `I` the lethal and injury radii after the reach scale, and `p` the casualty chance at the blast ([`people.js:110`](../frontend/src/sim/people.js#L110) to [`people.js:131`](../frontend/src/sim/people.js#L131)):
 
 - beyond `I`, nothing happens;
 - otherwise one roll `r` from 0 to 1: killed if `r < p × max(0, 1 − d / L)`, else injured if `r < p × (1 − d / I)`, else unhurt.
@@ -147,7 +147,7 @@ So the chance of being hurt at all falls in a straight line from `p` at the blas
 
 For example, an FPV (2 kg) going off on the ground 5 m from a person in the open: the kill chance is 0.9 × (1 − 5 / 11.34) = 0.50 and the chance of any harm is 0.9 × (1 − 5 / 31.50) = 0.76, so about a 50% chance of death, 25% of injury and 24% of no harm.
 
-Each drone's blast draws from a random stream of its own, seeded from the run's seed and the drone's number ([`people.js:133`](../frontend/src/sim/people.js#L133)), so casualty rolls never disturb the rest of the run.
+Each drone's blast draws from a random stream of its own, seeded from the run's seed and the drone's number ([`people.js:134`](../frontend/src/sim/people.js#L134)), so casualty rolls never disturb the rest of the run.
 
 ## Do people change the attack?
 
@@ -182,9 +182,9 @@ By day a crew sees an FPV (0.35 m) at about 309 m, a Shahed-class drone (2.5 m) 
 
 In patrol mode you protect soldiers walking a route instead of a site. The full rules are in [PATROL_MODE.md](PATROL_MODE.md); the parts that concern people are these.
 
-- **The soldiers** are a group of 12, in the open, drawn as soldiers ([`patrol.js:64`](../frontend/src/sim/patrol.js#L64), [`patrol.js:9`](../frontend/src/sim/config/patrol.js#L9)). They are hurt exactly as any other group. The group is rebuilt from the route, so it is not saved with the other groups and cannot be removed on its own.
+- **The soldiers** are a group of 12, in the open, drawn as soldiers ([`patrol.js:67`](../frontend/src/sim/patrol.js#L67), [`patrol.js:9`](../frontend/src/sim/config/patrol.js#L9)). They are hurt exactly as any other group. The group is rebuilt from the route, so it is not saved with the other groups and cannot be removed on its own.
 - **Formation** ([`formation.js:14`](../frontend/src/sim/formation.js#L14)): single file, a staggered column or a wedge, 5 m apart. Each soldier follows the route at their own place along it.
-- **Movement:** 1.4 m/s out to the end of the route, 60 s wait, then back, then hold until the next wave. The whole patrol halts while any weapon in the column (not a jammer) is engaging ([`patrol.js:117`](../frontend/src/sim/patrol.js#L117)).
+- **Movement:** 1.4 m/s out to the end of the route, 60 s wait, then back, then hold until the next wave. The whole patrol halts while any weapon in the column (not a jammer) is engaging ([`patrol.js:120`](../frontend/src/sim/patrol.js#L120)).
 - **Escorts:** 1 to 6 vehicles, each carrying one system, up to 200 m ahead or behind and 100 m to either side ([`patrol.js:41`](../frontend/src/sim/config/patrol.js#L41) to [`patrol.js:43`](../frontend/src/sim/config/patrol.js#L43)). A new patrol gets a Toyota Hilux with a Blighter A800 radar 40 m ahead and a Patria 6x6 with a Rapid Ranger 40 m behind ([`patrol.js:12`](../frontend/src/sim/config/patrol.js#L12)). A strike on a system riding a Patria does half damage (armour 2). The vehicles' crews are not modelled.
 - **How the enemy finds them** ([`patrol.js:18`](../frontend/src/sim/config/patrol.js#L18)): a spotter sees the patrol within 3,500 m with a clear line of sight and passes a fix; a strike flown by video sees it for itself within 500 m; with no fix, strikes circle within 400 m of the corridor's middle for up to 600 s.
 - **A strike on the patrol** takes integrity as a strike on the site does, and its blast lands at the fix among the soldiers. If no soldier is within 30 m of the fix, it is a miss with no loss of integrity, but the blast can still hurt anyone close ([`hunt.js:61`](../frontend/src/sim/hunt.js#L61)).
@@ -194,12 +194,12 @@ All of these figures are labelled assumptions in the Sources tab.
 
 ## Counting and showing casualties
 
-When a blast hurts anyone, the run adds to its killed, injured and total casualty counts, records a casualty event such as "First-person-view strike drone: 2 killed, 1 injured (simulated)", and shows the same text as a toast ([`people.js:125`](../frontend/src/sim/people.js#L125) to [`people.js:129`](../frontend/src/sim/people.js#L129)).
+When a blast hurts anyone, the run adds to its killed, injured and total casualty counts, records a casualty event such as "First-person-view strike drone: 2 killed, 1 injured (simulated)", and shows the same text as a toast ([`people.js:126`](../frontend/src/sim/people.js#L126) to [`people.js:130`](../frontend/src/sim/people.js#L130)).
 
 | Where | What it shows |
 |---|---|
-| HUD | People killed and injured so far ([`Hud.jsx:58`](../frontend/src/ui/Hud.jsx#L58)) |
-| Timeline | A marker for each casualty event ([`Timeline.jsx:8`](../frontend/src/ui/Timeline.jsx#L8)) |
+| HUD | People killed and injured so far ([`Hud.jsx:66`](../frontend/src/ui/Hud.jsx#L66)) |
+| Timeline | A marker for each casualty event ([`Timeline.jsx:11`](../frontend/src/ui/Timeline.jsx#L11)) |
 | The map | Injured and killed people drawn down, each in its own colour; each group's tag adds "N hurt" ([`people-view.js:183`](../frontend/src/render/people-view.js#L183)) |
 | People panel | Each group as unhurt of total ([`PeoplePicker.jsx:43`](../frontend/src/ui/PeoplePicker.jsx#L43)) |
 | End of run | Killed and injured of all people, broken down by protection level ([`Overlay.jsx:80`](../frontend/src/ui/Overlay.jsx#L80) to [`Overlay.jsx:95`](../frontend/src/ui/Overlay.jsx#L95)) |

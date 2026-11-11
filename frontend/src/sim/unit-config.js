@@ -240,8 +240,10 @@ function cleanValue(field, id, value) {
   if (field.arcs || field.bands) return field.parse(value, id);
   if (field.choices) return Object.hasOwn(field.choices, value) ? value : undefined;
   if (!Number.isFinite(value)) return undefined;
-  const [min, max] = field.limits[id], step = stepOf(field, id);
-  return Math.min(max, Math.max(min, Number((min + Math.round((value - min) / step) * step).toFixed(2))));
+  const [min, max] = field.limits[id], step = stepOf(field, id), base = field.base(STRUCTURES[id]);
+  const snapped = Math.min(max, Math.max(min, Number((min + Math.round((value - min) / step) * step).toFixed(2))));
+  // The steps count from the minimum, so the standard value can fall between two of them: it stays reachable, at the standard price.
+  return Number.isFinite(base) && Math.abs(value - base) <= Math.abs(value - snapped) ? base : snapped;
 }
 
 // Only what differs from the catalogue is kept, so a unit with no changes saves and plays exactly as before.

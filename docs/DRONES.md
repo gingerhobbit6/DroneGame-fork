@@ -94,7 +94,7 @@ A spotter never strikes ([`drones.js:131`](../frontend/src/sim/drones.js#L131)).
 
 1. **Approach.** It flies straight towards the centre of what is defended until it is at its orbit radius (2,500 m for the generic spotter, 1,000 m for the Mini 4 Pro). It holds at least 30 m above the ground ([`drones.js:16`](../frontend/src/sim/drones.js#L16)).
 2. **On station.** It circles at that radius at its own speed for its time on station (60 s), then turns away. While circling with working video, each spotter adds its `spotBonus` (0.5) to the damage of every strike ([`drones.js:86`](../frontend/src/sim/drones.js#L86)). Two spotters on station double what each strike does.
-3. **Egress.** It flies straight away until it is more than 26 km out or off the map, and counts as escaped ([`drones.js:121`](../frontend/src/sim/drones.js#L121)). When a wave's last strike drone has gone, every spotter still flying turns away too ([`waves.js:42`](../frontend/src/sim/waves.js#L42) to [`waves.js:43`](../frontend/src/sim/waves.js#L43)).
+3. **Egress.** It flies straight away until it is more than 26 km out or off the map, and counts as escaped ([`drones.js:121`](../frontend/src/sim/drones.js#L121)). When a wave's last strike drone has gone, every spotter still flying turns away too ([`waves.js:46`](../frontend/src/sim/waves.js#L46) to [`waves.js:47`](../frontend/src/sim/waves.js#L47)).
 
 Against a patrol a spotter must first find it: it sweeps the route end to end until its camera sees the patrol, then circles the last fix it took ([`hunt.js:32`](../frontend/src/sim/hunt.js#L32)). See [PATROL_MODE.md](PATROL_MODE.md).
 
@@ -166,7 +166,7 @@ Each wave after the first, new drones spawn harder to hit and harder to jam ([`d
 - evasion = max(min(0.25, base), base × (1 − 0.07 k))
 - jam resistance = max(base, min(0.95, base + 0.05 k))
 
-In the sandbox the level chosen there stands in for the wave number ([`drones.js:21`](../frontend/src/sim/drones.js#L21)). The per-wave steps (0.07 and 0.05) can be changed in the Tuning panel ([`Panels.jsx:20`](../frontend/src/ui/Panels.jsx#L20)) and travel with exported figure sets. Evasion / jam resistance for the generic types:
+In the sandbox the level chosen there stands in for the wave number ([`drones.js:21`](../frontend/src/sim/drones.js#L21)). The per-wave steps (0.07 and 0.05) can be changed in the Tuning panel ([`Panels.jsx:21`](../frontend/src/ui/Panels.jsx#L21)) and travel with exported figure sets. Evasion / jam resistance for the generic types:
 
 | Wave | Fixed-wing spotter | Fibre-optic | First-person-view | Fixed-wing strike |
 |---|---|---|---|---|
@@ -185,14 +185,14 @@ The fibre-optic drone has an adaptation rate of 0, so it never changes. A real d
 
 ### Size and timing
 
-A wave is planned when it starts, from its own seeded random stream, so a wave is the same however it is reached ([`waves.js:58`](../frontend/src/sim/waves.js#L58)). There are four slots, one per generic type:
+A wave is planned when it starts, from its own seeded random stream, so a wave is the same however it is reached ([`waves.js:62`](../frontend/src/sim/waves.js#L62)). There are four slots, one per generic type:
 
-- **FPV slot:** 3 + 2 × wave drones, one every 20 s (`WAVES.fpvGap`, [`world.js:107`](../frontend/src/sim/config/world.js#L107), editable), each from its own random bearing and distance ([`waves.js:72`](../frontend/src/sim/waves.js#L72)).
+- **FPV slot:** 3 + 2 × wave drones, one every 20 s (`WAVES.fpvGap`, [`world.js:107`](../frontend/src/sim/config/world.js#L107), editable), each from its own random bearing and distance ([`waves.js:76`](../frontend/src/sim/waves.js#L76)).
 - **Fixed-wing strike slot:** from wave 2, ⌈(wave − 1) / 2⌉ drones, launched between 4 s and 18 s in.
 - **Fibre-optic slot:** from wave 3, ⌊(wave − 1) / 2⌋ drones, launched between 2 s and 12 s in.
 - **Spotter slot:** from wave 3, one spotter, and two from wave 8, launched in the first second.
 
-The fixed-wing, fibre-optic and spotter drones come from shared launch areas: one at waves 1 and 2, two from wave 3 and three from wave 6 ([`waves.js:62`](../frontend/src/sim/waves.js#L62)). Each drone in an area gets up to ±0.15 radians (about ±8.6°) of bearing jitter.
+The fixed-wing, fibre-optic and spotter drones come from shared launch areas: one at waves 1 and 2, two from wave 3 and three from wave 6 ([`waves.js:66`](../frontend/src/sim/waves.js#L66)). Each drone in an area gets up to ±0.15 radians (about ±8.6°) of bearing jitter.
 
 Counts from `makeWave` with the default mix (a script imported `waves.js` and counted each slot; the counts do not depend on the seed):
 
@@ -225,20 +225,20 @@ What each wave costs the enemy with the default mix:
 | 15 | 49 | £348,900 |
 | 20 | 64 | £432,150 |
 
-A wave ends when its queue is empty and no strike drone is left; the spotters then withdraw ([`waves.js:42`](../frontend/src/sim/waves.js#L42)). With auto-start on, the next wave begins 6 s later. Start times are spawn times: an FPV starting 12 to 15 km out at 30 m/s takes about 400 to 500 s to arrive.
+A wave ends when its queue is empty and no strike drone is left; the spotters then withdraw ([`waves.js:46`](../frontend/src/sim/waves.js#L46)). With auto-start on, the next wave begins 6 s later. Start times are spawn times: an FPV starting 12 to 15 km out at 30 m/s takes about 400 to 500 s to arrive.
 
 ### Attack mix
 
 **Attack** (top right) chooses which drones the waves send ([`attack-mix.js`](../frontend/src/sim/attack-mix.js), [`AttackMix.jsx`](../frontend/src/ui/AttackMix.jsx)). The default is the four generic types, which keeps the original waves exactly.
 
-- Each slot sends the ticked drones whose type matches it, taking turns, starting at a different one each wave so every one is seen ([`attack-mix.js:22`](../frontend/src/sim/attack-mix.js#L22), [`waves.js:59`](../frontend/src/sim/waves.js#L59)). The Molniya-2 plays as an FPV, so it takes FPV places even though it has wings.
+- Each slot sends the ticked drones whose type matches it, taking turns, starting at a different one each wave so every one is seen ([`attack-mix.js:22`](../frontend/src/sim/attack-mix.js#L22), [`waves.js:63`](../frontend/src/sim/waves.js#L63)). The Molniya-2 plays as an FPV, so it takes FPV places even though it has wings.
 - A strike slot with none of its type ticked is filled by all the ticked strike drones in turn. The spotter slot is filled only if a spotter is ticked.
 - A mix must hold at least one strike drone ([`laydown.js:154`](../frontend/src/sim/laydown.js#L154)). A saved mix is cleaned to known drones, once each, in catalogue order ([`attack-mix.js:15`](../frontend/src/sim/attack-mix.js#L15)). It is saved with the laydown and locked when the first wave starts.
 - The mix is also what the fusion node expects to see ([Classification](#classification-the-threat-library)).
 
 ### The attack area
 
-Without a drawn area, the attack is centred on the station. A drawn area becomes the site: drones launch around its centre (the mean of its corners) and strike drones aim inside it ([`laydown.js:175`](../frontend/src/sim/laydown.js#L175), [`attack-area.js`](../frontend/src/sim/attack-area.js)). With a patrol, the centre is the lead soldier, wherever the patrol has walked to ([`patrol.js:46`](../frontend/src/sim/patrol.js#L46)). An area and a patrol cannot both be set.
+Without a drawn area, the attack is centred on the station. A drawn area becomes the site: drones launch around its centre (the mean of its corners) and strike drones aim inside it ([`laydown.js:175`](../frontend/src/sim/laydown.js#L175), [`attack-area.js`](../frontend/src/sim/attack-area.js)). With a patrol, the centre is the lead soldier, wherever the patrol has walked to ([`patrol.js:47`](../frontend/src/sim/patrol.js#L47)). An area and a patrol cannot both be set.
 
 ### Conditions
 

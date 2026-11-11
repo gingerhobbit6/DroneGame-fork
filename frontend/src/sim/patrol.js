@@ -10,6 +10,7 @@ import { designLocked } from './lock.js';
 import { addGroup, cleanCount } from './people.js';
 import { FORMATIONS, placeIn, soldierSpot } from './formation.js';
 import { legEnds, routeProblem, widthProblem } from './route.js';
+import { cleanSettings, unitCost } from './unit-config.js';
 
 export { MAX_WAYPOINTS, routeProblem } from './route.js';
 
@@ -48,13 +49,15 @@ function placeAll(w) {
 
 // Every system in the column and its terminal, and a terminal for the fusion node if it has none. The vehicles themselves are
 // not priced: the budget is for counter-drone systems.
-const escortCost = (w, column) => column.reduce((sum, e) => sum + STRUCTURES[e.system].cost, 0)
+const onVehicle = ({ vehicle, system }) => (STRUCTURES[system].mount == null ? {} : { mount: PATROL_VEHICLES[vehicle].mast }); // its mast on the vehicle
+// priced as startPatrol charges it, on its vehicle's mast, so what passes the check can be paid for
+const escortCost = (w, column) => column.reduce((sum, e) => sum + unitCost(e.system, cleanSettings(e.system, onVehicle(e))), 0)
   + COMMS.starlink.cost * (column.filter((e) => STRUCTURES[e.system].networked !== false).length + (w.net.fusion.uplinks.has('starlink') ? 0 : 1));
 
 function startPatrol(w, route, column, plan) {
   const [x, z] = route[0];
   const escorts = column.map(({ vehicle, system, gap, side }) => {
-    const s = addStructure(w, system, x, z, { settings: STRUCTURES[system].mount == null ? {} : { mount: PATROL_VEHICLES[vehicle].mast } }); // its mast on the vehicle
+    const s = addStructure(w, system, x, z, { settings: onVehicle({ vehicle, system }) });
     s.escort = true; s.def.vehicle = vehicle; // the unit's own definition, so the drawing puts it on the vehicle
     w.state.budget -= s.def.cost; w.ledger.capex += s.def.cost;
     if (s.def.networked !== false) wireNode(w, s, 'starlink'); // shortcut: assumes a terminal that works on the move. Model cellular or a mesh radio if escorts need a choice.

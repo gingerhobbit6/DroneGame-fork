@@ -1,6 +1,6 @@
 // Real worlds in the rules: the grid arithmetic, checking and cutting a pack, and a full game on one.
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bngToWgs84, parseGridRef, squaresAround, wgs84ToBng } from '../src/sim/bng.js';
 import { fromLatLon, gridFor, gridRef, onGrid, parsePosition, toLatLon } from '../src/sim/grids.js';
 import { lest97ToWgs84, wgs84ToLest97 } from '../src/sim/lest97.js';
@@ -11,7 +11,7 @@ import { hereU } from '../src/sim/units.js';
 import { bus, location } from '../src/sim/sapient.js';
 import { resetAllFigures, WORLD } from '../src/sim/config/index.js';
 import * as THREE from 'three';
-import { buildWorldView } from '../src/render/terrain-view.js';
+import { buildWorldView, makeHillshade } from '../src/render/terrain-view.js';
 import { CENTRE, fixtureParts, gridsHash } from './support/fixture-pack.js';
 import { MIXED, setUp } from './support/scenarios.js';
 
@@ -299,5 +299,18 @@ describe('playing on a real world', () => {
       sim.step();
       expect(d.pos.y).toBeGreaterThan(hereU(d.pos.x, d.pos.z));
     }
+  });
+});
+
+describe('the relief picture', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('paints snow on generated mountains, but not on a real map, where heights are metres above the site', () => {
+    let painted;
+    vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({ createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData(img) { painted = img.data; } }) }) });
+    const high = { R: 100, groundAt: () => 375, coverAt: () => 0 }; // level ground near the top of the generated relief
+    makeHillshade(high, 2);
+    const snow = painted[2];
+    makeHillshade({ ...high, geo: {} }, 2);
+    expect(snow).toBeGreaterThan(painted[2] * 2); // snow is near white, bare high ground is brown: far less blue
   });
 });

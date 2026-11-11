@@ -43,7 +43,7 @@ def db_path(tmp_path):
 
 @pytest.fixture(autouse=True)
 def quick_hashing(monkeypatch):
-    # the real cost makes each hash take ~50 ms; tests only need the same code path
+    # the real cost makes each hash take about 0.2 to 0.3 s; tests only need the same code path
     monkeypatch.setitem(accounts.SCRYPT, "n", 2**8)
 
 

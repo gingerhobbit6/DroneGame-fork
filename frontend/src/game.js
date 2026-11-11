@@ -111,6 +111,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   const loadoutFor = (id) => (loadouts[id] ??= {});
   function setLoadout(id, field, value) {
     if (fieldsFor(id).includes(field)) setSetting(loadoutFor(id), field, id, value);
+    if (placement) placement.refresh(); // the preview judges the new price
     bump();
   }
   // A deployed pack's lines: each system is placed with the settings its line holds, or the catalogue's. With no pack (null), the
@@ -120,6 +121,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     for (const id of fromPack) delete loadouts[id];
     fromPack = (lines ?? []).map((l) => l.id);
     for (const l of lines ?? []) loadouts[l.id] = cleanSettings(l.id, l.settings);
+    if (placement) placement.refresh();
     bump();
   }
   // With a pack's kit, a hotkey opens its kind's list of what the pack holds rather than picking a system to place.
@@ -189,7 +191,7 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
     const pick = () => pickStructure(sim.structures, gameView.camera, x, y);
     if (tool === 'sell') { // the command takes a point on the ground, and the system's own position can only mean that system
       const s = !state.over && (tagged || pick());
-      if (s) commands.sell(s.pos.x, s.pos.z);
+      if (s && !s.escort) commands.sell(s.pos.x, s.pos.z); // an escort goes with its patrol, and its spot would sell the system nearest it
       return !!s;
     }
     const drone = !tool && view.truth && view.replayT == null && pickDrone(sim.drones, gameView.camera, x, y); // drones are drawn only with the truth overlay
@@ -254,9 +256,12 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   const frameClock = new THREE.Timer(); // three.js 0.186 deprecates Clock
   // Panels refresh on the timer only while what they show can change: the run moving, a replay, or the player's hand on the mouse or
   // keys (the cursor read-outs, a dragged panel). Paused, idle or on the start screen, nothing re-renders.
-  let lastBump = 0, stirred = true, covered = false;
+  let lastBump = 0, stirred = true, covered = false, faulted = false;
   const stir = () => { stirred = true; };
-  function frame() {
+  // A fault in a step or a view pauses the game and says so once: it used to freeze the picture and retry the same step every frame.
+  const fault = (e) => { simAcc = 0; if (clock.speed > 0) setSpeed(0); if (!faulted) { faulted = true; console.error(e); toast('The game hit an error and has been paused. Reset run starts again.'); } };
+  function frame() { try { runFrame(); faulted = false; } catch (e) { fault(e); } }
+  function runFrame() {
     const real = Math.min(frameClock.update().getDelta(), 0.05);
     let n = 0;
     if (!debug.frozen && state.started && !state.over && clock.speed > 0) {
@@ -278,10 +283,10 @@ export function createGame({ seed, terrainSeed, api = createApi(), storage = glo
   // Called once, when the canvas and label layer are in the page.
   function attach(canvas, labelLayer) {
     for (const type of ['pointermove', 'pointerdown', 'wheel', 'keydown']) addEventListener(type, stir, { capture: true, passive: true });
-    gameView = createGameView(canvas, labelLayer, sim, mapSource);
+    gameView = createGameView(canvas, labelLayer, sim, mapSource, toast);
     placement = createPlacement({
       scene: gameView.scene, camera: gameView.camera, canvas, sim,
-      getTool: tools.get, defFor: (id) => unitDef(id, onVehicle(id, loadoutFor(id), tools.vehicle())), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
+      getTool: tools.get, defFor: (id) => unitDef(id, cleanSettings(id, onVehicle(id, loadoutFor(id), tools.vehicle()))), onGroundClick: groundClick, onSelect: mapClick, onDrop: dropAt,
       onDoubleClick: gameView.zoomInOn,
     });
     replay = createReplay({

@@ -48,7 +48,7 @@ export function buildWorldView(scene, data, siteMat) {
       c.copy(low).lerp(mid, clamp(t * 2.2, 0, 1)).lerp(high, clamp(t * 2.2 - 1, 0, 1));
       const slope = data.slope(x, z);
       c.lerp(rock, clamp((slope - 0.3) * 3, 0, 0.8));
-      if (t > TERRAIN.snowLine) c.lerp(snow, clamp((t - TERRAIN.snowLine) * 8, 0, 1) * (1 - clamp((slope - 0.9) * 2, 0, 0.6)));
+      if (!data.geo && t > TERRAIN.snowLine) c.lerp(snow, clamp((t - TERRAIN.snowLine) * 8, 0, 1) * (1 - clamp((slope - 0.9) * 2, 0, 0.6)));
       if (cov === 1) c.lerp(forest, 0.65); else if (cov === 2) c.lerp(built, 0.7);
       if (Math.hypot(x, z) < 280) c.lerp(gravel, 0.8);
       // convex ground (ridges) catches the light, concave ground (valleys) is darker: cheap ambient occlusion
@@ -253,7 +253,7 @@ export function makeHillshade(data, size = Math.round(data.R / 22)) { // about 4
       const cov = data.coverAt(x, z);
       if (cov === 1) { r *= 0.55; gr *= 0.8; b *= 0.55; } else if (cov === 2) { r = 150; gr = 150; b = 150; }
       else if (cov === 4) { r = 40; gr = 110; b = 160; }
-      else if (t > TERRAIN.snowLine) { const s = clamp((t - TERRAIN.snowLine) * 8, 0, 1); r += (235 - r) * s; gr += (240 - gr) * s; b += (245 - b) * s; }
+      else if (!data.geo && t > TERRAIN.snowLine) { const s = clamp((t - TERRAIN.snowLine) * 8, 0, 1); r += (235 - r) * s; gr += (240 - gr) * s; b += (245 - b) * s; }
       const o = (py * size + px) * 4;
       img.data[o] = r * shade; img.data[o + 1] = gr * shade; img.data[o + 2] = b * shade; img.data[o + 3] = 255;
     }

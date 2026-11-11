@@ -57,7 +57,7 @@ Generated ground has one map: its own colouring by height, slope, cover and snow
 
 ### Packs and worlds
 
-A **map pack** is one `.sgmap` file holding the grids, buildings, power lines, roads, place names and map pictures for a square of real ground, 70 km across by default. A **world** is the 54 km square cut from a pack around the start point you choose. One pack serves any start point within 8 km of its middle in each direction (half the pack less the world's radius, [`world-pack.js:53`](../frontend/src/sim/world-pack.js#L53)).
+A **map pack** is one `.sgmap` file holding the grids, buildings, power lines, roads, place names and map pictures for a square of real ground, 70 km across by default. A **world** is the 54 km square cut from a pack around the start point you choose. One pack serves any start point within 8 km of its middle in each direction (half the pack less the world's radius, [`world-pack.js:56`](../frontend/src/sim/world-pack.js#L56)).
 
 Packs exist for two countries, because each needs its own open data and grid:
 
@@ -68,12 +68,12 @@ A position says for itself which grid it is on: British northings stop at 1,300 
 
 ### How a world is cut from a pack
 
-[`cutWorld`](../frontend/src/sim/world-pack.js#L69) does this, synchronously and with no DOM, so it is deterministic:
+[`cutWorld`](../frontend/src/sim/world-pack.js#L72) does this, synchronously and with no DOM, so it is deterministic:
 
-1. The start point snaps to the nearest 20 m post, so the cut needs no resampling. It must be far enough from the pack's edge for a full world, and not on water ([`siteProblem`](../frontend/src/sim/world-pack.js#L51)).
+1. The start point snaps to the nearest 20 m post, so the cut needs no resampling. It must be far enough from the pack's edge for a full world, and not on water ([`siteProblem`](../frontend/src/sim/world-pack.js#L54)).
 2. It copies the 2,701 x 2,701 posts around that point from each grid. Heights become metres above the start point's ground (`H0`), so the site sits at height 0 as on generated ground.
 3. Buildings and power line pylons inside the world move to be relative to the site. Roads and names stay with the map pictures.
-4. Three notional masts are picked on high ground with a generator seeded from the world string ([`world-pack.js:93`](../frontend/src/sim/world-pack.js#L93)), as OS open data has no masts. The credit line says "Masts are notional."
+4. Three notional masts are picked on high ground with a generator seeded from the world string ([`world-pack.js:96`](../frontend/src/sim/world-pack.js#L96)), as OS open data has no masts. The credit line says "Masts are notional."
 5. The world keeps `geo`: the start point, `H0`, the pack's position fit, its geoid separation, its tier and its lidar width, for positions and the map.
 
 There is no power station on real ground: the real buildings are the site.
@@ -105,7 +105,7 @@ Satellite and Hybrid say "Not in this map pack" when the pack has no satellite p
 | MGRS grid | 1 km squares of the Military Grid Reference System in the UTM zone of the world's middle, with each 100 km square named, for example `30U WC` ([`paintMgrs`](../frontend/src/render/map-texture.js#L194)) | Worked out in the browser |
 | Trees and buildings | The 3D tree and building models. Hiding them only changes the picture: they still block sight lines. | The world |
 
-Keys on a real map ([`useHotkeys.js:45`](../frontend/src/ui/useHotkeys.js#L45)): **M** moves to the next usable base map, **G** steps through national grid, MGRS and off, and **C** turns contours on and off. **P** looks straight down on any ground. The cursor's readout gives a grid reference on whichever grid is showing, and the height above sea level.
+Keys on a real map ([`useHotkeys.js:53`](../frontend/src/ui/useHotkeys.js#L53)): **M** moves to the next usable base map, **G** steps through national grid, MGRS and off, and **C** turns contours on and off. **P** looks straight down on any ground. The cursor's readout gives a grid reference on whichever grid is showing, and the height above sea level.
 
 A credit line is always on screen on a real map, and changes with the base map ([`Credits`](../frontend/src/ui/MapControls.jsx#L57)). The map panel also says when part of the world has no lidar, and that live tiles tell OpenStreetMap which area you are viewing.
 
@@ -156,7 +156,7 @@ uv --directory tools/mapbuild run python -m mapbuild --centre "SU 22 66" --name 
 uv --directory tools/mapbuild run python -m mapbuild --centre 611700,6570700 --name "Tapa" --data ~/site-guard-maps/estonia --out ~/site-guard-maps/packs/tapa.sgmap --fetch
 ```
 
-| Option | Meaning ([`__main__.py:46`](../tools/mapbuild/mapbuild/__main__.py#L46)) |
+| Option | Meaning ([`__main__.py:50`](../tools/mapbuild/mapbuild/__main__.py#L50)) |
 |---|---|
 | `--centre` | An OS grid reference such as `"SU 22 66"`, or `easting,northing` on either grid. Rounded down to the kilometre. A northing of 6,000 km or more means Estonia. |
 | `--name` | The name shown in the game, up to 80 characters |
@@ -167,7 +167,7 @@ uv --directory tools/mapbuild run python -m mapbuild --centre 611700,6570700 --n
 | `--fetch` | Download any files missing from `--data`. Without it, they must already be there. |
 | `--no-satellite` | Leave out the satellite picture |
 
-The builder works out the position fit first, so a refusal does not waste an hour of downloads ([`__main__.py:60`](../tools/mapbuild/mapbuild/__main__.py#L60)). It needs Python 3.12 or later and `uv`, and its mapping packages (numpy, pyogrio, pyproj, rasterio, shapely) stay out of the game's backend ([`pyproject.toml`](../tools/mapbuild/pyproject.toml)).
+The builder works out the position fit first, so a refusal does not waste an hour of downloads ([`__main__.py:64`](../tools/mapbuild/mapbuild/__main__.py#L64)). It needs Python 3.12 or later and `uv`, and its mapping packages (numpy, pyogrio, pyproj, rasterio, shapely) stay out of the game's backend ([`pyproject.toml`](../tools/mapbuild/pyproject.toml)).
 
 ### What a British build downloads and does
 
@@ -180,15 +180,15 @@ The builder works out the position fit first, so a refusal does not waste an hou
 | Copernicus Sentinel-2 L2A | Summer scenes for the satellite picture, read only for the pack's area | Not measured | No |
 | PROJ grid files (OSTN15, OSGM15) | Exact national grid and geoid for the position fit | PROJ's cache was 3.4 MB here | Yes, in PROJ's own cache |
 
-OS files come from the OS Data Hub download API, only from `api.os.uk` over https, each checked against the size and MD5 that OS lists ([`download.py:21`](../tools/mapbuild/mapbuild/download.py#L21)). A 70 km pack needs one to four 100 km squares.
+OS files come from the OS Data Hub download API, only from `api.os.uk` over https, each checked against the size and MD5 that OS lists ([`download.py:22`](../tools/mapbuild/mapbuild/download.py#L22)). A 70 km pack needs one to four 100 km squares.
 
 From these the builder makes the grids ([`terrain.py`](../tools/mapbuild/mapbuild/terrain.py), [`features.py`](../tools/mapbuild/mapbuild/features.py)):
 
 - **Cover:** OS woodland is class 1, buildings 2, a 50 m corridor round power lines 3, and water 4. A missing Terrain 50 tile is open sea, which OS tidal water does not reach.
 - **With lidar:** ground is the mean of the 1 m DTM in each 20 m cell. Anything at least 5 m tall (the 90th percentile of DSM minus DTM) that is not a building or water is trees, which catches hedgerows and tree belts outside OS woods. A building's height is the 90th percentile inside OS footprints covering at least 10% of the cell, if 2 m or more.
-- **Without lidar:** Terrain 50 ground, trees assumed 16 m tall inside OS woodland, and buildings 8 m tall ([`terrain.py:169`](../tools/mapbuild/mapbuild/terrain.py#L169)).
+- **Without lidar:** Terrain 50 ground, trees assumed 16 m tall inside OS woodland, and buildings 8 m tall ([`terrain.py:171`](../tools/mapbuild/mapbuild/terrain.py#L171)).
 - **Features:** each building as a rotated box, pylons every 260 m along each power line, roads simplified to 5 m, and place names.
-- **Satellite:** Earth Search is asked for Sentinel-2 scenes over the pack from May to September of the last two years, under 10% cloud. Scenes are read clearest first; each must cover a quarter of the pack. The builder stops once it has five and every pixel is seen three times, takes the median of each pixel to remove leftover cloud, and saves a JPEG at 10 m a pixel. With fewer than two usable scenes the pack has no satellite layer ([`pictures.py:89`](../tools/mapbuild/mapbuild/pictures.py#L89)).
+- **Satellite:** Earth Search is asked for Sentinel-2 scenes over the pack from May to September of the last two years, under 10% cloud. Scenes are read clearest first; each must cover a quarter of the pack. The builder stops once it has five and every pixel is seen three times, takes the median of each pixel to remove leftover cloud, and saves a JPEG at 10 m a pixel. With fewer than two usable scenes, or if the search or a scene cannot be fetched, the pack has no satellite layer and the build still finishes ([`pictures.py:114`](../tools/mapbuild/mapbuild/pictures.py#L114)).
 
 ### What an Estonian build downloads and does
 
@@ -229,7 +229,7 @@ Everything lives under `~/site-guard-maps`, or the folder named by `SITE_GUARD_M
 | `estonia/` | The national files, `copernicus/` and `geonames/` |
 | `packs/` | Finished `.sgmap` files, which the server lists |
 
-Downloads are kept, so later builds in the same area fetch only lidar, map tiles and satellite. Lidar, basic map tiles and satellite scenes are never kept outside the pack. Files are never refreshed once present, and nothing in the app deletes downloads or packs. The only free-space check is for Estonia: the builder refuses to start fetching missing national files with less than 8 GB free ([`estonia_files.py:25`](../tools/mapbuild/mapbuild/estonia_files.py#L25)).
+Downloads are kept, so later builds in the same area fetch only lidar, map tiles and satellite. Lidar, basic map tiles and satellite scenes are never kept outside the pack. Files are never refreshed once present, and nothing in the app deletes downloads or packs. Every download stops rather than leave less than 8 GB free ([`source_limits.py:44`](../tools/mapbuild/mapbuild/source_limits.py#L44)), and for Estonia the builder also refuses to start fetching missing national files with less than that ([`estonia_files.py:165`](../tools/mapbuild/mapbuild/estonia_files.py#L165)).
 
 ## Installing, importing and exporting packs
 
@@ -265,7 +265,7 @@ One file, written by [`packfile.py`](../tools/mapbuild/mapbuild/packfile.py) and
 
 **Pictures:** sections `picture0` onwards, stored as they are, each with `layer` (`osmap` or `satellite`), `west`, `top`, `width`, `height` in metres, and `type` (`image/png` or `image/jpeg`).
 
-**The grids hash** is SHA-256 over the four raw grids in order ([`packfile.py:44`](../tools/mapbuild/mapbuild/packfile.py#L44)). A world's identity uses its first 32 hex characters, so rebuilding pictures, roads or names does not change a world, but any change to the ground does.
+**The grids hash** is SHA-256 over the four raw grids in order ([`packfile.py:45`](../tools/mapbuild/mapbuild/packfile.py#L45)). A world's identity uses its first 32 hex characters, so rebuilding pictures, roads or names does not change a world, but any change to the ground does.
 
 **Limits the browser enforces** ([`pack-store.js:6`](../frontend/src/api/pack-store.js#L6), [`world-pack.js:29`](../frontend/src/sim/world-pack.js#L29)):
 
@@ -294,7 +294,7 @@ The builder refuses non-finite heights and features over 32 MiB, and draws only 
 How each conversion is done:
 
 - **In the builder,** pyproj does the accurate work once: OSTN15 for Great Britain, and PROJ's own transformation for Estonia. It fits a quadratic for longitude and latitude over 61 x 61 sample points across the pack and refuses a fit worse than 5 m ([`fit.py:52`](../tools/mapbuild/mapbuild/fit.py#L52)). The three packs above fit to 1.6 to 2.1 m. The pack stores the fit, so the browser needs no projection library.
-- **Positions in a world** use that fit ([`latLonOf`](../frontend/src/sim/world-pack.js#L63)). Altitude sent over SAPIENT is the height above the site plus `H0` plus one geoid separation for the pack: OSGM15 in Great Britain, and EGM2008 standing in for Estonia's own height system, which PROJ has no grid for ([`fit.py:47`](../tools/mapbuild/mapbuild/fit.py#L47)). See [SAPIENT.md](SAPIENT.md).
+- **Positions in a world** use that fit ([`latLonOf`](../frontend/src/sim/world-pack.js#L66)). Altitude sent over SAPIENT is the height above the site plus `H0` plus one geoid separation for the pack: OSGM15 in Great Britain, and EGM2008 standing in for Estonia's own height system, which PROJ has no grid for ([`fit.py:47`](../tools/mapbuild/mapbuild/fit.py#L47)). See [SAPIENT.md](SAPIENT.md).
 - **GPS to the British grid** in the browser uses the published Helmert shift and the OS transverse Mercator series ([`bng.js:31`](../frontend/src/sim/bng.js#L31)), good to about 5 m by the code's own note. The reverse steps towards the answer through the same function, so the two agree.
 - **L-EST97** is a Lambert conformal conic projection of GRS 80, worked directly both ways ([`lest97.js`](../frontend/src/sim/lest97.js)). WGS 84 is taken as ETRS89, a difference far below a 20 m post.
 - **MGRS** is UTM on WGS 84 using the same transverse Mercator series, with the standard letters ([`mgrs.js`](../frontend/src/sim/mgrs.js)).
@@ -358,7 +358,7 @@ Licence wording here is a summary of the sources' own terms, not legal advice.
 | "The site cannot be on water." | Move the start point onto land. |
 | "This pack is smaller than a 54 km world. Build it again at a larger size." | An older 30 or 44 km pack. Rebuild it at 56 km or more. |
 | Satellite and Hybrid say "Not in this map pack" | The build found fewer than two clear scenes, or used `--no-satellite`. Rebuild later, or use the OS map. |
-| Live map says "Needs internet", or "The live map could not load" | The browser is offline, or no tile arrived. The game goes back to the OS map ([`game.js:312`](../frontend/src/game.js#L312)). "N of M map tiles could not load" means some did. |
+| Live map says "Needs internet", or "The live map could not load" | The browser is offline, or no tile arrived. The game goes back to the OS map ([`game.js:327`](../frontend/src/game.js#L327)). "N of M map tiles could not load" means some did. |
 | The start map shows only pack pictures | A tile failed to load, so it switched to pictures from your packs. Check the connection, or keep **No live map**. |
 | "The map builder could not start. It needs uv installed." | Install `uv` and restart the backend. |
 | "A map is already being built." | One build at a time. Wait for it to finish. |
@@ -388,7 +388,7 @@ Disk use, checked against the code on 9 November 2026:
 - **Every build from the start screen at a new 1 km centre writes a new pack** named `area_E_N.sgmap` ([`packs.py:116`](../backend/app/services/packs.py#L116)). The three 70 km packs on the development machine are 36 to 128 MB. There is no cap on how many, and the app cannot delete one: remove files from `packs/` by hand.
 - **A build in the same 1 km square overwrites** that file. If its ground differs, for example with lidar on one time and off the next, laydowns saved against the old pack can no longer find it.
 - **British builds have no free-space check.** Only the Estonian national files have one ([`estonia_files.py:133`](../tools/mapbuild/mapbuild/estonia_files.py#L133)).
-- **The pack is written straight to its final name** ([`packfile.py:74`](../tools/mapbuild/mapbuild/packfile.py#L74)), so a write that fails part way, for example on a full disk, leaves a truncated pack, and replaces any good pack of that name. The server still lists it from its header, and the browser refuses it as damaged.
+- **The pack is written straight to its final name** ([`packfile.py:92`](../tools/mapbuild/mapbuild/packfile.py#L92)), so a write that fails part way, for example on a full disk, leaves a truncated pack, and replaces any good pack of that name. The server still lists it from its header, and the browser refuses it as damaged.
 - **An Estonian download has no size cap when the server sends no `Content-Length`** ([`estonia_files.py:77`](../tools/mapbuild/mapbuild/estonia_files.py#L77)): the read loop only stops at a declared total. OS downloads stop at OS's listed size, and Copernicus and GeoNames files at fixed caps.
 - **Packs imported into a browser are kept permanently,** with persistent storage requested and no delete in the app. Clearing the site's data in the browser removes them all.
 - **Downloads are never refreshed or tidied.** If OS lists a file under a new name, it is downloaded beside the old one, and the builder reads whichever zip `glob` returns first.

@@ -16,7 +16,7 @@ import numpy as np
 from rasterio.features import rasterize
 from rasterio.io import MemoryFile
 from rasterio.transform import from_origin
-from shapely import STRtree, box, intersects
+from shapely import STRtree, box
 from shapely.geometry import mapping
 
 from .grid import CELL, Window, square_letters
@@ -145,7 +145,8 @@ def reduce_square(dtm: np.ndarray, dsm: np.ndarray, houses: np.ndarray) -> dict[
 
 
 def lidar_square(east: int, north: int, tree: STRtree, buildings) -> dict[str, np.ndarray]:
-    dtm, dsm = (fetch_square(SERVICES[name], east, north) for name in ("dtm", "dsm"))
+    dtm = fetch_square(SERVICES["dtm"], east, north)
+    dsm = fetch_square(SERVICES["dsm"], east, north) if np.isfinite(dtm).any() else dtm  # reduce_square reads no surface where there is no ground, and an empty answer costs seconds of waiting
     near = buildings[tree.query(box(east, north, east + SQUARE_M, north + SQUARE_M))]
     houses = np.zeros((SQUARE_M, SQUARE_M), "uint8")
     if len(near):
@@ -160,16 +161,19 @@ def lidar(window: Window, half: int, buildings, say) -> dict[str, np.ndarray]:
     west, top = window.east - half, window.north + half
     count = 2 * half // SQUARE_M
     corners = [(west + col * SQUARE_M, top - (row + 1) * SQUARE_M) for row in range(count) for col in range(count)]
-    began = time.time()
+    began, empty = time.time(), 0
     with ThreadPoolExecutor(SQUARES_AT_ONCE) as pool:
         squares = pool.map(lambda corner: lidar_square(*corner, tree, buildings), corners)  # answers come back in order; a failure cancels the rest
         for done, ((east, north), reduced) in enumerate(zip(corners, squares), 1):
             r0, c0 = (window.top - (north + SQUARE_M)) // CELL, (east - window.west) // CELL
+            empty += not np.isfinite(reduced["ground"]).any()
             for name, values in reduced.items():
                 target = grids[name][r0:r0 + POSTS_PER_SQUARE, c0:c0 + POSTS_PER_SQUARE]
                 target[np.isnan(target)] = values[np.isnan(target)]  # the first square to reach a shared edge post keeps it
             if done % 20 == 0:
                 say(f"lidar {done}/{count * count} squares, {(time.time() - began) / done:.1f} s each")
+    if empty:  # said because a service fault otherwise looks like a finished lidar pack
+        say(f"lidar: {empty} of {count * count} squares had no data and use Terrain 50 heights")
     return grids
 
 

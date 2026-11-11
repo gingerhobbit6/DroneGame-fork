@@ -39,7 +39,9 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
   function headingForAny(tr) {
     if (!tr.vel) return true;
     const m = mpu(), c = ctx.siteCentre();
-    return [[c.x * m, -c.z * m], ...[...nodes.values()].map((s) => [s.pos.x * m, -s.pos.z * m])].some(([east, north]) => {
+    // the fusion node and the perimeter sensor stand for the station at the map's middle, which a drawn area or a patrol may be far from
+    const systems = [...nodes.values()].filter((s) => s.def.role !== 'fusion' && s.def.id !== 'perimeter');
+    return [[c.x * m, -c.z * m], ...systems.map((s) => [s.pos.x * m, -s.pos.z * m])].some(([east, north]) => {
       const de = east - tr.est.east, dn = north - tr.est.north, dist = Math.hypot(de, dn);
       return !dist || (de * tr.vel[0] + dn * tr.vel[1]) / dist > FUSION.minClosing;
     });
@@ -136,9 +138,10 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     sendStatus(s);
   }
 
+  // Returns whether the effector is now on the track, or waiting for the operator's word to be.
   function assign(s, tr, approved = false) {
-    if (!approved && authority().needsApproval(s)) { if (!authority().isPending(s, tr)) authority().requestApproval(s, tr); return; }
-    if (s.task?.trackId === tr.id) return; // already on it
+    if (!approved && authority().needsApproval(s)) { if (!authority().isPending(s, tr)) authority().requestApproval(s, tr); return true; }
+    if (s.task?.trackId === tr.id) return true; // already on it
     if (s.task) { // a re-task: the engagement it replaces stops only once the new one may go ahead
       const cur = tracker.tracks.get(s.task.trackId);
       sendTask(s, { control: 'CONTROL_STOP' }, `Stop ${cur ? cur.short : 'task'}`, 'Re-tasked to a more urgent threat');
@@ -148,7 +151,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
       control: 'CONTROL_START',
       command: { request: 'Engage', command_parameter: tr.id },
     }, `Engage ${tr.short}`, `Engage track ${tr.short} (${tr.airframe || 'unclassified'})`);
-    if (sent.dropped) { s.rejected.set(tr.id, T() + FUSION.rejectBackoff); return; } // the task never arrived
+    if (sent.dropped) { s.rejected.set(tr.id, T() + FUSION.rejectBackoff); return false; } // the task never arrived
     // the effector acquires whatever real target is at the track; a false or mis-placed track has none
     const res = ctx.acceptTask(s, tr.drone);
     if (res.ok) {
@@ -161,6 +164,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
       else s.rejected.set(tr.id, T() + FUSION.rejectBackoff); // try a different target next time
       if (res.empty) tr.emptyUntil = T() + FUSION.emptyHold; // it looked and saw nothing there: no effector is sent there for a while
     }
+    return res.ok;
   }
 
   // Is the track between this effector's minimum range (a missile's, to arm and turn onto it) and its reach?
@@ -174,9 +178,14 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     return meetTime(p, tr.flat ? [tr.vel[0], tr.vel[1], 0] : tr.vel, s.def.missileSpeed) * s.def.missileSpeed <= s.def.range;
   }
 
+  const heldElsewhere = (s, tr) => [...nodes.values()].some((o) => o !== s && o.task?.trackId === tr.id);
+  // A track waiting for the operator's word is asked for once: an effector that must ask too is not offered it. One that need not ask still is.
+  const askedElsewhere = (s, tr) => authority().needsApproval(s) && authority().pending.some((p) => p.s !== s && p.tr.id === tr.id);
+
   // Should the fusion node offer this track to this effector? Keeps expensive rounds for the targets that need them.
   function eligible(s, tr) {
     const def = s.def;
+    if (tr.killWatch) return false; // reported destroyed, perhaps earlier in this pass: the sensors are given time to agree
     if (!canMeet(s, tr)) return false; // its rounds could not catch it
     if (s.denied.has(tr.id) || authority().pending.some((p) => p.s === s)) return false; // one request at a time for each effector
     if (T() < (s.rejected.get(tr.id) ?? 0) || T() < (tr.emptyUntil ?? 0)) return false;
@@ -185,8 +194,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     if (def.engagePolicy === 'fixed-wing' && tr.airframe !== 'Fixed wing') {
       if (tr.airframe === 'Multirotor') return false; // a known quadcopter is never worth the round
       // last ditch only: something unidentified that has got close and that nothing else is on
-      const taken = [...nodes.values()].some((o) => o !== s && o.task && o.task.trackId === tr.id);
-      if (siteDist(tr) >= FUSION.critZone || taken) return false;
+      if (siteDist(tr) >= FUSION.critZone || heldElsewhere(s, tr)) return false;
     }
     return true;
   }
@@ -228,6 +236,8 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
 
   function tasking() {
     const live = confirmedTracks();
+    // a jammer stays on a track that has only missed a scan or two (coasting), or each gap would switch it off and on again
+    const held = [...tracker.tracks.values()].filter((tr) => tr.status !== 'tentative' && !tr.killWatch);
     believe = threatLibrary(ctx.expected?.());
     reachMemo = new Map();
     released = released.filter((r) => { if (r.drone?.dead) { watchKill(r.trackId, r.by); return false; } return T() < r.until; });
@@ -237,7 +247,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     const free = [];
     for (const s of nodes.values()) {
       if (s.def.networked === false) continue; // its crew works it by hand (crew.js)
-      if (s.def.kind === 'jammer') { switchJammer(s, live); continue; }
+      if (s.def.kind === 'jammer') { switchJammer(s, held); continue; }
       if (s.def.role !== 'effector' || s.offline) continue; // an effector we have lost contact with can't be tasked
       // Out of rounds or reloading: give the target up so another launcher can take it, and offer this one nothing for now.
       // shortcut: the fusion node reads the magazine directly. Report it in SAPIENT status if a lost launcher should be able to look armed.
@@ -266,6 +276,7 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
       let best = null, bd = Infinity;
       for (const tr of live) {
         if (!takes(s, tr)) continue;
+        if (siteDist(tr) >= FUSION.critZone && (heldElsewhere(s, tr) || askedElsewhere(s, tr))) continue; // one effector a track out there, as when pairing
         const dd = urgency(tr);
         if (dd < bd) { bd = dd; best = tr; }
       }
@@ -295,23 +306,27 @@ export function createTasking(core, { raiseAlert }, registration, authority, con
     for (let made = true; made && free.length;) {
       made = false;
       for (const tr of tracks) {
-        if (engaged.has(tr.id) && siteDist(tr) >= FUSION.critZone) continue;
-        const can = free.filter((s) => takes(s, tr));
+        const far = siteDist(tr) >= FUSION.critZone;
+        if (engaged.has(tr.id) && far) continue;
+        const can = free.filter((s) => takes(s, tr) && !(far && askedElsewhere(s, tr)));
         if (!can.length) continue;
         const top = Math.max(...can.map((s) => chanceOf(s, tr)));
         const pick = can.filter((s) => chanceOf(s, tr) >= top * FAIR).sort((a, b) => costPerKill(a, tr) - costPerKill(b, tr))[0];
-        free.splice(free.indexOf(pick), 1);
-        assign(pick, tr);
-        engaged.add(tr.id);
         made = true;
+        if (!assign(pick, tr)) continue; // refused, or lost on the way: the track is still open, and that effector may take another
+        free.splice(free.indexOf(pick), 1);
+        engaged.add(tr.id);
         if (!free.length) break;
       }
     }
   }
 
   // An operator's approval goes ahead only if the engagement still makes sense: while they decided, the track may have come inside the
-  // launcher's minimum range or turned away, or the launcher may have emptied or lost contact.
-  const approve = (s, tr) => { if (!s.offline && canFire(s) && takes(s, tr)) assign(s, tr, true); };
+  // launcher's minimum range or turned away, the launcher may have emptied or lost contact, or another effector may have taken the track.
+  const approve = (s, tr) => {
+    if (siteDist(tr) >= FUSION.critZone && heldElsewhere(s, tr)) return; // one effector a track out there, as when pairing
+    if (!s.offline && canFire(s) && takes(s, tr)) assign(s, tr, true);
+  };
 
   return { assign, approve, tasking, reset: () => { softKill.clear(); released = []; } };
 }

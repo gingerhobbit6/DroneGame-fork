@@ -46,6 +46,15 @@ def test_lists_readable_packs_and_leaves_out_the_rest(client, root):
     assert rows[0]["hash"] == "a" * 64 and rows[0]["east"] == 422000 and rows[0]["lidarHalf"] == 7000
 
 
+def test_a_header_with_an_infinite_number_or_deep_nesting_is_left_out(client, root):
+    (root / "packs" / "good.sgmap").write_bytes(pack_bytes())
+    infinite = json.dumps(HEADER).replace("422000", "Infinity").encode()
+    deep = b"[" * 100_000 + b"]" * 100_000
+    for name, head in (("infinite", infinite), ("deep", deep)):
+        (root / "packs" / f"{name}.sgmap").write_bytes(b"SGMAP\x01" + struct.pack("<I", len(head)) + head)
+    assert [r["file"] for r in client.get(API).json()] == ["good.sgmap"]  # these used to answer 500 and hide every pack
+
+
 def test_an_empty_or_missing_folder_is_an_empty_list(client, root):
     assert client.get(API).json() == []
     (root / "packs").rmdir()

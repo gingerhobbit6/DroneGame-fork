@@ -119,6 +119,21 @@ describe('setting a patrol', () => {
     expect(sim.getPatrol().route).toEqual(moved);
   });
 
+  // on a vehicle's mast a system costs less (the default radar) or more (a small jammer on a Patria) than in the catalogue
+  it.each([['the default column', FOOT.column], ['a jammer on a Patria', [{ vehicle: 'patria', system: 'jammer_s', gap: 40, side: 0 }]]])('checks %s at the price it is charged', (_, column) => {
+    const full = sim.state.budget;
+    expect(sim.commands.setPatrol(ROUTE, column)).toBeNull();
+    const cost = full - sim.state.budget;
+    sim.commands.setPatrol(null);
+    sim.state.budget = cost;
+    expect(sim.commands.setPatrol(ROUTE, column)).toBeNull();
+    expect(sim.state.budget).toBe(0);
+    expect(sim.structures.every((s) => s.def.networked === false || s.uplink === 'starlink')).toBe(true); // nothing left offline for want of a terminal
+    sim.commands.setPatrol(null);
+    sim.state.budget = cost - 1;
+    expect(sim.commands.setPatrol(ROUTE, column)).toMatch(/Not enough budget for the escort/);
+  });
+
   it('refuses a bad route, leaving nothing behind', () => {
     expect(sim.commands.setPatrol(WET)).toMatch(/water/);
     expect(sim.getPatrol()).toBeNull();

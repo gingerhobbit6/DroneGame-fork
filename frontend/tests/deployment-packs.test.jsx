@@ -168,6 +168,26 @@ describe('the profile hub', { timeout: 30000 }, () => {
     await settle();
     expect($('#recovery-code').textContent).toBe('FRESH2-FRESH3-FRESH4-FRESH5');
   });
+
+  it('keeps a new recovery code on the page until it is confirmed saved', async () => {
+    await api.units.create(PACK);
+    const { onEnter } = hub();
+    await settle();
+    press('New recovery code');
+    fireEvent.change(screen.getByLabelText('Current password', { selector: 'input' }), { target: { value: 'old password' } });
+    press('Show a new code');
+    await settle();
+    fireEvent.click($('#enter-game'));
+    fireEvent.click(within($('[data-pack]')).getByRole('button', { name: 'Deploy' }));
+    expect($('#enter-game').disabled).toBe(true);
+    expect(onEnter).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+    fireEvent.click(screen.getByLabelText(/I have saved it/));
+    press('Done');
+    expect($('#enter-game').disabled).toBe(false);
+    press('Deploy', within($('[data-pack]')));
+    expect(onEnter).toHaveBeenCalled();
+  });
 });
 
 describe('the pack tray in the game', { timeout: 30000 }, () => {

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createGame } from '../src/game.js';
 import { COMMS, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { costProblem } from '../src/sim/laydown.js';
-import { UNIT_FIELDS, cleanSettings, fieldsFor, stepOf, unitCost } from '../src/sim/unit-config.js';
+import { UNIT_FIELDS, cleanSettings, fieldsFor, stepOf, unitCost, unitDef } from '../src/sim/unit-config.js';
 import { GameContext } from '../src/ui/hooks.js';
 import { UnitPanel } from '../src/ui/UnitPanel.jsx';
 import { CostTab } from '../src/ui/dock/CostTab.jsx';
@@ -42,6 +42,22 @@ describe('the field table', () => {
         expect(base).toBeLessThanOrEqual(max);
       }
     }
+  });
+
+  it('takes every standard value as typed, though the steps count from the minimum', () => {
+    for (const f of UNIT_FIELDS.filter((x) => !x.choices && !x.arcs && !x.bands)) {
+      for (const id of Object.keys(f.limits)) {
+        const base = f.base(STRUCTURES[id]);
+        if (base == null) continue; // no standard value
+        expect(cleanSettings(id, { [f.key]: base }), `${id} ${f.key}`).toEqual({}); // the same as the catalogue, so nothing is kept
+      }
+    }
+    const typed = cleanSettings('laser_s', { beam: 14 }); // its steps are 7, 9 ... 13, 15: this once stored 15, at a higher price
+    expect(unitDef('laser_s', typed).dps).toBe(14);
+    expect(unitCost('laser_s', typed)).toBe(STRUCTURES.laser_s.cost);
+    expect(unitDef('camera_l', cleanSettings('camera_l', { view: 7.1 })).fov).toBe(7.1); // its steps stop at 7.0
+    expect(cleanSettings('laser_s', { beam: 15 })).toEqual({ beam: 15 }); // any other value still goes to a step
+    expect(cleanSettings('laser_s', { beam: 16.2 })).toEqual({ beam: 17 });
   });
 });
 
@@ -377,6 +393,16 @@ describe('the Configure side of the panel', () => {
     expect(sim.structures.length).toBe(1);
     fireEvent.click($('#unit-sell'));
     expect(sim.structures.length).toBe(0);
+  });
+
+  it('does not offer to remove a patrol escort, which goes with its patrol', () => {
+    lay('radar');
+    unit('radar').escort = true; // selling skips escorts, so the button would take the system nearest it instead
+    render(<GameContext.Provider value={game}><UnitPanel /></GameContext.Provider>);
+    act(() => game.select(unit('radar')));
+    fireEvent.click($('#unit-configure'));
+    expect($('#unit-editor')).not.toBeNull();
+    expect($('#unit-sell')).toBeNull();
   });
 
   it('locks at the first wave, leaving a jammer\'s bands live', () => {

@@ -22,7 +22,13 @@ const CONTENT_KEYS = [
 // Message timestamps follow simulated time, so paused/fast-forwarded play stays consistent.
 export const clock = { epochMs: EPOCH_MS, t: 0 };
 const simMs = () => clock.epochMs + clock.t * 1000;
-export const timestamp = () => new Date(simMs()).toISOString();
+// Every message in a step carries the same time, so its text is built once for each time, not once a message.
+let stampMs = NaN, stampText = '';
+export function timestamp() {
+  const ms = simMs();
+  if (ms !== stampMs) { stampText = new Date(ms).toISOString(); stampMs = ms; }
+  return stampText;
+}
 
 // ---------- identifiers ----------
 const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford base32, as used by ULID

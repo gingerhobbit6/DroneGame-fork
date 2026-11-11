@@ -102,7 +102,7 @@ Three vehicles can carry a system, in a patrol's column or parked from a deploym
 
 Each system that can ride is given a class by weight and how it is shown mounted, an assumption (`MOUNTS`, [`patrol.js:35`](../frontend/src/sim/config/patrol.js#L35)): light rides on any vehicle, medium on a Hilux or a Patria, heavy only on a Patria. The two crewed machine guns are medium because the gunner stands in the back, so they cannot go on the uncrewed Mule. Systems drawn on their own vehicles but missing from `MOUNTS` (the Gepard, the LOCUST and the RapidDestroyer) cannot join a patrol.
 
-- **Vehicles cost nothing.** The budget is for counter-drone systems, so only the system on a vehicle is charged ([`patrol.js:49`](../frontend/src/sim/patrol.js#L49)).
+- **Vehicles cost nothing.** The budget is for counter-drone systems, so only the system on a vehicle is charged ([`patrol.js:50`](../frontend/src/sim/patrol.js#L50)).
 - **Armour.** A system on a Patria takes half the damage of a strike, the same as a system with armour of its own; the higher of the two counts ([`targeting.js:95`](../frontend/src/sim/targeting.js#L95)).
 - **Mast on a vehicle.** A system with a mast is set to the vehicle's mast height ([`laydown.js:76`](../frontend/src/sim/laydown.js#L76)). That value then passes through the unit's mast limits and mast price like any other setting ([`unit-config.js:239`](../frontend/src/sim/unit-config.js#L239)). So a radar or camera whose lowest allowed mast is 5 m stands at 5 m on any vehicle, not at the vehicle's 2 to 3.5 m, and it costs less because its mast is lower than standard. The table shows what each system ends up with on each vehicle, worked out by the game's own functions:
 
@@ -139,21 +139,21 @@ In patrol mode the player protects soldiers walking a route, escorted by vehicle
 | Figure | Value | Meaning |
 |---|---|---|
 | Walking speed | 1.4 m/s | How fast the group walks its route |
-| People | 12 | Soldiers in the patrol, a group of unprotected military people ([`patrol.js:64`](../frontend/src/sim/patrol.js#L64)) |
+| People | 12 | Soldiers in the patrol, a group of unprotected military people ([`patrol.js:67`](../frontend/src/sim/patrol.js#L67)) |
 | Spacing | 5 m | Between soldiers in the formation |
 | Wait at the end | 60 s | Before it walks back |
 | Gap to each escort | 40 m | Where a vehicle added to the column is placed, from the last |
 | Formations | single file, staggered column, wedge | [`formation.js:7`](../frontend/src/sim/formation.js#L7) |
-| Corridor width | 20 to 1,000 m, 200 m to start | [`route.js:10`](../frontend/src/sim/route.js#L10), [`patrol.js:17`](../frontend/src/sim/patrol.js#L17) |
+| Corridor width | 20 to 1,000 m, 200 m to start | [`route.js:10`](../frontend/src/sim/route.js#L10), [`patrol.js:18`](../frontend/src/sim/patrol.js#L18) |
 | Route | 2 to 32 waypoints | [`route.js:9`](../frontend/src/sim/route.js#L9) |
 | Column | 1 to 6 vehicles | `MAX_ESCORTS` ([`patrol.js:41`](../frontend/src/sim/config/patrol.js#L41)) |
 | Vehicle place | up to 200 m ahead or behind, 100 m to either side | `MAX_ESCORT_GAP`, `MAX_ESCORT_SIDE` |
 
-A new patrol's column is a Hilux with a Blighter A800 40 m ahead of the lead soldier and a Patria with a Rapid Ranger 40 m behind ([`patrol.js:12`](../frontend/src/sim/config/patrol.js#L12)). Each vehicle carries one system, which must be one it can take ([`patrol.js:20`](../frontend/src/sim/patrol.js#L20)).
+A new patrol's column is a Hilux with a Blighter A800 40 m ahead of the lead soldier and a Patria with a Rapid Ranger 40 m behind ([`patrol.js:12`](../frontend/src/sim/config/patrol.js#L12)). Each vehicle carries one system, which must be one it can take ([`patrol.js:21`](../frontend/src/sim/patrol.js#L21)).
 
-**How it moves** ([`patrol.js:114`](../frontend/src/sim/patrol.js#L114)). From the first wave the patrol walks to the end of its route, waits, walks back, and holds at the start until the next wave. Every member, vehicles included, follows the route at its own place in the formation, so the column bends round turns ([`formation.js:22`](../frontend/src/sim/formation.js#L22)). Sensors work on the move. While any weapon in the column has an engagement task the whole patrol halts; a jammer does not halt it ([`patrol.js:117`](../frontend/src/sim/patrol.js#L117)).
+**How it moves** ([`patrol.js:117`](../frontend/src/sim/patrol.js#L117)). From the first wave the patrol walks to the end of its route, waits, walks back, and holds at the start until the next wave. Every member, vehicles included, follows the route at its own place in the formation, so the column bends round turns ([`formation.js:22`](../frontend/src/sim/formation.js#L22)). Sensors work on the move. While any weapon in the column has an engagement task the whole patrol halts; a jammer does not halt it ([`patrol.js:120`](../frontend/src/sim/patrol.js#L120)).
 
-**What it costs.** The escort's systems are charged at their price as set up on their vehicles, each networked one is wired to Starlink (£262) as the patrol starts, and the fusion node gets a Starlink terminal if it has none ([`patrol.js:54`](../frontend/src/sim/patrol.js#L54)). The affordability check beforehand uses the catalogue prices instead ([`patrol.js:51`](../frontend/src/sim/patrol.js#L51)), which differ from the charge where a vehicle's mast changes the price. Clearing the patrol before the first wave refunds the escort's systems and their terminals; the fusion node keeps its terminal ([`patrol.js:74`](../frontend/src/sim/patrol.js#L74)). An escort cannot be sold on its own ([`laydown.js:94`](../frontend/src/sim/laydown.js#L94)).
+**What it costs.** The escort's systems are charged at their price as set up on their vehicles, each networked one is wired to Starlink (£262) as the patrol starts, and the fusion node gets a Starlink terminal if it has none ([`patrol.js:57`](../frontend/src/sim/patrol.js#L57)). The affordability check beforehand uses the same prices ([`patrol.js:52`](../frontend/src/sim/patrol.js#L52)), so a patrol that passes it can be paid for, terminals included. Clearing the patrol before the first wave refunds the escort's systems and their terminals; the fusion node keeps its terminal ([`patrol.js:77`](../frontend/src/sim/patrol.js#L77)). An escort cannot be sold on its own ([`laydown.js:94`](../frontend/src/sim/laydown.js#L94)).
 
 With a patrol set, static systems from the purchase bar stand anywhere inside its corridor and stay put, and the patrol, not the station, is what the enemy attacks.
 
@@ -299,7 +299,7 @@ Settings that can be changed at any time, wave or not:
 
 Names, callsigns and the network are also set per unit before the first wave:
 
-- **Name and callsign.** A name is up to 40 characters, with control characters removed ([`unit-config.js:311`](../frontend/src/sim/unit-config.js#L311)). A callsign is up to 12 letters, digits, spaces or dashes, starting with a letter or digit, and must not be in use ([`unit-config.js:312`](../frontend/src/sim/unit-config.js#L312), [`laydown.js:200`](../frontend/src/sim/laydown.js#L200)).
+- **Name and callsign.** A name is up to 40 characters, with control characters removed ([`unit-config.js:313`](../frontend/src/sim/unit-config.js#L313)). A callsign is up to 12 letters, digits, spaces or dashes, starting with a letter or digit, and must not be in use ([`unit-config.js:314`](../frontend/src/sim/unit-config.js#L314), [`laydown.js:200`](../frontend/src/sim/laydown.js#L200)).
 - **Network terminal.** Starlink (£262) or cellular (£450), and for cellular the band: 900 MHz, 1800 MHz or 3.5 GHz ([`comms.js:45`](../frontend/src/sim/config/comms.js#L45)). Crewed systems cannot be wired. How links work is in [SAPIENT.md](SAPIENT.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Limits and simplifications

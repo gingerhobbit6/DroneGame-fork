@@ -56,3 +56,23 @@ def test_bad_replacement_does_not_overwrite_the_cached_file(tmp_path, monkeypatc
         download._fetch(item_for(body), str(tmp_path), lambda _message: None)
     assert target.read_bytes() == damaged
     assert not (tmp_path / "terrain.zip.part").exists()
+
+
+def test_a_download_that_drops_is_tried_again_and_leaves_no_part_file(tmp_path, monkeypatch):
+    body = b"valid OS map data"
+
+    class Dropped(io.BytesIO):
+        def read(self, size=-1):
+            if self.tell():
+                raise ConnectionResetError("connection reset part way")
+            return super().read(4)
+
+    replies = [Dropped(body), io.BytesIO(body)]
+    monkeypatch.setattr(download.urllib.request, "urlopen", lambda *_args, **_kwargs: replies.pop(0))
+    download._fetch(item_for(body), str(tmp_path), lambda _message: None)
+    assert not replies and [path.name for path in tmp_path.iterdir()] == ["terrain.zip"]
+    (tmp_path / "terrain.zip").unlink()
+    replies[:] = [Dropped(body) for _ in range(5)]
+    with pytest.raises(SystemExit, match="did not download correctly"):
+        download._fetch(item_for(body), str(tmp_path), lambda _message: None)
+    assert len(replies) == 5 - download.TRIES and list(tmp_path.iterdir()) == []

@@ -62,7 +62,7 @@ def read_summary(path: Path) -> dict[str, Any] | None:
             "file": path.name, "hash": str(header["gridsSha256"]), "name": str(header["name"])[:80], "east": int(header["east"]), "north": int(header["north"]),
             "half": int(header["half"]), "tier": str(header["tier"]), "lidarHalf": int(header.get("lidarHalf", 0)),
         }
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, OverflowError, RecursionError):  # the last two: a number like 1e999, and deep nesting
         return None
 
 

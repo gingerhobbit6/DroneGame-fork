@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as S from '../src/sim/sapient.js';
 import { seedAll } from '../src/sim/rng.js';
 
@@ -15,6 +15,27 @@ describe('identifiers', () => {
     expect(a[1]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     seedAll('test');
     expect([S.ulid(), S.uuid()]).toEqual(a);
+  });
+});
+
+describe('timestamps', () => {
+  it('are built once for each time, and change when the clock or its epoch moves', () => {
+    const was = { ...S.clock }, text = () => new Date(S.clock.epochMs + S.clock.t * 1000).toISOString();
+    const built = vi.spyOn(Date.prototype, 'toISOString');
+    try {
+      S.clock.t = 12.5;
+      const first = S.timestamp();
+      expect(S.timestamp()).toBe(first);
+      expect(built).toHaveBeenCalledTimes(1); // the second message in the step reuses the first one's text
+      expect(first).toBe(text());
+      S.clock.t = 12.55;
+      expect(S.timestamp()).not.toBe(first);
+      expect(S.timestamp()).toBe(text());
+      const moved = S.timestamp();
+      S.clock.epochMs += 60000;
+      expect(S.timestamp()).not.toBe(moved);
+      expect(S.timestamp()).toBe(text());
+    } finally { built.mockRestore(); Object.assign(S.clock, was); }
   });
 });
 
