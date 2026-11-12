@@ -83,7 +83,7 @@ Every system is a SAPIENT node, and an unwired one cannot report or be tasked. O
 
 ## 3. Check what it can see
 
-The **Plan** tab maps sensor coverage for a chosen drone. In this example the laydown sees very little of a fibre-optic drone at 18 m, while a spotter at 450 m is almost entirely covered. **Spectrum** shows where your jamming overlaps your own links.
+**Plan** (from the Run panel) maps sensor coverage for a chosen drone. In this example the laydown sees very little of a fibre-optic drone at 18 m, while a spotter at 450 m is almost entirely covered. **Spectrum** shows where your jamming overlaps your own links.
 
 ![Sensor coverage for a low, RF-silent drone, mostly red beyond the immediate site](screenshots/coverage.jpg)
 
@@ -109,7 +109,7 @@ With the truth overlay on, click a drone to open the **Selected drone** panel: w
 
 ## 6. Read the messages
 
-The **Messages** tab shows the SAPIENT messages between nodes, filterable by node and by type. Status reports and raw detections are nine messages in ten, so they start hidden and the list opens on the decisions: tasks, their answers and alerts. Click the **Status** or **Detect** chip to show them. **Freeze** stops new messages joining the list while you read it, and the filters still work. Tick **Explain** for a plain-English note beside each field, or use **Inject fault** to see how errors are reported. **Learn** walks through the protocol using messages from your own run.
+**SAPIENT nodes** lists every node and, below it, the SAPIENT messages between them, filterable by node and by type. Status reports and raw detections are nine messages in ten, so they start hidden and the list opens on the decisions: tasks, their answers and alerts. Click the **Status** or **Detect** chip to show them. **Freeze** stops new messages joining the list while you read it, and the filters still work. Tick **Explain** for a plain-English note beside each field, or use **Inject fault** to see how errors are reported. **Learn** walks through the protocol using messages from your own run.
 
 ![A fused detection report with a plain-English note on each field](screenshots/messages.jpg)
 
@@ -121,11 +121,11 @@ Pause at any moment and scrub back through the run. Markers on the timeline show
 
 ## 8. Count the cost
 
-The **Cost** tab compares what you spent with what the attack cost the enemy, broken down by system, effector and drone type. The sandbox can also launch the real drones, and their public figures, with how solid each one is, are in the **Sources** tab.
+**Target engagement** sets which weapons may fire at which drones and, beside it, Magazine depth compares what you spent with what the attack cost the enemy, broken down by system, effector and drone type. The sandbox can also launch the real drones, and their public figures, with how solid each one is, are in the **Sources** tab.
 
 ![The Cost tab showing the budget, cost exchange and shots fired per effector](screenshots/cost.jpg)
 
-When the site falls, the run is saved to your history under Past runs in the **Saved** tab. You can retry the same laydown or start a new one, and laydowns are kept in the **Saved** tab. A laydown made on other ground, generated or a different real map, has **Load here** beside **Load**: it lays the laydown out round the site you are on now, keeping each system's distance and bearing from it, and leaves out any that would stand in water, on a building, on steep ground or off the map. The **Lab** tab has the same button for the lab's laydowns.
+When the site falls, the run is saved to your history under Past runs in **Saved runs**. You can retry the same laydown or start a new one, and laydowns are kept in the **Saved** tab. A laydown made on other ground, generated or a different real map, has **Load here** beside **Load**: it lays the laydown out round the site you are on now, keeping each system's distance and bearing from it, and leaves out any that would stand in water, on a building, on steep ground or off the map. The **Lab** tab has the same button for the lab's laydowns.
 
 ![The Site Lost card after 12 full waves](screenshots/gameover.jpg)
 
@@ -133,7 +133,7 @@ The same scenario seed, terrain seed and laydown give the same run. Time between
 
 ## 9. Question the numbers
 
-The **Sources** tab shows the evidence and confidence behind each figure, labelled as published, price or game rule, and every figure can be edited. Changes take effect at once and can be saved as a named set, exported or imported. The figures come from public sources, mostly vendor claims and press reports, and many are labelled assumptions. This is a game and a teaching tool, not a model to base real decisions on.
+**The Lab** holds the lab's laydowns, the game's tuning and **Sources**, which shows the evidence and confidence behind each figure, labelled as published, price or game rule, and every figure can be edited. Changes take effect at once and can be saved as a named set, exported or imported. The figures come from public sources, mostly vendor claims and press reports, and many are labelled assumptions. This is a game and a teaching tool, not a model to base real decisions on.
 
 ![The Sources tab with editable figures, each labelled as published, price or game rule](screenshots/sources.jpg)
 

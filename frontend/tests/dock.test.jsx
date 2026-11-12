@@ -7,7 +7,7 @@ import { createGame } from '../src/game.js';
 import { resetAllFigures } from '../src/sim/config/index.js';
 import { view } from '../src/render/view.js';
 import { GameContext } from '../src/ui/hooks.js';
-import { Dock } from '../src/ui/dock/Dock.jsx';
+import { Dock, VIEWS } from '../src/ui/dock/Dock.jsx';
 import { summary } from '../src/ui/dock/MessagesTab.jsx';
 import { createPlanCanvas } from '../src/ui/dock/plan-canvas.js';
 import { createNetworkCanvas, pointAlong, linkColour, nodeList } from '../src/ui/dock/network-canvas.js';
@@ -25,10 +25,10 @@ const drawNow = () => act(async () => { await new Promise((r) => setTimeout(r, 6
 let game;
 const $ = (sel) => document.querySelector(sel);
 const refresh = () => act(() => game.bump());
-const tab = (name) => fireEvent.click($(`[data-tab="${name}"]`));
-function openDock(name) {
-  render(<GameContext.Provider value={game}><Dock open onClose={() => {}} /></GameContext.Provider>);
-  if (name) tab(name);
+// A view by its own name, or by one of its parts' (which that view then shows); a part's tab switches to it.
+const tab = (name) => fireEvent.click($(`#dock [data-tab="${name}"]`));
+function openDock(name = 'nodes') {
+  render(<GameContext.Provider value={game}><Dock open onClose={() => {}} tab={name} /></GameContext.Provider>);
 }
 const running = (laydown = MIXED, steps = 2400) => {
   setUp(game.sim, { seed: '1', laydown });
@@ -45,24 +45,26 @@ beforeEach(() => {
 afterEach(() => { cleanup(); resetAllFigures(); });
 
 describe('dock', () => {
-  it('switches tabs, keeps one visible, and grows', () => {
+  it('shows one view, with a tab for each of its two parts, and grows', () => {
     openDock();
-    expect($('[data-pane="nodes"]').className).not.toContain('hidden');
+    expect($('#dock').dataset.view).toBe('nodes');
+    expect([...document.querySelectorAll('#dock [data-tab]')].map((t) => t.textContent)).toEqual(['Nodes', 'Messages', 'Network']);
+    expect($('[data-part="messages"]').className).toContain('hidden');
     tab('messages');
-    expect($('[data-pane="nodes"]').className).toContain('hidden');
-    expect($('[data-pane="messages"]').className).not.toContain('hidden');
+    expect($('[data-part="nodes"]').className).toContain('hidden');
+    expect($('[data-part="messages"]').className).not.toContain('hidden');
     fireEvent.click($('#dock-max'));
     expect($('#dock').className).toContain('max');
   });
 
-  it('puts every tab in exactly one named group', () => {
-    openDock();
-    const groups = [...document.querySelectorAll('.tabs [role="group"]')];
-    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Live', 'Comms', 'Plan and cost', 'Records', 'Reference']);
-    const tabs = groups.flatMap((g) => [...g.querySelectorAll('[data-tab]')]);
-    expect(tabs).toHaveLength(document.querySelectorAll('[data-pane]').length);
-    expect(new Set(tabs.map((t) => t.dataset.tab)).size).toBe(tabs.length);
-    for (const t of tabs) expect(t.title).not.toBe('');
+  it("opens a view by its name or a part's, and a view with one part has no tabs", () => {
+    openDock('cost');
+    expect($('#dock').dataset.view).toBe('engage');
+    expect($('[data-part="cost"]').className).not.toContain('hidden');
+    cleanup(); openDock('plan');
+    expect($('#dock').dataset.view).toBe('plan');
+    expect(document.querySelectorAll('#dock [data-tab]')).toHaveLength(0);
+    for (const v of VIEWS) expect(v.hint).not.toBe('');
   });
 });
 
@@ -167,8 +169,9 @@ describe('nodes tab', () => {
 
 describe('plan tab', () => {
   it('offers coverage for each threat', () => {
-    openDock('plan');
-    expect($('#cov-legend').textContent).toBe('');
+    openDock('propagation');
+    expect($('#cov-legend').textContent).not.toContain('Not seen');
+    expect($('#cov-legend').textContent).toContain('Jammed ground'); // jamming is shown from the start
     fireEvent.click($('#cov-on'));
     expect($('#cov-legend').textContent).toMatch(/Not seen.*Seen by 1 sensor.*By 2 or more.*% of the build area seen/);
     fireEvent.change($('#cov-threat'), { target: { value: 'fw' } });

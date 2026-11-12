@@ -9,7 +9,7 @@ import { STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { CONDITIONS, ENV, cleanConditions, weatherRange } from '../src/sim/conditions.js';
 import { unitDef } from '../src/sim/unit-config.js';
 import { GameContext } from '../src/ui/hooks.js';
-import { ControlPanel } from '../src/ui/ControlPanel.jsx';
+import { ConditionsPicker } from '../src/ui/ConditionsPicker.jsx';
 import { Overlay } from '../src/ui/Overlay.jsx';
 import { setUp } from './support/scenarios.js';
 import { replayRun } from './support/replay.js';
@@ -125,9 +125,9 @@ describe('choosing them', () => {
     fireEvent.change($('#start-conditions'), { target: { value: 'dusk' } });
     expect(sim.state.conditions).toBe('dusk');
   });
-  it('in the control panel, until the first wave starts', () => {
+  it('in its map panel, until the first wave starts', () => {
     lay('radar');
-    render(<GameContext.Provider value={game}><ControlPanel onToggleDock={() => {}} onToggleTuning={() => {}} onSandbox={() => {}} /></GameContext.Provider>);
+    render(<GameContext.Provider value={game}><ConditionsPicker /></GameContext.Provider>);
     fireEvent.change($('#conditions'), { target: { value: 'rain' } });
     expect(sim.state.conditions).toBe('rain');
     act(() => firstWave());

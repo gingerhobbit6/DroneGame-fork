@@ -12,7 +12,7 @@ import { useMovable } from '../useMovable.js';
 import { liveStats } from '../../sim/stats.js';
 import { StatsHeadline } from '../RunStats.jsx';
 
-const DOCK_TAB = { network: 'network', coverage: 'plan', refine: 'systems' };
+const DOCK_TAB = { network: 'network', coverage: 'propagation', refine: 'systems' };
 const Icon = () => <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6.5" /><path d="M8 8 L13 4" /><circle cx="8" cy="8" r="1" /></svg>;
 
 export function WizardButton() {

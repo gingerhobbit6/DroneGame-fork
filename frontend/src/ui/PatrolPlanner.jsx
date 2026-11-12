@@ -13,6 +13,8 @@ import { view } from '../render/view.js';
 import { useGame } from './hooks.js';
 import { useAccount } from './account/pack.js';
 import { Movable } from './Movable.jsx';
+import { ICONS, Icon } from './icons.jsx';
+import { useBeside } from './beside.js';
 import { NumberInput } from './NumberInput.jsx';
 import { DEFAULT_SPACING, VEHICLE_SHAPES, bearers, carryProblem, fill, giveTo, overPack, packLeft, relay, takeOff, typeProblem } from './patrol-bearers.js';
 
@@ -84,6 +86,8 @@ function Bearer({ b, plan, left, locked, change }) {
 export function PatrolPlanner({ patrol, locked, onClose }) {
   const game = useGame(), assets = useAccount()?.activeUnit?.assets;
   const [selected, pick] = useState(() => view.patrolBearer ?? null), [shape, setShape] = useState('column');
+  const [max, setMax] = useState(false);
+  useBeside('patrol-planner', 'zone-panel', 'right', [max], { off: max }); // beside the patrol panel
   const setSelected = (key) => { view.patrolBearer = key; pick(key); }; // kept in the view, so it survives the panel closing
   const plan = planOf(patrol), soldiers = patrol.group.count, column = patrol.column;
   const left = packLeft(assets, game.sim.structures), over = overPack(column, left);
@@ -119,7 +123,8 @@ export function PatrolPlanner({ patrol, locked, onClose }) {
   const type = PATROL_TYPES[plan.type], vehicles = column.filter((e) => e.vehicle !== 'foot').length;
 
   return (
-    <Movable id="patrol-planner" title="Patrol planner" role="dialog" aria-label="Patrol planner">
+    <Movable id="patrol-planner" className={`panel${max ? ' max' : ''}`} title="Patrol planner" role="dialog" aria-label="Patrol planner">
+      <button type="button" id="patrol-planner-max" className="panel-max" aria-pressed={max} aria-label={max ? 'Make the planner smaller' : 'Make the planner bigger'} title={max ? 'Make the planner smaller' : 'Make the planner bigger'} onClick={() => setMax(!max)}><Icon path={ICONS.max} size={14} /></button>
       <button type="button" id="patrol-planner-close" aria-label="Close" onClick={onClose}>×</button>
       <div className="pp-row">
         <span>This patrol is</span>

@@ -17,6 +17,7 @@ export const view = {
   mapContours: false, // height lines on the map
   scenery: true, // the 3D trees and buildings on a real map. Hiding them only changes the picture, not the rules
   mapPanel: false, // the map switcher is open
+  defend: null, // the defence panel the Controls menu opened: 'area', 'patrol' or null
   mapLoading: false, // a new map picture is on its way
   startAt: null, // a real place the start screen should open on: { e, n, note }
   planView: false, // the camera looks straight down

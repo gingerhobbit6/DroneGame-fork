@@ -11,7 +11,7 @@ import { useHotkeys } from '../src/ui/useHotkeys.js';
 import { Hud } from '../src/ui/Hud.jsx';
 import { Toolbar } from '../src/ui/Toolbar.jsx';
 import { ControlPanel } from '../src/ui/ControlPanel.jsx';
-import { Approvals, Toast, Tuning } from '../src/ui/Panels.jsx';
+import { Approvals, Toast, TuningFields } from '../src/ui/Panels.jsx';
 import { Sandbox } from '../src/ui/Sandbox.jsx';
 import { Overlay } from '../src/ui/Overlay.jsx';
 import { Timeline } from '../src/ui/Timeline.jsx';
@@ -108,7 +108,8 @@ describe('toolbar', () => {
 });
 
 describe('control panel', () => {
-  const panel = (props = {}) => show(<ControlPanel onToggleDock={vi.fn()} onToggleTuning={vi.fn()} onSandbox={vi.fn()} {...props} />);
+  // the Controls menu, and the Run panel that now holds the attack, sandbox, reset and clear buttons
+  const panel = ({ onView = vi.fn(), onSandbox = vi.fn() } = {}) => show(<><ControlPanel onView={onView} /><Hud openDock={vi.fn()} onView={onView} onSandbox={onSandbox} /></>);
 
   it('starts a wave and sets the speed', () => {
     armed();
@@ -193,8 +194,8 @@ describe('control panel', () => {
   });
 
   it('resets, opens the sandbox, and does nothing before deployment', () => {
-    const onSandbox = vi.fn(), onToggleDock = vi.fn(), onToggleTuning = vi.fn();
-    panel({ onSandbox, onToggleDock, onToggleTuning });
+    const onSandbox = vi.fn(), onView = vi.fn();
+    panel({ onSandbox, onView });
     fireEvent.click($('#btn-clear')); // not deployed yet, so this does nothing
     expect($('#btn-clear').textContent).toBe('Clear map');
     fireEvent.click($('#btn-reset'));
@@ -207,9 +208,11 @@ describe('control panel', () => {
     expect(game.sim.state.sandbox).toBe(false);
     fireEvent.click($('#btn-reset'));
     expect(game.sim.structures.length).toBe(MIXED.length);
-    fireEvent.click($('#btn-sapient')); fireEvent.click($('#btn-tuning'));
-    expect(onToggleDock).toHaveBeenCalled();
-    expect(onToggleTuning).toHaveBeenCalled();
+    fireEvent.click($('#btn-view-nodes'));
+    expect(onView).toHaveBeenCalledWith('nodes');
+    fireEvent.click($('#btn-plan'));
+    expect(onView).toHaveBeenCalledWith('plan');
+    expect($('#btn-tuning')).toBeNull(); // tuning is in The Lab view of the SAPIENT panel
   });
 });
 
@@ -286,7 +289,7 @@ describe('toasts', () => {
 describe('tuning', () => {
   it('commits valid numbers and restores invalid ones', () => {
     const before = WORLD.timeScale, adapt = ADAPT.evadePerWave;
-    show(<Tuning open />);
+    show(<TuningFields />);
     const [time, evade] = document.querySelectorAll('#tuning input');
     fireEvent.change(time, { target: { value: '9' } });
     expect(WORLD.timeScale).toBe(9);
@@ -299,10 +302,6 @@ describe('tuning', () => {
     fireEvent.change(evade, { target: { value: '' } });
     expect(ADAPT.evadePerWave).toBe(adapt);
     WORLD.timeScale = before;
-  });
-  it('can be hidden', () => {
-    show(<Tuning open={false} />);
-    expect($('#tuning').className).toContain('hidden');
   });
 });
 

@@ -13,7 +13,8 @@ import { km, useGame, useTick } from './hooks.js';
 import { UnitField } from './UnitEditor.jsx';
 import { PeoplePicker } from './PeoplePicker.jsx';
 import { PanelHead, SystemCard } from './SystemCard.jsx';
-import { UnitTray } from './account/UnitTray.jsx';
+import { UnitTray, VehiclePicker } from './account/UnitTray.jsx';
+import { useBeside } from './beside.js';
 import { useAccount } from './account/pack.js';
 import { Movable } from './Movable.jsx';
 
@@ -50,9 +51,11 @@ export function ToolPicker() {
   const tool = game.getTool(), open = game.catalogue(), withWizard = view.wizard === 'open';
   const [peopleHidden, setPeopleHidden] = useState(false);
   useEffect(() => { if (tool !== 'people') setPeopleHidden(false); }, [tool]);
+  useBeside('tool-picker', 'toolbar', 'left', [open, tool === 'people', peopleHidden]); // beside Place systems, like every pop-up
   if (tool === 'people') return peopleHidden || withWizard ? null : <PeoplePicker onHide={() => setPeopleHidden(true)} />;
   if (!game.sim.state.started) return null;
   if (open === 'unit') return <UnitTray withWizard={withWizard} />;
+  if (open === 'vehicles') return <VehiclePicker withWizard={withWizard} />;
   const group = TOOLBAR.find((g) => g.kind === open);
   if (!group) return null;
   return <KindList game={game} group={group} tool={tool} withWizard={withWizard} />;

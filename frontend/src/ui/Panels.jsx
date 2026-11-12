@@ -1,4 +1,4 @@
-// The smaller panels: tuning, legend, toasts and the operator's approval cards.
+// The smaller panels: the tuning fields, legend, toasts and the operator's approval cards.
 
 import { useEffect, useRef, useState } from 'react';
 import { ADAPT, DRONES, WORLD } from '../sim/config/index.js';
@@ -6,21 +6,22 @@ import { hex, useGame, useTick } from './hooks.js';
 import { NumberInput } from './NumberInput.jsx';
 import { Movable } from './Movable.jsx';
 
-export function Tuning({ open }) {
+// The game's own settings, in The Lab view of the SAPIENT panel.
+export function TuningFields() {
   const { commands } = useGame();
   const adaptField = (label, key, step) => (
     <label>{label}<NumberInput value={ADAPT[key]} step={step} onCommit={(v) => commands.setAdapt(key, v)} /></label>
   );
   return (
-    <Movable id="tuning" title="Tuning" className={`panel${open ? '' : ' hidden'}`}>
+    <div id="tuning" className="tuning">
       <div className="label">GAME</div>
       {/* 20 at most: a slip such as 1000 had the frame loop run its cap of steps on every frame, and the page crawled */}
       <label>Time scale (x)<NumberInput value={WORLD.timeScale} step={0.5} min={0.5} max={20} onCommit={(v) => { WORLD.timeScale = v; }} /></label>
-      <div className="muted" style={{ margin: '6px 0' }}>Ranges, prices and drone figures are in the SAPIENT panel, Sources tab.</div>
+      <div className="muted" style={{ margin: '6px 0' }}>Ranges, prices and drone figures are below, under Sources.</div>
       <div className="label">ENEMY LEARNING (per wave)</div>
       {adaptField('Evade gain', 'evadePerWave', 0.01)}
       {adaptField('Jam resist gain', 'jamResistPerWave', 0.01)}
-    </Movable>
+    </div>
   );
 }
 
@@ -33,9 +34,10 @@ const LEGEND = [
   ['#8a94a3', 'Grey ghost: real drone no sensor has (truth overlay)'],
   ['#ff8080', 'Air track symbol: a fused track (yellow clover frame = unclassified, red peaked frame = named by a camera, with a rotor over a multirotor; dashed = tentative, dimmer = coasting). Faint unless Highlight tracks is ticked'],
 ];
-export function Legend() {
+export function Legend({ onClose }) {
   return (
-    <Movable id="hud-bottom-left" title="Legend" startMin>
+    <Movable id="hud-bottom-left" title="Legend">
+      {onClose && <button id="legend-close" aria-label="Close the legend" onClick={onClose}>×</button>}
       <div className="label">THREATS</div>
       {LEGEND.map(([c, text]) => <div key={c}><i style={{ background: c }} />{text}</div>)}
       <div className="hint">Click a system or drone for details · drag to move · right-drag or Shift-drag to turn · scroll or pinch to zoom</div>

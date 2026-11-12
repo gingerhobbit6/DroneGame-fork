@@ -1,16 +1,16 @@
 // Top right: starting waves, game speed, view toggles, engagement authority, and opening the other panels.
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { FUSION } from '../sim/config/index.js';
 import { view } from '../render/view.js';
 import { useArmed, useGame, useTick } from './hooks.js';
 import { ResupplyButton } from './ResupplyButton.jsx';
-import { AttackMix, mixLabel } from './AttackMix.jsx';
-import { ConditionsPicker } from './ConditionsPicker.jsx';
 import { SpeedControl } from './SpeedControl.jsx';
 import { Movable } from './Movable.jsx';
+import { VIEWS } from './dock/Dock.jsx';
+import { ICONS, Icon } from './icons.jsx';
 
-export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox, menuOpen }) {
+export function ControlPanel({ onView, shownView, menuOpen }) {
   useTick();
   const game = useGame();
   const { sim, commands } = game;
@@ -18,9 +18,7 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox, menuOpen
 
   useEffect(() => { document.body.classList.toggle('track-hi', view.trackHi); });
 
-  const clear = useArmed(); // it throws the laydown away
   const end = useArmed(); // it ends the run
-  const [mixOpen, setMixOpen] = useState(false);
   // Before the first wave: what the first press of Start wave refused over, kept on screen until it is put right or overruled.
   const building = state.started && state.wave === 0 && !state.sandbox;
   const loose = building && state.warnedWire ? sim.unwired().length : 0;
@@ -62,19 +60,12 @@ export function ControlPanel({ onToggleDock, onToggleTuning, onSandbox, menuOpen
           <option value="auto">Automatic</option><option value="costly">Ask for costly shots</option><option value="all">Ask for every engagement</option>
         </select>
       </label>
-      <ConditionsPicker />
-      <button id="btn-attack" title="Choose which drones the waves send. Locked once the first wave starts." aria-expanded={mixOpen} onClick={() => setMixOpen((o) => !o)}>Attack: {mixLabel(state.attack)}</button>
-      <button id="btn-sandbox" title="Try attacks against your laydown without risking the site" onClick={() => { if (state.sandbox) commands.exitSandbox(); else { commands.enterSandbox(); onSandbox(); } }}>
-        {state.sandbox ? 'Exit sandbox' : 'Sandbox'}
-      </button>
-      <div className="row">
-        <button id="btn-reset" title="Start the run again with the same laydown, wiring and seed" onClick={() => { if (state.started) commands.reset('keep'); }}>Reset run</button>
-        <button id="btn-clear" className="danger" title="Remove every system, refund the budget and go back to before wave 1" disabled={!sim.structures.length && !state.wave} onClick={state.started ? clear.confirm('clear', () => commands.reset('clear')) : undefined}>{clear.armed ? 'Sure? Click again' : 'Clear map'}</button>
+      <div className="view-buttons" role="group" aria-label="SAPIENT views">
+        {VIEWS.filter((v) => !v.run).map((v) => (
+          <button key={v.id} id={`btn-view-${v.id}`} className={`with-icon wide${shownView === v.id ? ' on' : ''}`} aria-pressed={shownView === v.id} title={v.hint} onClick={() => onView(v.id)}><Icon path={ICONS[v.icon]} size={16} />{v.label}</button>
+        ))}
       </div>
-      <button id="btn-sapient" onClick={onToggleDock}>SAPIENT</button>
-      <button id="btn-tuning" onClick={onToggleTuning}>Tuning</button>
     </Movable>
-    {mixOpen && <AttackMix onClose={() => setMixOpen(false)} />}
     </>
   );
 }

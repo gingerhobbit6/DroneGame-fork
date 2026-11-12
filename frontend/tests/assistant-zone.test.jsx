@@ -29,6 +29,7 @@ const opened = () => { deployed(); fireEvent.click($('#btn-wizard')); };
 const armed = () => { setUp(game.sim, { seed: '1', laydown: MIXED }); refresh(); };
 
 beforeEach(() => {
+  view.defend = null;
   HTMLCanvasElement.prototype.getContext = () => null;
   game = createGame({ seed: '1', terrainSeed: '1', api: createFakeApi(), storage: createFakeStorage() });
   Object.assign(view, { zone: null, spot: null, wizard: 'closed', coverageOn: false, coverageThreat: null });
@@ -86,8 +87,7 @@ describe('the zone', () => {
     opened();
     fireEvent.click($('[aria-label="Close the wizard"]'));
     setView('zone', { ...TRIANGLE, closed: true });
-    fireEvent.click($('#btn-sapient'));
-    fireEvent.click($('[data-tab="saved"]'));
+    fireEvent.click($('#btn-view-saved'));
     fireEvent.change($('#save-name'), { target: { value: 'with a zone' } });
     await act(async () => { fireEvent.submit($('#save-laydown').closest('form')); });
     expect(game.api.laydowns.rows.get(1).spec.zone).toEqual(TRIANGLE.points);
@@ -100,9 +100,9 @@ describe('the zone', () => {
 });
 
 describe('drawing the area without the wizard', () => {
-  const openPanel = () => { deployed(); fireEvent.click($('#map-zone')); };
+  const openPanel = () => { deployed(); fireEvent.click($('#btn-defend-area')); };
 
-  it('starts drawing from the map rail, closes the area and scores it', () => {
+  it('starts drawing from the Controls menu, closes the area and scores it', () => {
     openPanel();
     expect(game.getTool()).toBe('zone');
     expect($('#wizard')).toBeNull();
@@ -122,9 +122,9 @@ describe('drawing the area without the wizard', () => {
     fireEvent.click($('#zone-clear'));
     expect(view.zone).toBe(null);
     setView('zone', { points: TRIANGLE.points, closed: true });
-    fireEvent.click($('#map-zone')); // closing the panel stops drawing
+    fireEvent.click($('#btn-defend-area')); // closing the panel stops drawing
     expect(game.getTool()).toBe(null);
-    fireEvent.click($('#map-zone')); // an area is already drawn, so opening shows it and leaves the map clicks alone
+    fireEvent.click($('#btn-defend-area')); // an area is already drawn, so opening shows it and leaves the map clicks alone
     expect(game.getTool()).toBe(null);
     fireEvent.click($('#zone-redraw'));
     expect(view.zone).toBe(null);
@@ -133,9 +133,9 @@ describe('drawing the area without the wizard', () => {
   it('leaves a system being placed alone when it closes', () => {
     deployed();
     setView('zone', { points: TRIANGLE.points, closed: true });
-    fireEvent.click($('#map-zone'));
+    fireEvent.click($('#btn-defend-area'));
     act(() => game.setTool('radar'));
-    fireEvent.click($('#map-zone'));
+    fireEvent.click($('#btn-defend-area'));
     expect(game.getTool()).toBe('radar');
   });
   it('makes way for the map panel', () => {

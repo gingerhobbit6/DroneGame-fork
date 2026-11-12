@@ -2,6 +2,10 @@
 // switcher opens beside it. None of this reaches the simulation, except placing a system, which is the normal command.
 // An option that can't be used stays visible and says why.
 
+import { ICONS, Icon } from './icons.jsx';
+import { Legend } from './Panels.jsx';
+import { useBeside } from './beside.js';
+import { ConditionsPicker } from './ConditionsPicker.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { terrainState } from '../sim/terrain.js';
@@ -12,7 +16,6 @@ import { contourStep, heightRange } from '../render/topo.js';
 import { view } from '../render/view.js';
 import { useArmed, useGame, useTick } from './hooks.js';
 import { accuracyText, locateMe } from './locate.js';
-import { ZonePanel } from './ZonePanel.jsx';
 import { Compass } from './Compass.jsx';
 import './map-panel.css';
 import { Movable } from './Movable.jsx';
@@ -87,14 +90,6 @@ function TopoLegend({ data }) {
   );
 }
 
-const Icon = ({ path }) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
-const ICONS = {
-  me: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10z',
-  site: 'M4 20V10l8-6l8 6v10M9 20v-6h6v6',
-  zone: 'M5 8l7-4l7 5l-2 10l-10 1z',
-  fit: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M9 12h6M12 9v6',
-};
-
 function Thumb({ id, pictures }) {
   return pictures[id] ? <img className="map-thumb" src={pictures[id]} alt="" /> : <span className={`map-thumb thumb-${id}`} />;
 }
@@ -109,8 +104,15 @@ export function MapControls() {
   const [offer, setOffer] = useState(null); // a real place outside this world, which could have a map of its own
   const [locating, setLocating] = useState(false);
   const [pictures, setPictures] = useState({});
-  const [zoneOpen, setZoneOpen] = useState(false);
   const change = useArmed();
+  const [weather, setWeather] = useState(false); // the conditions picker, from its map button
+  const [legend, setLegend] = useState(false);
+  const [slot, setSlot] = useState(null); // where the map buttons go: under the overview map, once it is on the page
+  useEffect(() => setSlot(document.getElementById('map-rail-slot')), []);
+  // a panel from a map button opens beside the overview map, to its right
+  useBeside('map-panel', 'minimap', 'right', [view.mapPanel]);
+  useBeside('conditions-panel', 'minimap', 'right', [weather]);
+  useBeside('hud-bottom-left', 'minimap', 'right', [legend]);
 
   const maps = !geo ? GENERATED_MAPS : isEstonian(geo.n0) ? ESTONIAN_MAPS : REAL_MAPS;
   const source = game.mapSource?.(seed);
@@ -169,15 +171,6 @@ export function MapControls() {
       say(`Moved to ${gridRef(point.e, point.n)}. Pick a system first to place one there.`);
     }
   };
-  const stopDrawing = () => { if (game.getTool() === 'zone') game.setTool('zone'); };
-  const toggleZone = () => {
-    if (zoneOpen) stopDrawing();
-    else {
-      game.setViewOption('mapPanel', false);
-      if (!view.zone?.closed && !game.sim.designLocked() && game.getTool() !== 'zone') game.setTool('zone');
-    }
-    setZoneOpen(!zoneOpen);
-  };
   const choose = (id) => { if (geo) game.setViewOption('baseMap', id); };
   const forced = (key) => (key === 'mapRoads' && view.baseMap === 'hybrid') || (key === 'mapContours' && view.baseMap === 'topo');
   const showContours = geo && (view.mapContours || view.baseMap === 'topo');
@@ -189,20 +182,32 @@ export function MapControls() {
     </div>
   );
 
+  const rail = (
+    <div id="map-rail">
+      <button id="map-switch" className={`${view.mapPanel ? 'on ' : ''}${view.mapLoading ? 'loading' : ''}`} aria-expanded={view.mapPanel} title="Change the map" onClick={() => game.setViewOption('mapPanel', !view.mapPanel)}>
+        <Thumb id={current} pictures={pictures} />
+      </button>
+      <button id="map-me" className={`${locating ? 'loading ' : ''}${view.me ? 'on' : ''}`} aria-label="Centre on my location" title="Centre on my location. Live map tiles switch off first; choosing Live map again shares the viewed area with OpenStreetMap." disabled={locating} onClick={centreOnMe}><Icon path={ICONS.me} /></button>
+      <button id="map-site" aria-label="Centre on the site" title="Centre on the site" onClick={() => gameView?.centreOn(0, 0)}><Icon path={ICONS.site} /></button>
+      <button id="map-fit" aria-label="Show the whole laydown (H)" title="Show the whole laydown (H)" onClick={() => gameView?.fitLaydown?.()}><Icon path={ICONS.fit} /></button>
+      <Compass />
+      <button id="map-conditions" className={weather ? 'on' : ''} aria-expanded={weather} aria-label="Light and weather" title="Light and weather: day, dusk, night or rain" onClick={() => setWeather(!weather)}><Icon path={ICONS.conditions} /></button>
+      <button id="map-legend" className={legend ? 'on' : ''} aria-expanded={legend} aria-label="Legend" title="Legend: what each colour and symbol means" onClick={() => setLegend(!legend)}><Icon path={ICONS.legend} /></button>
+      <button id="map-plan" className={view.planView ? 'on' : ''} aria-pressed={view.planView} title="Look straight down (P)" onClick={() => game.setViewOption('planView', !view.planView)}>{view.planView ? '3D' : '2D'}</button>
+    </div>
+  );
+
   return (
     <>
-      <div id="map-rail">
-        <button id="map-switch" className={`${view.mapPanel ? 'on ' : ''}${view.mapLoading ? 'loading' : ''}`} aria-expanded={view.mapPanel} title="Change the map" onClick={() => game.setViewOption('mapPanel', !view.mapPanel)}>
-          <Thumb id={current} pictures={pictures} />
-        </button>
-        <button id="map-me" className={`${locating ? 'loading ' : ''}${view.me ? 'on' : ''}`} aria-label="Centre on my location" title="Centre on my location. Live map tiles switch off first; choosing Live map again shares the viewed area with OpenStreetMap." disabled={locating} onClick={centreOnMe}><Icon path={ICONS.me} /></button>
-        <button id="map-site" aria-label="Centre on the site" title="Centre on the site" onClick={() => gameView?.centreOn(0, 0)}><Icon path={ICONS.site} /></button>
-        <button id="map-fit" aria-label="Show the whole laydown (H)" title="Show the whole laydown (H)" onClick={() => gameView?.fitLaydown?.()}><Icon path={ICONS.fit} /></button>
-        <Compass />
-        <button id="map-zone" className={zoneOpen ? 'on' : ''} aria-expanded={zoneOpen} aria-label="Draw the area to defend" title="Draw the area to defend" onClick={toggleZone}><Icon path={ICONS.zone} /></button>
-        <button id="map-plan" className={view.planView ? 'on' : ''} aria-pressed={view.planView} title="Look straight down (P)" onClick={() => game.setViewOption('planView', !view.planView)}>{view.planView ? '3D' : '2D'}</button>
-      </div>
+      {slot ? createPortal(rail, slot) : rail}
 
+      {legend && <Legend onClose={() => setLegend(false)} />}
+      {weather && (
+        <Movable id="conditions-panel" title="Conditions" role="dialog" aria-label="Light and weather">
+          <button id="conditions-close" aria-label="Close" onClick={() => setWeather(false)}>×</button>
+          <ConditionsPicker />
+        </Movable>
+      )}
       {view.mapPanel && (
         <Movable id="map-panel" title="Map" role="dialog" aria-label="Map">
           <div className="map-panel-head"><b>Map</b>{geo && <span className="muted">M changes it</span>}<button id="map-close" aria-label="Close the map panel" onClick={() => game.setViewOption('mapPanel', false)}>×</button></div>
@@ -242,8 +247,7 @@ export function MapControls() {
           <button id="map-change-world" title="Go back to the start screen to pick generated ground or another real map. This clears your laydown." onClick={change.confirm('world', () => game.leaveWorld())}>{change.armed ? 'Sure? This clears your laydown' : 'Change world'}</button>
         </Movable>
       )}
-      {zoneOpen && !view.mapPanel && <ZonePanel onClose={toggleZone} />}
-      {!view.mapPanel && !zoneOpen && message && <Movable id="map-bubble" title="Map note"><button id="map-bubble-close" aria-label="Dismiss" onClick={() => say('')}>×</button>{message}</Movable>}
+      {!view.mapPanel && !view.defend && message && <Movable id="map-bubble" title="Map note"><button id="map-bubble-close" aria-label="Dismiss" onClick={() => say('')}>×</button>{message}</Movable>}
       {geo && <Credits geo={geo} source={source} here={here} />}
     </>
   );

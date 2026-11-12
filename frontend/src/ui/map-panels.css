@@ -4,7 +4,7 @@
 #map-credit summary { display: inline; padding: 0 4px; cursor: pointer; list-style: none; }
 #map-credit summary::-webkit-details-marker { display: none; }
 #map-credit { position: fixed; left: 50%; transform: translateX(-50%); bottom: 52px; margin: 0; padding: 2px 8px; background: rgba(11, 18, 32, 0.8); border-radius: 4px; max-width: 60vw; text-align: center; pointer-events: none; }
-#hud-top-right { max-height: calc(100vh - 60px); overflow-y: auto; }
+#hud-top-right { max-height: calc(100vh - 60px); overflow-y: auto; scrollbar-width: none; }
 #world-picker { margin: 10px 0; }
 #world-picker .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
 #world-real-panel select { flex: 1; min-width: 160px; }

@@ -2,7 +2,7 @@
 // so selling a system puts it back in the tray. They are the limit too: while a pack is deployed, only its kit can be placed.
 
 import { useState } from 'react';
-import { PATROL_VEHICLES, PEOPLE, STRUCTURES, carries } from '../../sim/config/index.js';
+import { PATROL_VEHICLES, PEOPLE, STRUCTURES, TOOLBAR, carries } from '../../sim/config/index.js';
 import { useGame } from '../hooks.js';
 import { PanelHead, SystemCard, dragProps, onKeys } from '../SystemCard.jsx';
 import { remaining, useAccount } from './pack.js';
@@ -30,7 +30,7 @@ function VehicleCard({ game, line, systems, locked }) {
         title={system ? `Drag the ${v.name} with its ${STRUCTURES[system].product} onto the map, or click it and then click the map` : v.desc}
         onClick={pick} onKeyDown={onKeys(pick)} {...dragProps(game, { system, vehicle: line.id }, usable)}>
         <b>{v.name}</b>{system && <span className="pick-price">{STRUCTURES[system].product}</span>}
-        <span className="tray-left">{toPlace(line)}</span>
+        <span className="tray-left">{line.count == null ? 'Click it, then click the map' : toPlace(line)}</span>
       </div>
     </div>
   );
@@ -75,6 +75,23 @@ export function UnitTray({ withWizard }) {
         </>
       )}
       {!systems.length && !people.length && !left.vehicles.length && <p className="muted">This pack is empty. Add kit to it from your profile.</p>}
+    </Movable>
+  );
+}
+
+// Vehicles from Place systems: each with the system it carries, chosen here, dragged or clicked onto the map like a system. With a
+// pack, its vehicles and systems still to place; without one, every vehicle and any system it can carry.
+export function VehiclePicker({ withWizard }) {
+  const game = useGame(), unit = useAccount()?.activeUnit, locked = game.sim.designLocked();
+  const left = unit ? remaining(unit.assets, game.sim) : null;
+  const systems = left ? left.systems.filter((l) => STRUCTURES[l.id]) : TOOLBAR.flatMap((g) => g.classes).map((id) => ({ id, left: 1 }));
+  const vehicles = left ? left.vehicles : Object.keys(PATROL_VEHICLES).map((id) => ({ id, left: 1 }));
+  return (
+    <Movable id="tool-picker" title="Vehicles" className={`panel${withWizard ? ' with-wizard' : ''}`} role="region" aria-label="Park a vehicle with a system on board">
+      <PanelHead title="Vehicles" color={0xd99a00} onHide={() => game.openCatalogue('vehicles', false)} />
+      <p className="pick-hint">Choose what each carries, then drag it onto the map, or click it and then click the map. Its system is raised to the vehicle&apos;s mast height. Place another system on a parked vehicle to add it, up to three.</p>
+      {vehicles.length ? <div className="pick-list">{vehicles.map((l) => <VehicleCard key={l.id} game={game} line={l} systems={systems} locked={locked} />)}</div>
+        : <p className="muted">Your pack has no vehicles. Add them from your profile.</p>}
     </Movable>
   );
 }

@@ -168,5 +168,5 @@
 }
 
 /* in the game: the account button and the deployment pack tray */
-#acct-chip { position: fixed; z-index: 4; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 999px; font-size: 12px; background: rgba(12, 20, 34, 0.92); border: 1px solid #2f4468; }
+#acct-chip { position: fixed; z-index: 4; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 999px; font-size: 12px; background: rgba(12, 20, 34, 0.92); border: 1px solid #2f4468; }
 #acct-chip i { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font: 700 11px ui-monospace, Consolas, monospace; font-style: normal; color: #04121c; background: linear-gradient(135deg, #4f95ff, #ffc61a); }

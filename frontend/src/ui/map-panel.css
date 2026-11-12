@@ -67,7 +67,7 @@
 #map-rail { position: fixed; left: 254px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
 #map-rail button { width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; background: rgba(12, 20, 34, 0.92); color: #dbe4f0; border: 1px solid #2f4468; border-radius: 8px; position: relative; overflow: hidden; }
 #map-rail button:hover { background: #243759; }
-#map-rail button.on { border-color: #4fc3f7; color: #4fc3f7; }
+#map-rail button.on { border-color: #4f95ff; background: rgba(79, 149, 255, 0.2); color: #e8f1ff; } /* lit as button.on */
 #map-switch .map-thumb { width: 100%; height: 100%; border-radius: 0; }
 
 .map-thumb { display: block; width: 100%; aspect-ratio: 1.5; object-fit: cover; border-radius: 5px; background: #1b2a45; }
@@ -102,6 +102,9 @@
 #map-bubble { left: 304px; bottom: 64px; max-width: 280px; padding: 8px 10px; z-index: 4; } /* above the timeline */
 #zone-panel { left: 304px; bottom: 64px; width: 400px; max-width: calc(100vw - 316px); max-height: calc(100vh - 76px); overflow-y: auto; padding: 8px 10px; z-index: 4; display: flex; flex-direction: column; gap: 8px; font-size: 12px; line-height: 16px; }
 #zone-panel p { margin: 0; }
+#conditions-panel { left: 304px; bottom: 64px; width: 240px; padding: 8px 10px; z-index: 4; font-size: 12px; }
+#conditions-panel label { display: flex; gap: 6px; align-items: center; padding-right: 22px; }
+#conditions-close { position: absolute; top: 6px; right: 6px; padding: 0 6px; }
 #patrol-planner { left: 716px; bottom: 64px; width: 640px; max-width: calc(100vw - 728px); max-height: calc(100vh - 76px); overflow-y: auto; padding: 8px 10px; z-index: 4; display: flex; flex-direction: column; gap: 8px; font-size: 12px; line-height: 16px; }
 #patrol-planner p { margin: 0; }
 #patrol-planner-close { position: absolute; top: 6px; right: 6px; padding: 0 6px; }
@@ -129,6 +132,9 @@
 .pp-offer li.grey { opacity: 0.45; }
 .pp-warn { color: #ffb74d; }
 #zone-panel-close { position: absolute; top: 6px; right: 6px; padding: 0 6px; }
+.panel-max { position: absolute; top: 6px; right: 30px; padding: 1px 4px; line-height: 0; }
+#zone-panel.max, #patrol-planner.max { left: 12px; right: 12px; top: 12px; bottom: 64px; width: auto; max-width: none; max-height: none; z-index: 6; }
+#patrol-planner.max .pp-wrap { max-height: 55vh; }
 #map-bubble-close { float: right; margin-left: 8px; padding: 0 6px; }
 #map-bubble .map-note { margin: 0; font-size: 12px; }
 

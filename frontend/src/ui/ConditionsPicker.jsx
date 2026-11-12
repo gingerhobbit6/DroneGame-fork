@@ -1,9 +1,10 @@
 // The light and weather the run is fought in. Like the attack, it can change until the first wave starts.
 
 import { CONDITIONS } from '../sim/conditions.js';
-import { useGame } from './hooks.js';
+import { useGame, useTick } from './hooks.js';
 
 export function ConditionsPicker({ id = 'conditions' }) {
+  useTick(); // it locks once the first wave starts
   const game = useGame();
   const { sim, commands } = game;
   const change = (e) => { const problem = commands.setConditions(e.target.value); if (problem) game.toast(problem); };

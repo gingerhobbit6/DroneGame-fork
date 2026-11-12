@@ -27,6 +27,10 @@ function traceRange(g, n, X, Y, k) {
 export const COVER_FILL = ['rgba(229,57,53,0.32)', 'rgba(255,193,7,0.32)', 'rgba(102,187,106,0.45)'];
 const COVER_MS = 12; // of each frame go on working the coverage map out: all of it at once froze the page for over half a second
 
+// The categories the plan can show or hide: each kind of sensor, and weapons together.
+export const PLAN_CATEGORIES = [['radar', 'Radars'], ['rf', 'RF detectors'], ['camera', 'Cameras'], ['acoustic', 'Acoustic'], ['effector', 'Weapons and jammers']];
+export const planCategory = (def) => (def.role === 'effector' ? 'effector' : def.kind);
+
 export function createPlanCanvas(cv, sim) {
   const { net, drones } = sim;
   const g = cv.getContext('2d');
@@ -60,8 +64,9 @@ export function createPlanCanvas(cv, sim) {
     return cover.canvas;
   }
 
-  // coverage: the drone type to map, or null for none. Returns true while the coverage map has rows left to work out.
-  function draw(coverage) {
+  // coverage: the drone type to map, or null for none. hidden: the categories (planCategory) not to draw. jamming: shade where each
+  // jammer reaches over the ground, solid while it is jamming. Returns true while the coverage map has rows left to work out.
+  function draw(coverage, hidden = [], { jamming = false } = {}) {
     const { w, h } = sharpCanvas(cv, g) ?? {};
     if (!w) return false;
     let more = false;
@@ -95,13 +100,19 @@ export function createPlanCanvas(cv, sim) {
       g.strokeStyle = '#c6ff00'; g.lineWidth = 2; g.setLineDash([8, 6]); g.stroke(); g.setLineDash([]); g.lineWidth = 1;
     }
 
-    const nodes = [...net.nodes.values()].filter((n) => (n.def.role === 'sensor' || n.def.role === 'effector') && n.def.id !== 'perimeter');
+    const nodes = [...net.nodes.values()].filter((n) => (n.def.role === 'sensor' || n.def.role === 'effector') && n.def.id !== 'perimeter' && !hidden.includes(planCategory(n.def)));
     if (!coverage) for (const n of nodes) { // each node's range
       const col = hex(n.def.color);
       traceRange(g, n, X, Y, k);
       if (n.def.role === 'sensor') { g.fillStyle = col + '14'; g.fill(); }
       g.strokeStyle = col + (n.def.role === 'sensor' ? '88' : '66'); g.setLineDash(n.def.role === 'sensor' ? [] : [6, 4]);
       g.stroke(); g.setLineDash([]);
+    }
+    if (jamming) for (const n of nodes.filter((m) => m.def.fire === 'jam')) { // where each jammer's reach falls on the ground
+      const on = n.mode === 'Jam' || n.jamOn;
+      traceRange(g, n, X, Y, k);
+      g.fillStyle = on ? '#ff52523a' : '#ff525214'; g.fill();
+      g.strokeStyle = '#ff7a7a'; g.lineWidth = 1.5; g.setLineDash(on ? [] : [4, 4]); g.stroke(); g.setLineDash([]); g.lineWidth = 1;
     }
     const now = performance.now();
     if (!coverage) for (const n of nodes) { // links to fusion

@@ -9,6 +9,8 @@ import { PatrolColumn } from './PatrolColumn.jsx';
 import { Movable } from './Movable.jsx';
 import { PatrolPlan } from './PatrolPlan.jsx';
 import { PatrolPlanner } from './PatrolPlanner.jsx';
+import { ICONS, Icon } from './icons.jsx';
+import { RUN, useBeside } from './beside.js';
 
 // How much of the area is seen, for each drone type, with the strongest first.
 export function CoverageBars({ scores, gap }) {
@@ -26,7 +28,8 @@ export function CoverageBars({ scores, gap }) {
 
 export const ATTACK_NOTE = 'Strike drones attack spots inside the area, in place of the station. FPV and FO strikes can still turn on a loud emitter.';
 
-export function ZonePanel({ onClose }) {
+export function ZonePanel({ onClose, mode }) {
+  const area = mode !== 'patrol', patrolled = mode !== 'area';
   const game = useGame();
   const zone = view.zone, closed = !!zone?.closed, drawing = game.getTool() === 'zone';
   const count = zone && !closed ? zone.points.length : 0;
@@ -39,11 +42,15 @@ export function ZonePanel({ onClose }) {
   const drawRoute = () => { game.setViewOption('route', null); game.setTool('patrol'); };
   const clearPatrol = () => { game.commands.setPatrol(null); game.bump(); };
   const [planner, setPlanner] = useState(true), older = patrol?.type === 'mixed';
+  const [max, setMax] = useState(false);
+  useBeside('zone-panel', RUN, 'right', [mode, max], { off: max });
 
   return (
     <>
-    <Movable id="zone-panel" title="Area to defend" role="dialog" aria-label="Area to defend">
+    <Movable id="zone-panel" className={`panel${max ? ' max' : ''}`} title={mode === 'patrol' ? 'Defend a patrol' : 'Area to defend'} role="dialog" aria-label={mode === 'patrol' ? 'Defend a patrol' : 'Area to defend'}>
+      <button id="zone-panel-max" className="panel-max" aria-pressed={max} aria-label={max ? 'Make the panel smaller' : 'Make the panel bigger'} title={max ? 'Make the panel smaller' : 'Make the panel bigger'} onClick={() => setMax(!max)}><Icon path={ICONS.max} size={14} /></button>
       <button id="zone-panel-close" aria-label="Close" onClick={onClose}>×</button>
+      {area && <>
       <b>Area to defend</b>
       {drawing && <p>Click the map to mark each corner, then double-click to close it.{count > 0 && ` ${count} point${count > 1 ? 's' : ''} so far.`}</p>}
       {!drawing && closed && <p>How much of your area your sensors can see, for each drone type:</p>}
@@ -57,7 +64,9 @@ export function ZonePanel({ onClose }) {
         {zone && <button id="zone-clear" onClick={() => set(null)}>Clear</button>}
       </div>}
       <p className="muted">{locked ? 'Locked until you reset the run.' : ATTACK_NOTE}</p>
-      <b>Or protect a patrol</b>
+      </>}
+      {patrolled && <>
+      <b>{area ? 'Or protect a patrol' : 'Defend a patrol'}</b>
       <p>{walking ? 'Click the map for each waypoint from the start, then double-click to finish at the end.' : patrol ? `${patrol.group.count} soldiers walk the blue route from the first wave, escorted by:` : 'Soldiers walk a route to its end and back, escorted by vehicles you choose, carrying sensors and weapons, and the drones hunt them.'}</p>
       {patrol && !walking && older && <PatrolColumn patrol={patrol} locked={locked} />}
       {patrol && !walking && (older || locked) && <PatrolPlan patrol={patrol} locked={locked} />}
@@ -66,8 +75,9 @@ export function ZonePanel({ onClose }) {
         <button id="patrol-draw" onClick={drawRoute}>{walking ? 'Stop drawing' : patrol ? 'Redraw the route' : 'Draw a patrol route'}</button>
         {patrol && <button id="patrol-clear" onClick={clearPatrol}>Clear the patrol</button>}
       </div>}
+      </>}
     </Movable>
-    {patrol && !walking && planner && <PatrolPlanner patrol={patrol} locked={locked} onClose={() => setPlanner(false)} />}
+    {patrolled && patrol && !walking && planner && <PatrolPlanner patrol={patrol} locked={locked} onClose={() => setPlanner(false)} />}
     </>
   );
 }

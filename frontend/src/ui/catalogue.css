@@ -19,6 +19,7 @@
 #tool-picker.with-wizard ~ #wizard { max-height: calc(55vh - 84px); }
 .tool-pack { border-left-color: #c6ff00; }
 .tool-pack .k { color: #c6ff00; }
+.tool-vehicle { border-left-color: #d99a00; }
 /* the wizard's steps for placing a system: the step to do now stands out, and done ones are struck through */
 #wz-place { display: flex; flex-direction: column; gap: 6px; }
 #wz-place li { color: #8193ad; }

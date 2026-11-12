@@ -60,7 +60,7 @@ describe('getting started', () => {
     page();
     fireEvent.click($('#btn-load-saved'));
     expect($('#dock').className).not.toContain('hidden');
-    expect($('[data-tab="saved"]').className).toBe('active');
+    expect($('#dock').dataset.view).toBe('saved');
   });
   it('collapses to a pill, and reopens from it', () => {
     opened();
@@ -172,7 +172,7 @@ describe('proving it', () => {
     fireEvent.click($('#btn-wizard'));
     goToStep(4);
     expect($('#dock').className).not.toContain('hidden');
-    expect($('[data-tab="network"]').className).toBe('active');
+    expect($('#dock').dataset.view).toBe('nodes'); // Network is a part of SAPIENT nodes
     expect($('#wizard .wz-warn').textContent).toContain('1 of 1 systems are offline, and the fusion node has no terminal');
     click('Auto-wire for me');
     expect(game.sim.unwired().length).toBe(0);
@@ -182,7 +182,7 @@ describe('proving it', () => {
   });
   it('scores coverage and shows the weakest drone on the plan map', () => {
     stepWith(5);
-    expect($('[data-tab="plan"]').className).toBe('active');
+    expect($('#dock').dataset.view).toBe('em'); // coverage is on Propagation, in EM Spectrum
     expect(view.coverageOn).toBe(true);
     expect(view.coverageThreat).toBeTruthy();
     expect($('#cov-on').checked).toBe(true);
@@ -218,9 +218,9 @@ describe('proving it', () => {
   it('points at the figures with no verified source', () => {
     const scroll = vi.fn();
     stepWith(8);
-    expect($('[data-tab="systems"]').className).toBe('active');
+    expect($('#dock').dataset.view).toBe('lab');
     expect($('#wizard').textContent).toContain('OPTIONAL');
-    const first = $('[data-pane="systems"] .fb.assumption');
+    const first = $('#systems .fb.assumption');
     first.scrollIntoView = scroll;
     click('Show the first assumption');
     expect(scroll).toHaveBeenCalled();
@@ -240,7 +240,7 @@ describe('committing', () => {
     fireEvent.click([...document.querySelectorAll('#wizard input[type=radio]')][2]);
     expect(FUSION.authority).toBe('all');
     click('Save this laydown first');
-    expect($('[data-tab="saved"]').className).toBe('active');
+    expect($('#dock').dataset.view).toBe('saved');
   });
   it('cannot start from inside the sandbox', () => {
     preflight();

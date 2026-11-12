@@ -1,5 +1,6 @@
 // Try attacks against the laydown without risking the site.
 
+import { useBeside } from './beside.js';
 import { useState } from 'react';
 import { THREAT_GROUPS } from '../sim/config/index.js';
 import { money } from '../sim/economy.js';
@@ -30,6 +31,7 @@ export function Sandbox() {
   const { sim, commands } = useGame();
   const { state, drones } = sim;
   const { style, handle } = useMovable();
+  useBeside('sandbox', 'hud-top-left', 'right', [state.sandbox]); // opens beside the Run panel
   const [mix, setMix] = useState({ fpv: START_COUNT }); // drone type -> how many, for the types ticked
   const [form, setForm] = useState({ dir: '0', gap: '4' });
   const [small, setSmall] = useState(false); // shrunk to its title and live figures, to watch an attack

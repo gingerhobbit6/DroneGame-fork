@@ -124,17 +124,42 @@ describe('the whole page', () => {
     render(<App game={game} />);
     expect(game.attach).toHaveBeenCalledWith($('#game'), $('#labels'));
     expect($('#dock').className).toContain('hidden');
-    fireEvent.click($('#btn-sapient'));
+    fireEvent.click($('#btn-view-nodes'));
     expect($('#dock').className).not.toContain('hidden');
     fireEvent.click($('#dock-close'));
     expect($('#dock').className).toContain('hidden');
-    fireEvent.click($('#btn-tuning'));
-    expect($('#tuning').className).not.toContain('hidden');
+    expect($('#btn-tuning')).toBeNull(); // tuning is in The Lab view of the SAPIENT panel
     fireEvent.click($('#btn-deploy'));
-    fireEvent.click($('#btn-sandbox'));
-    expect($('#tuning').className).toContain('hidden');
+    fireEvent.click($('#btn-defend-area'));
+    expect($('#zone-panel')).not.toBeNull(); // defending an area or a patrol opens from the Controls menu
+    fireEvent.click($('#zone-panel-max'));
+    expect($('#zone-panel').className).toContain('max');
+    fireEvent.click($('#btn-defend-patrol'));
+    expect($('#zone-panel').getAttribute('aria-label')).toBe('Defend a patrol');
+    fireEvent.click($('#btn-plan'));
+    expect($('[data-pane="plan"]').className).not.toContain('hidden'); // Plan and Statistics open from the Run panel
+    expect($('#plan-filter input[data-plan-show="radar"]').checked).toBe(true);
+    fireEvent.click($('#btn-view-engage'));
+    expect($('#dock').dataset.view).toBe('engage'); // one view at a time: it replaces Plan
+    expect($('[data-pane="plan"]').className).toContain('hidden');
+    expect([...document.querySelectorAll('#dock [data-tab]')].map((t) => t.textContent)).toEqual(['Engagement rules', 'Magazine depth']);
+    fireEvent.click($('#btn-view-engage'));
+    expect($('#dock').className).toContain('hidden'); // its own button closes it
+    expect($('#hud-bottom-left')).toBeNull(); // the legend opens from its map button
+    expect($('#left-col #map-rail-slot #map-rail')).not.toBeNull(); // the map buttons sit under the overview map, on the left
+    expect($('#left-col #minimap')).not.toBeNull();
+    expect($('#right-col #toolbar')).not.toBeNull(); // Place systems is under Controls
+    fireEvent.click($('[data-catalogue="vehicles"]')); // Vehicles, in Place systems
+    expect($('#tool-picker .mv-title').textContent).toBe('Vehicles');
+    expect([...document.querySelectorAll('#tool-picker [data-tray-vehicle]')].map((c) => c.dataset.trayVehicle)).toEqual(['patria', 'hilux', 'themis']);
+    fireEvent.click($('#tool-picker [data-tray-vehicle="hilux"]'));
+    expect(game.toolVehicle()).toBe('hilux'); // the next click on the map parks it, with its system on board
+    expect(game.getTool()).toBeTruthy();
+    expect($('[data-catalogue="vehicles"] svg')).not.toBeNull(); // every row has its icon
+    fireEvent.click($('#map-legend'));
     expect($('#hud-bottom-left .mv-title').textContent).toBe('Legend');
-    expect($('#hud-bottom-left').className).toContain('minimised'); // it starts shrunk to its title
+    fireEvent.click($('#legend-close'));
+    expect($('#hud-bottom-left')).toBeNull();
   });
 });
 

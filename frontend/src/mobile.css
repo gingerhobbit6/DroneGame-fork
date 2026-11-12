@@ -28,7 +28,11 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
 
   /* top bar: status on the left, guide and menu buttons on the right */
   #left-col { display: contents; }
+  #brand-bar { display: none; } /* no room on a phone: the Run panel takes the top left */
   #left-col .panel { position: fixed; }
+  #right-col, #map-rail-slot { display: contents; }
+  #acct-chip { right: auto; left: 12px; } /* the map buttons have the bottom right on a phone */
+  #right-col .panel { position: fixed; }
   #hud-top-left { top: 8px; left: 8px; width: calc(100vw - 120px); padding: 6px 10px; z-index: 2; }
   #hud-top-left .label { margin-bottom: 2px; }
   #hud-top-left .bb-legend, #hud-top-left #status { display: none; }

@@ -248,7 +248,7 @@ function RehearseStep({ next, passed }) {
   );
 }
 
-const ASSUMPTION = '[data-pane="systems"] .fb.assumption';
+const ASSUMPTION = '#systems .fb.assumption';
 
 function RefineStep({ next }) {
   return (

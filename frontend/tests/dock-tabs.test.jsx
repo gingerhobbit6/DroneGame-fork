@@ -25,10 +25,10 @@ const newCanvas = () => sized(document.createElement('canvas'));
 let game;
 const $ = (sel) => document.querySelector(sel);
 const refresh = () => act(() => game.bump());
-const tab = (name) => fireEvent.click($(`[data-tab="${name}"]`));
-function openDock(name) {
-  render(<GameContext.Provider value={game}><Dock open onClose={() => {}} /></GameContext.Provider>);
-  if (name) tab(name);
+// A view by its own name, or by one of its parts' (which that view then shows); a part's tab switches to it.
+const tab = (name) => fireEvent.click($(`#dock [data-tab="${name}"]`));
+function openDock(name = 'nodes') {
+  render(<GameContext.Provider value={game}><Dock open onClose={() => {}} tab={name} /></GameContext.Provider>);
 }
 const running = (laydown = MIXED, steps = 2400) => {
   setUp(game.sim, { seed: '1', laydown });
