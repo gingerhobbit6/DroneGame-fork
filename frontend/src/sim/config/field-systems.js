@@ -135,10 +135,10 @@ export const FIELD_SYSTEMS = {
   },
 
   camera_spyke: {
-    product: 'Quell SPYKE', variantOf: 'camera', size: 'L', name: 'SPYKE array camera', short: 'SPK', model: 'camera', cost: 400000, shotCost: 0, color: 0x9fa8da, role: 'sensor', kind: 'camera', published: 1800, mount: 3, mobile: 'vehicle', falseAlarm: 0.03,
+    product: 'Quell SPYKE', variantOf: 'camera', size: 'L', name: 'SPYKE array camera', short: 'SPK', model: 'camera', cost: 66700, shotCost: 0, color: 0x9fa8da, role: 'sensor', kind: 'camera', published: 1800, mount: 3, mobile: 'vehicle', falseAlarm: 0.03,
     health: 25, signature: 0.05, emits: [], channels: 'visible',
-    stare: true, arc: 79, elevation: 57, locators: 6, // a fixed wide view that needs no cue, and six locating cameras inside it
-    desc: 'A Scottish staring camera: an array of cameras watches a wide 79° by 57° view all the time, so it needs no cue, and six mirror-steered locating cameras inside it fix up to six drones at once. Daylight only. It gives bearings, not range, and speaks SAPIENT.',
+    stare: true, arc: 79, elevation: 57, locators: 1, // a fixed wide view that needs no cue, and a mirror-steered locating camera inside it
+    desc: 'A Scottish staring camera: an array of cameras watches a wide 79° by 57° view all the time, so it needs no cue, and a mirror-steered locating camera fixes one drone at a time. Six make a SkySpyke. Daylight only. It gives bearings, not range, and speaks SAPIENT.',
     sapient: {
       nodeType: 'NODE_TYPE_CAMERA', subType: ['EO', 'C-UAS'], scan: 'SCAN_TYPE_FIXED', interval: 0.5,
       noise: { az: 0.05, el: 0.05 }, modes: ['Search'],
@@ -147,10 +147,30 @@ export const FIELD_SYSTEMS = {
       class: 'Staring electro-optical drone detector with steered locating cameras',
       analogues: ['Quell SPYKE'],
       published: 'Quell: detects a DJI Mini 3 Pro (251 x 362 x 70 mm) at 1.3 km, a DJI Matrice 300 RTK (810 x 670 x 430 mm) at 2.6 km and a QinetiQ Banshee (2,840 x 2,490 x 860 mm) at 8 km; coverage 79° x 57°; 270 x 290 x 170 mm; 5.9 kg; static and on the move; set up in 60 s; electro-optical; 50 W, battery operated; Drone ID, SAPIENT and TAK.',
-      basis: 'Game range 1.8 km for the 0.35 m reference drone is the Mini 3 Pro figure scaled by size (1.3 km x 0.35 / 0.25). The game scales a camera’s reach in proportion to a drone’s size, so it gives the larger drones more than Quell does (about 4 km for a Matrice 300, against 2.6 km): an ASSUMPTION that favours it against big drones. The six locating cameras are modelled as a limit of six drones located per look, each to 0.05° (ASSUMED). Visible light only, as the maker says electro-optical; the 3 m mount and false alarm rate are ASSUMPTIONS.',
+      basis: 'Game range 1.8 km for the 0.35 m reference drone is the Mini 3 Pro figure scaled by size (1.3 km x 0.35 / 0.25). The game scales a camera’s reach in proportion to a drone’s size, so it gives the larger drones more than Quell does (about 4 km for a Matrice 300, against 2.6 km): an ASSUMPTION that favours it against big drones. Its locating camera is modelled as one drone located per look, the nearest, to 0.05° (ASSUMED). Visible light only, as the maker says electro-optical; the 3 m mount and false alarm rate are ASSUMPTIONS.',
       confidence: 'Maker figures; locating accuracy is an assumption',
       sources: [{ label: 'Quell: SPYKE', url: 'https://quell.scot/spyke/' }],
-      cost: { capex: 'Price given by the user: £300,000, which is $400,000 at the game’s £0.75 to the dollar.', confidence: 'User figure', sources: [] },
+      cost: { capex: 'A sixth of the SkySpyke’s £300,000 the user gave: £50,000, $66,700 at the game’s £0.75 to the dollar.', confidence: 'User figure, divided', sources: [] },
+    },
+  },
+
+  camera_skyspyke: {
+    product: 'Quell SkySpyke (six SPYKE heads)', variantOf: 'camera', size: 'L', name: 'SkySpyke', short: 'SKY', model: 'camera', cost: 400000, shotCost: 0, color: 0x7986cb, role: 'sensor', kind: 'camera', published: 1800, mount: 4, mobile: 'vehicle', falseAlarm: 0.06,
+    health: 40, signature: 0.1, emits: [], channels: 'visible',
+    stare: true, arc: 360, elevation: 57, locators: 6, // six SPYKE heads round one mast: all round, six drones located a look
+    desc: 'Six SPYKE staring cameras on one mount, facing out all round, so together they watch every direction at once with no cue, and their six locating cameras fix up to six drones a look. Daylight only. Bearings, not range. SAPIENT.',
+    sapient: {
+      nodeType: 'NODE_TYPE_CAMERA', subType: ['EO', 'C-UAS'], scan: 'SCAN_TYPE_FIXED', interval: 0.5,
+      noise: { az: 0.05, el: 0.05 }, modes: ['Search'],
+    },
+    ref: {
+      class: 'All-round staring electro-optical drone detector',
+      analogues: ['Quell SPYKE, six heads'],
+      published: 'Per SPYKE head (Quell): a DJI Mini 3 Pro at 1.3 km, a Matrice 300 RTK at 2.6 km, a Banshee at 8 km; 79° x 57°; 5.9 kg; 50 W. Six heads cover 474°, so all round with overlap.',
+      basis: 'As the SPYKE, six times over: game range 1.8 km for the 0.35 m reference drone, 360° by 57° (from 10° below the horizon), six drones located per look, the nearest first, each to 0.05° (ASSUMED). The 4 m mount, double false alarm rate for six heads, about 35 kg and 300 W, are ASSUMPTIONS.',
+      confidence: 'Maker figures per head; the combination is the user’s',
+      sources: [{ label: 'Quell: SPYKE', url: 'https://quell.scot/spyke/' }],
+      cost: { capex: 'Price given by the user: £300,000 for the six heads together, which is $400,000 at the game’s £0.75 to the dollar.', confidence: 'User figure', sources: [] },
     },
   },
 

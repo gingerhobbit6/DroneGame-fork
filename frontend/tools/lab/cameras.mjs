@@ -1,4 +1,5 @@
-// Cameras compared on the brief's V11 laydown: one Quell SPYKE staring camera against Overview PodViews, and none, on the same seeds.
+// Cameras compared on the brief's V11 laydown: one SkySpyke (six Quell SPYKE heads, all round) against Overview PodViews, and none,
+// on the same seeds.
 // Every variant keeps V11's guns, radars, interceptors and jammers and adds cameras to its vehicles, so only the cameras differ.
 //
 //   node tools/lab/cameras.mjs [--seeds 12] [--max 45] [--workers 12]
@@ -25,12 +26,12 @@ function withCameras(id, n) {
 }
 const GBP = 0.75;
 const VARIANTS = [
-  ['No cameras (V11)', withCameras('camera_spyke', 0), 0],
-  ['1 SPYKE, £300k', withCameras('camera_spyke', 1), 300000],
+  ['No cameras (V11)', withCameras('camera_skyspyke', 0), 0],
+  ['1 SkySpyke, £300k', withCameras('camera_skyspyke', 1), 300000],
   ['1 PodView, £30k', withCameras('camera_podview', 1), 30000],
   ['4 PodViews, £120k', withCameras('camera_podview', 4), 120000],
   ['10 PodViews, £300k', withCameras('camera_podview', 10), 300000],
-  ['5 SPYKEs all round, £1.5M', withCameras('camera_spyke', 5), 1500000],
+  ['1 SkySpyke and 4 PodViews, £420k', (() => { const d = withCameras('camera_podview', 4); d.vehicles.find((v) => v.sys.length < 3 && !v.sys.some(([id]) => id.startsWith('camera'))).sys.push(['camera_skyspyke']); return d; })(), 420000],
 ];
 
 const pool = createPool(Math.min(workers, VARIANTS.length * seeds.length)), t0 = Date.now();

@@ -15,7 +15,7 @@ import { createSimulation } from '../src/sim/simulation.js';
 import { unitDef } from '../src/sim/unit-config.js';
 import { setUp } from './support/scenarios.js';
 
-const NEW = ['gun_shotgun', 'gun_droneround', 'rf_rfpatrol', 'rf_chuyka', 'camera_podview', 'camera_spyke', 'radar_xenta', 'jammer_vepr'];
+const NEW = ['gun_shotgun', 'gun_droneround', 'rf_rfpatrol', 'rf_chuyka', 'camera_podview', 'camera_spyke', 'camera_skyspyke', 'radar_xenta', 'jammer_vepr'];
 const square = (cx, cz, r) => [[cx - r, cz - r], [cx + r, cz - r], [cx + r, cz + r], [cx - r, cz + r]];
 
 let sim;
@@ -95,7 +95,9 @@ describe('the PodView camera, XENTA-M5 radar and VEPR dome jammer', () => {
 
   it('has the SPYKE stare at a fixed 79° by 57° view, with no aim to cue and six drones located a look', () => {
     const spyke = STRUCTURES.camera_spyke;
-    expect(spyke).toMatchObject({ kind: 'camera', stare: true, arc: 79, elevation: 57, locators: 6 });
+    expect(spyke).toMatchObject({ kind: 'camera', stare: true, arc: 79, elevation: 57, locators: 1 });
+    expect(STRUCTURES.camera_skyspyke).toMatchObject({ stare: true, arc: 360, locators: 6, cost: 400000 }); // six heads, £300,000
+    expect(coverArc(STRUCTURES.camera_skyspyke)).toBe(360);
     expect(spyke.fov).toBeUndefined(); // so nothing cues or turns it
     const def = { ...spyke, facing: 90 };
     expect(inCover(def, 90 + 39, 5)).toBe(true);

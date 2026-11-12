@@ -39,7 +39,7 @@ export const MOUNTS = {
   radar_s: 2, radar_a400: 2, radar_a800: 2, camera: 2, jammer_jupiter: 2, jammer_sf: 2, missile_rr: 2,
   gun_s: 2, gun_50: 2, // a gunner stands in the back, so not on an uncrewed Mule
   radar_giraffe: 3, missile_paladin: 3, gun_skyranger: 3,
-  rf_chuyka: 1, rf_rfpatrol: 1, camera_podview: 1, camera_spyke: 1, jammer_vepr: 1, gun_shotgun: 2, gun_droneround: 2, radar_xenta: 3, // field-systems.js
+  rf_chuyka: 1, rf_rfpatrol: 1, camera_podview: 1, camera_spyke: 1, camera_skyspyke: 2, jammer_vepr: 1, gun_shotgun: 2, gun_droneround: 2, radar_xenta: 3, // field-systems.js
 };
 // A soldier on foot can take a place in a patrol's column with a hand-held system, walking with the others. Not a vehicle, so it is
 // not part of a deployment pack's vehicles: a unit always has soldiers. `takes` lists what one can carry.
