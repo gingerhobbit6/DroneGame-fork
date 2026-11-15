@@ -9,7 +9,7 @@
 /* a pack's vehicle: which of the pack's systems it carries, above the card to drag */
 .tray-vehicle { display: flex; flex-direction: column; gap: 4px; }
 .tray-vehicle label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a9b8cf; }
-.tray-vehicle select { flex: 1; min-width: 0; }
+.tray-vehicle select { flex: 1 1 0; width: 0; min-width: 0; } /* takes the room left beside its label, never more */
 .pick-card .tray-left { font: 600 11px ui-monospace, Consolas, monospace; color: #69f0ae; }
 .pick-card.used .tray-left { color: #7f93b2; }
 .pick-hint { margin: 6px 0 0; padding: 6px 8px; border-radius: 6px; border: 1px dashed #3a5280; color: #dbe4f0; }

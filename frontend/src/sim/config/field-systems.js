@@ -166,10 +166,14 @@ export const FIELD_SYSTEMS = {
     ref: {
       class: 'All-round staring electro-optical drone detector',
       analogues: ['Quell SPYKE, six heads'],
-      published: 'Per SPYKE head (Quell): a DJI Mini 3 Pro at 1.3 km, a Matrice 300 RTK at 2.6 km, a Banshee at 8 km; 79° x 57°; 5.9 kg; 50 W. Six heads cover 474°, so all round with overlap.',
-      basis: 'As the SPYKE, six times over: game range 1.8 km for the 0.35 m reference drone, 360° by 57° (from 10° below the horizon), six drones located per look, the nearest first, each to 0.05° (ASSUMED). The 4 m mount, double false alarm rate for six heads, about 35 kg and 300 W, are ASSUMPTIONS.',
+      published: 'Quell: six SPYKE units assembled around one central camera make one SkySpyke, giving 360° detection, identification and tracking; it detects autonomous, fibre-optic and cellular-controlled drones, as it watches rather than listens, and several can be linked. Per SPYKE head: a DJI Mini 3 Pro at 1.3 km, a Matrice 300 RTK at 2.6 km, a Banshee at 8 km; 79° x 57°; 5.9 kg; 50 W. Deployed as a second, optical layer beside RF sensors at the British Army garrison at Warminster (UK Defence Innovation, Project Halo Shield). No independent range or false-alarm figures are published.',
+      basis: 'As the SPYKE, six times over: game range 1.8 km for the 0.35 m reference drone, 360° by 57° (from 10° below the horizon), six drones located per look, the nearest first, each to 0.05° (ASSUMED). The central camera Quell fits is not modelled separately: the six locators stand in for it. The 4 m mount, double false alarm rate for six heads, about 35 kg and 300 W, are ASSUMPTIONS.',
       confidence: 'Maker figures per head; the combination is the user’s',
-      sources: [{ label: 'Quell: SPYKE', url: 'https://quell.scot/spyke/' }],
+      sources: [
+        { label: 'Quell: SPYKE', url: 'https://quell.scot/spyke/' },
+        { label: 'International Security Expo: Quell SkySpyke', url: 'https://www.internationalsecurityexpo.com/exhibitor-products/quell-skyspyke-' },
+        { label: 'ADS Advance: AI drone detection at Warminster', url: 'https://www.adsadvance.co.uk/warminster-ai-drone-detection/' },
+      ],
       cost: { capex: 'Price given by the user: £300,000 for the six heads together, which is $400,000 at the game’s £0.75 to the dollar.', confidence: 'User figure', sources: [] },
     },
   },
