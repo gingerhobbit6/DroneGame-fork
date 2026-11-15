@@ -1,6 +1,6 @@
 # Bombadil
 
-Bombadil is a fork of Site Guard ([ShabalalaWATP/DroneGame](https://github.com/ShabalalaWATP/DroneGame)), with its own name and version (see `PRODUCT` in `frontend/src/sim/config/world.js`). It keeps Site Guard's rules version, so laydowns and runs saved in either replay the same.
+Bombadil was called Site Guard until November 2026, and some file names, folders and settings still say so. Its name and version are `PRODUCT` in `frontend/src/sim/config/world.js`.
 
 A counter-drone defence game and command-and-control simulator. You place and network real sensors and weapons around a site you choose, then watch a fusion node detect, track and engage inbound drones using [SAPIENT](docs/SAPIENT.md) (BSI Flex 335 v2.0) messages.
 
@@ -103,7 +103,7 @@ npm --prefix frontend run build
 uv --directory backend run --no-dev python -m app
 ```
 
-Then open <http://localhost:8200> and press **Create account**. The first two commands are only needed once, or again after changing the frontend. The app runs entirely on your machine and is reachable only from this computer. It works offline, apart from the live map styles, which you can turn off.
+Then open <http://localhost:8200> and press **Create account**. The first two commands are only needed once, or again after changing the frontend. The app runs entirely on your machine and, unless you choose otherwise, is reachable only from this computer. To play from a phone or another computer on your own Tailscale network, see [DEVELOPING.md](docs/DEVELOPING.md#running-it) and read [SECURITY_NOTES.md](docs/SECURITY_NOTES.md) first. It works offline, apart from the live map styles, which you can turn off.
 
 To work on the code, run the backend as above and the Vite development server in a second terminal; the game is then at <http://localhost:5199> and reloads as you edit:
 

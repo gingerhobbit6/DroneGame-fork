@@ -378,6 +378,20 @@ describe('opening a laydown file', () => {
     expect(game.sim.structures.length).toBe(MIXED.length);
     await open('this is not json');
     expect(text('#saved-note')).toBeTruthy();
+    // what the server would refuse in a saved laydown: a link that is not one (which would make the budget NaN), a system off the map, too many
+    const spec = JSON.parse(JSON.stringify(game.sim.currentLaydown())), budget = game.sim.state.budget;
+    const bad = (change) => { const s = JSON.parse(JSON.stringify(spec)); change(s); return { name: 'Bad', world: '1', spec: s }; };
+    for (const change of [
+      (s) => { s.structures[0].uplink = '__proto__'; }, (s) => { s.structures[0].uplink = 'bytes'; }, (s) => { s.fusionUplinks = ['overhead']; },
+      (s) => { s.structures[0].x = 1e9; }, (s) => { s.structures[0].cellBand = 'B99'; }, (s) => { s.structures[0].jam = 'gnss'; },
+      (s) => { s.structures = Array.from({ length: 201 }, () => s.structures[0]); }, (s) => { s.people = Array.from({ length: 51 }, () => ({ x: 0, z: 0, count: 500, protection: 'open' })); },
+      (s) => { s.zone = [[0, 0], [1, 'a'], [2, 2]]; },
+    ]) {
+      await open(bad(change));
+      expect(text('#saved-note')).toMatch(/not a laydown/);
+    }
+    expect(game.sim.structures.length).toBe(MIXED.length);
+    expect(game.sim.state.budget).toBe(budget);
     expect(game.sim.structures.length).toBe(MIXED.length);
   });
 });

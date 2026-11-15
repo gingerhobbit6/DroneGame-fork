@@ -125,6 +125,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     // settings from before the rebuild that still apply, so the log alone can reproduce the run
     log.push({ step: 0, name: 'setAuthority', args: [FUSION.authority] }, { step: 0, name: 'setAutoStart', args: [state.autoStart] });
     if (state.packed) log.push({ step: 0, name: 'setPacked', args: [state.kit ?? true] });
+    if (Object.keys(w.engageRules).length) log.push({ step: 0, name: 'setEngageRules', args: [structuredClone(w.engageRules)] }); // they outlive the rebuild
   }
 
   // A run that has started is reported once, however it ends.
@@ -231,7 +232,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     configureUnit: (s, key, value) => laydown.configureUnit(w, s, key, value),
     renameUnit: (s, name, callsign) => laydown.renameUnit(w, s, name, callsign),
     autoWire: () => laydown.autoWire(w),
-    setEngageRules: (rules) => { w.engageRules = rules ?? {}; emit('engageRules'); }, // kept across runs, like the laydown
+    setEngageRules: (rules) => { w.engageRules = rules ?? {}; emit('engageRules'); }, // part of the laydown: kept across runs and saved with it
     wireAll: (kind) => laydown.wireAll(w, kind),
     clearAll: () => laydown.clearWires(w),
     enterSandbox: () => enterSandbox(w),

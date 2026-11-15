@@ -182,8 +182,9 @@ A laydown is a saved set of placed systems, wiring, people, the area to defend a
 | `people` | Optional. Up to 50 `{ x, z: Coordinate, count: 1 to 500, protection: Protection, role?: "military" }` |
 | `zone` | Optional. 3 to 32 points `[x, z]` of `Coordinate`: the area to defend |
 | `patrol` | Optional. 2 to 32 points `[x, z]`: a patrol route ([PATROL_MODE.md](PATROL_MODE.md)) |
-| `patrolColumn` | Optional. 1 to 6 escorts `{ vehicle: PatrolVehicle, system: SystemId, gap: -200 to 200 m, side?: -100 to 100 m }` |
-| `patrolPlan` | Optional. `{ width, formation }`: `width` 20 to 1,000 m, `formation` one of `file`, `staggered` or `wedge` |
+| `patrolColumn` | Optional. Up to 6 vehicles and 24 soldiers carrying systems: `{ vehicle: "patria", "hilux", "themis" or "foot", system: SystemId, also?: up to 2 more SystemId, gap: -200 to 200 m, side?: -100 to 100 m, soldier?: 0 to 99 }`. `soldier` is a carrier on foot's place in the formation, and no two share one |
+| `patrolPlan` | Optional. `{ width, formation, type?, spacing? }`: `width` 20 to 1,000 m, `formation` one of `file`, `staggered` or `wedge`, `type` one of `dismounted`, `mounted` or `mixed` (the default), `spacing` 2 to 30 m between members, or 10 to 80 m mounted |
+| `engageRules` | Optional. Rules of engagement: `{ SystemId: [drone type or "unknown", ...] }`, the drone types each weapon must not fire at. Left out when everything is allowed |
 
 `PlacedSystem` ([`schemas.py:70`](../backend/app/schemas.py#L70)):
 

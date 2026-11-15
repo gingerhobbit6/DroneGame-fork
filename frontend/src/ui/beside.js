@@ -9,10 +9,12 @@ export const RUN = () => (document.querySelector('#sandbox:not(.hidden)') ? 'san
 
 // Place `el` beside the pane with id `anchor`: `side` 'right' puts its left edge just right of that pane, 'left' its right edge just
 // left of it. `stretch` keeps the pane's own bottom (a pane that fills the height), otherwise its height is capped to the screen.
+const COMPACT = '(hover: none) and (pointer: coarse) and (max-width: 1000px), (max-width: 640px)'; // the compact layout's own test, in mobile.css
 export function placeBeside(el, anchor, side = 'right', { gap = 10, stretch = false, off = false } = {}) {
-  if (el && off) { Object.assign(el.style, { left: '', right: '', top: '', bottom: '', maxHeight: '' }); return; } // made bigger: its own CSS
+  // made bigger, or on a phone, where every pane is a sheet: its own CSS, with nothing left over from a wider window
+  if (el && (off || globalThis.matchMedia?.(COMPACT).matches)) { Object.assign(el.style, { left: '', right: '', top: '', bottom: '', maxHeight: '' }); return; }
   const a = document.getElementById(typeof anchor === 'function' ? anchor() : anchor)?.getBoundingClientRect();
-  if (!el || !a || innerWidth <= 760) return;
+  if (!el || !a) return;
   // level with the parent's top, lifted only as far as it takes to fit the pane's own height on screen
   const w = el.offsetWidth, room = innerHeight - 24, want = Math.min(el.scrollHeight || el.offsetHeight, room);
   const top = stretch ? Math.max(a.top, 12) : Math.max(12, Math.min(a.top, innerHeight - 12 - want));

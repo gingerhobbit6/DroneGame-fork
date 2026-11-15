@@ -200,6 +200,7 @@ if (DATA.timestep) {
   section('Does a finer time step change the answer?', 'The same layout and seeds at three step sizes. If the answers agree, the coarsest step that agrees is safe to use.',
     '<table><tr><th class="n">step (s)</th><th class="n">mean wave</th><th class="n">leaks per wave</th><th class="n">run time (s)</th></tr>' +
     d.rows.map((r) => '<tr><td class="n">' + r.dt + '</td><td class="n">' + f(r.mean, 2) + ' +-' + f(r.ci, 2) + '</td><td class="n">' + f(r.leakRate, 3) + '</td><td class="n">' + f(r.runSeconds, 0) + '</td></tr>').join('') + '</table>' +
-    (g ? '<p class="note">Grid convergence index: order ' + f(g.p, 2) + ', extrapolated to a zero step ' + f(g.ext, 2) + ' waves, uncertainty of the finest result ' + f(100 * g.gciFine, 1) + '%. ' + (g.note || '') + '</p>' : ''));
+    (g ? '<p class="note">Grid convergence index: order ' + f(g.p, 2) + ', extrapolated to a zero step ' + f(g.ext, 2) + ' waves, uncertainty of the finest result ' + f(100 * g.gciFine, 1) + '%. ' + (g.note || '') + '</p>'
+      : d.study ? '<p class="note">' + (d.study.same ? 'The step sizes cannot be told apart with these seeds: the means differ by at most ' + f(d.study.diff, 2) + ' waves, inside the 95% interval of a difference.' : 'The answer changes with the step, by up to ' + f(d.study.diff, 2) + ' waves, but no order or grid convergence index is given: ' + d.study.why + '.') + '</p>' : ''));
 }
 </script></body></html>`;

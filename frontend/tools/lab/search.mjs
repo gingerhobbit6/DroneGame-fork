@@ -66,6 +66,19 @@ export const startingDesigns = (k) => [
   [`brief's best with two guns each, ${k} sites`, clean({ ...V11, radars: Math.min(4, k), p1: Math.min(3, k), hmg2: k }, k)],
 ];
 
+// Up to cfg.lambda new layouts for one site count: changed copies of its best. state.seen holds every layout that site count has
+// tried since the first round, so none is played twice.
+export function breed(p, cfg, rand, scale) {
+  const kids = [];
+  for (let i = 0, tries = 0; i < cfg.lambda && tries < cfg.lambda * 6; tries++) {
+    const parent = p.pool[Math.floor(rand() * p.pool.length)];
+    const params = mutate(parent.params, p.state.k, rand, scale), key = keyOf(params);
+    if (p.state.seen.has(key)) continue;
+    p.state.seen.add(key); kids.push({ state: p.state, params, cap: cfg.full.cap, seeds: cfg.full.seeds }); i++;
+  }
+  return kids;
+}
+
 export async function runSearch(args, { workers, budget }) {
   const preset = PRESETS[args.thorough ? 'thorough' : args.quick ? 'quick' : 'normal'];
   const cfg = { ...preset, full: { ...preset.full, cap: Number(args.max) && args.max !== true ? Number(args.max) : preset.full.cap } };
@@ -80,7 +93,7 @@ export async function runSearch(args, { workers, budget }) {
   const states = sites.map((k) => {
     const seedDesigns = startingDesigns(k).map(([, p]) => p);
     const pop = [...seedDesigns, ...latin(cfg.n0 - seedDesigns.length, k, rand)];
-    return { k, pop, history: [], correlations: [], seen: new Set(), best: null, final: null };
+    return { k, pop, history: [], correlations: [], seen: new Set(pop.map(keyOf)), best: null, final: null };
   });
 
   console.log(`searching ${sites.join(', ')} vehicle sites on ${pool.size} cores (${args.thorough ? 'thorough' : args.quick ? 'quick' : 'normal'})`);
@@ -89,7 +102,7 @@ export async function runSearch(args, { workers, budget }) {
   // Plays every wanted layout on its seeds, all at once, and returns the layouts with their scores.
   async function evaluate(wants, label, round) {
     const jobs = [];
-    for (const w of wants) for (const seed of ALL_SEEDS.slice(0, w.seeds)) jobs.push({ design: fromParams(w.params, w.state.k), seed, opts: { maxWaves: w.cap, budget }, w, seed });
+    for (const w of wants) for (const seed of ALL_SEEDS.slice(0, w.seeds)) jobs.push({ design: fromParams(w.params, w.state.k), seed, opts: { maxWaves: w.cap, budget }, w });
     let done = 0;
     const results = await pool.run(jobs, () => { done++; if (done % 25 === 0 || done === jobs.length) process.stdout.write(`\r  ${label}: ${done}/${jobs.length} runs  ${clock()}   `); });
     process.stdout.write('\n');
@@ -135,20 +148,13 @@ export async function runSearch(args, { workers, budget }) {
       p.state.correlations.push({ from: `round ${r + 1}`, to: 'full length', rho: spearman(both.map((c) => c.byRound[r]), both.map((c) => c.byRound[cfg.rounds.length])), n: both.length });
     }
     p.pool = p.cands.filter((c) => c.valid).sort((x, y) => y.score - x.score).slice(0, cfg.mu);
+    if (!p.pool.length) { console.log(`  k=${p.state.k}: no layout was valid at full length, so this site count is left out`); continue; }
     record(p.state, 'full length', p.pool, p.cands.length);
   }
+  parents = parents.filter((p) => p.pool.length); // nothing to breed from or confirm; the other site counts carry on
   for (let g = 1; g <= cfg.gens; g++) {
     const scale = 0.18 * 0.7 ** (g - 1);
-    const kids = [];
-    for (const p of parents) {
-      p.state.seen = new Set(p.cands.map((c) => keyOf(c.params)));
-      for (let i = 0, tries = 0; i < cfg.lambda && tries < cfg.lambda * 6; tries++) {
-        const parent = p.pool[Math.floor(rand() * p.pool.length)];
-        const params = mutate(parent.params, p.state.k, rand, scale), key = keyOf(params);
-        if (p.state.seen.has(key)) continue;
-        p.state.seen.add(key); kids.push({ state: p.state, params, cap: cfg.full.cap, seeds: cfg.full.seeds }); i++;
-      }
-    }
+    const kids = parents.flatMap((p) => breed(p, cfg, rand, scale));
     await evaluate(kids, `generation ${g} (${kids.length} new layouts)`, `gen${g}`);
     for (const p of parents) {
       const mine = kids.filter((c) => c.state === p.state && c.valid);

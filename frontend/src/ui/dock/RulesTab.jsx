@@ -18,6 +18,7 @@ export function RulesTab() {
   const attack = [...new Set(sim.state.attack ?? [])].filter((id) => DRONES[id]);
   const set = (next) => { commands.setEngageRules(next); redraw((n) => n + 1); };
   const allowed = (e, d) => !(rules[e] ?? []).includes(d);
+  const open = attack.filter((d) => effectors.every((e) => !allowed(e, d))); // drone types every weapon placed is barred from
 
   if (!effectors.length) return <div className="sys note">Place some weapons first. Their rules appear here, one row each.</div>;
   return (
@@ -25,8 +26,9 @@ export function RulesTab() {
       <div className="sys note">
         Untick a box to stop that weapon firing at that drone type, so costly rounds are kept for the drones worth them.
         The fusion node can only hold fire once a sensor has named the drone (a camera, or an RF detector that knows its link); until then it counts as Unidentified.
-        Crews firing by eye always know what they see. The rules stay when you start a new run.
+        Crews firing by eye always know what they see. The rules stay when you start a new run, and are saved with the laydown.
       </div>
+      {open.length > 0 && <div className="sys note warn" id="rules-open" role="status">No weapon here may fire at: {open.map((d) => DRONES[d].label ?? DRONES[d].name).join(', ')}.</div>}
       <div className="net-tools">
         <button id="rules-value" title="Bar every pairing where one shot costs more than the drone" onClick={() => set(valueRules(effectors, attack, shotCost))}>Only where a shot costs less than the drone</button>
         <button id="rules-clear" onClick={() => set({})}>Allow everything</button>

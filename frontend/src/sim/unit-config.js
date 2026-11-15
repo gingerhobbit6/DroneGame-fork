@@ -75,7 +75,7 @@ export const UNIT_FIELDS = [
   },
   {
     // No standard value: left unset, it faces away from what is being defended, wherever that is (laydown.js).
-    key: 'facing', label: 'Facing', unit: '°', step: 5, base: () => null, limits: { ...Object.fromEntries(Object.keys(PANELLED).map((id) => [id, [0, 355]])), ...each(JAMMERS, [0, 355]) },
+    key: 'facing', label: 'Facing', unit: '°', step: 5, base: () => null, limits: { ...Object.fromEntries(Object.keys(PANELLED).map((id) => [id, [0, 355]])), ...each(JAMMERS, [0, 355]), ...each(STARING.filter((id) => STRUCTURES[id].arc < 360), [0, 355]) }, // and a staring camera's fixed view
     help: 'The compass bearing the middle of its arc points along. Reset, it faces away from what you defend.',
   },
   {

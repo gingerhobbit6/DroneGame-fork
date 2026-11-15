@@ -31,7 +31,7 @@ export function columnProblem(column, type = 'mixed') {
   for (const e of column) {
     if (!Object.hasOwn(ESCORT_CARRIERS, e?.vehicle)) return 'Choose a vehicle for each place in the column';
     if (!takes.includes(e.vehicle)) return `A ${PATROL_TYPES[type].name.toLowerCase()} patrol does not take a ${ESCORT_CARRIERS[e.vehicle].name}`;
-    if (e.soldier != null && !(Number.isInteger(e.soldier) && e.soldier >= 0 && e.soldier < 100)) return 'Choose a soldier in the patrol';
+    if (e.soldier != null && !(Number.isInteger(e.soldier) && e.soldier >= 0 && e.soldier < cleanCount(FOOT.groupSize))) return 'Choose a soldier in the patrol'; // a place past the last soldier would trail the patrol by kilometres
     const v = ESCORT_CARRIERS[e.vehicle], sys = STRUCTURES[e.system];
     if (!Object.hasOwn(MOUNTS, e.system) || !sys) return 'That system cannot ride in a patrol';
     if (!escortCarries(e.vehicle, e.system)) return `A ${v.name} cannot carry the ${sys.name}`;
@@ -158,7 +158,7 @@ export function updatePatrol(w, dt) {
     p.wait -= dt;
     if (p.wait <= 0) { p.phase = 'back'; p.dir = -1; w.rec.event('patrol', 'Patrol heading back'); }
   } else if ((p.phase === 'out' || p.phase === 'back') && !p.halted) {
-    p.dist += p.dir * u(p.type === 'mounted' ? FOOT.driveSpeed : FOOT.walkSpeed) * dt;
+    p.dist += p.dir * u(p.type === 'mounted' && p.escorts.length ? FOOT.driveSpeed : FOOT.walkSpeed) * dt; // with no vehicle to ride in, they walk
     if (p.phase === 'out' && p.dist >= total) { p.dist = total; p.phase = 'end'; p.wait = FOOT.endDelay; w.rec.event('patrol', 'Patrol reached the end'); w.emit('toast', `Patrol at the end: back in ${Math.round(FOOT.endDelay)} s`); }
     if (p.phase === 'back' && p.dist <= 0) { p.dist = 0; p.phase = 'home'; p.homeWave = state.wave; p.trips++; w.rec.event('patrol', 'Patrol back at the start'); w.emit('toast', 'Patrol back at the start: it sets out again with the next wave'); }
   }

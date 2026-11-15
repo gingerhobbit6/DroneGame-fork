@@ -50,7 +50,8 @@ const send = (res, code, type, body) => { res.writeHead(code, { 'content-type': 
 
 createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain', 'read-only');
-  const path = decodeURIComponent((req.url || '/').split('?')[0]);
+  let path;
+  try { path = decodeURIComponent((req.url || '/').split('?')[0]); } catch { return send(res, 400, 'text/plain', 'bad address'); } // "/%" must not stop the server
   if (path === '/' || path === '/index.html') return send(res, 200, 'text/html; charset=utf-8', index());
   if (path === '/report.html') { const f = resolve(OUT_DIR, 'report.html'); return existsSync(f) ? send(res, 200, 'text/html; charset=utf-8', readFileSync(f)) : send(res, 404, 'text/plain', 'no report yet'); }
   const m = /^\/laydowns\/([\w.-]+\.json)$/.exec(path);

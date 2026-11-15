@@ -37,7 +37,7 @@ export function LabTab({ active }) {
                 <td>{row.lab?.sites ?? ''}</td>
                 <td>{row.lab ? `${row.lab.waves}${row.lab.ci ? ` ±${row.lab.ci}` : ''}` : ''}</td>
                 <td>{row.lab?.capex ? money(row.lab.capex) : ''}</td>
-                <td>{row.lab?.perPound != null ? `${pound(row.lab.perPoundShots)} / ${pound(row.lab.perPound)}` : ''}</td>
+                <td>{typeof row.lab?.perPound === 'number' && typeof row.lab.perPoundShots === 'number' ? `${pound(row.lab.perPoundShots)} / ${pound(row.lab.perPound)}` : ''}</td>
                 <td className="saved-actions">
                   <button className="mini" onClick={load.confirm(row.file, () => loadRow(row))}>{load.armed === row.file ? 'Replace run?' : 'Load'}</button>
                   {row.world !== game.sim.state.terrainSeed && <button className="mini load-here" title="Lay it out round this site, on the ground in play now. Systems that cannot stand here are left out." onClick={loadHere.confirm(row.file, () => loadRow(row, true))}>{loadHere.armed === row.file ? 'Replace run?' : 'Load here'}</button>}

@@ -40,6 +40,19 @@ def test_lists_laydowns_best_first_and_skips_what_is_not_one(client, lab):
     assert body["report"] is False
 
 
+def test_one_odd_results_block_does_not_break_the_list(client, lab):
+    laydowns = lab / "laydowns"
+    write(laydowns, "good.json", lab={"waves": 9, "what": "x" * 500})
+    write(laydowns, "words.json", lab={"waves": "many", "sites": {"deep": [1]}, "capex": 5})
+    (laydowns / "huge.json").write_text(json.dumps({"name": "huge", "spec": SPEC})[:-1] + ', "lab": {"waves": 1e999, "ci": NaN}}')
+    res = client.get(API)
+    assert res.status_code == 200
+    rows = {r["file"]: r["lab"] for r in res.json()["laydowns"]}
+    assert list(rows) == ["good.json", "words.json", "huge.json"]  # a score that is not a number counts as none
+    assert rows["good.json"] == {"waves": 9, "what": "x" * 200}
+    assert rows["words.json"] == {"waves": "many", "capex": 5} and rows["huge.json"] is None
+
+
 def test_empty_when_the_lab_has_not_run(client, lab):
     assert client.get(API).json() == {"laydowns": [], "report": False}
 
@@ -62,6 +75,7 @@ def test_the_report_alone_may_run_its_own_script(client, lab):
     assert res.status_code == 200 and res.headers["content-type"].startswith("text/html")
     csp = res.headers["content-security-policy"]
     assert "script-src 'unsafe-inline'" in csp and "default-src 'none'" in csp and "connect-src" not in csp
+    assert "sandbox allow-scripts" in csp and "allow-same-origin" not in csp  # its script runs in an origin of its own
     # every other response keeps the strict policy
     assert "unsafe-inline" not in client.get(API).headers["content-security-policy"]
 

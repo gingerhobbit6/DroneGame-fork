@@ -10,20 +10,20 @@ Bombadil runs on one machine, with no configured secrets. Each player signs in t
 4. **Another account on the same machine** reading or changing someone's packs, or guessing their password.
 5. **A compromised dependency.**
 
-It is not built to be hosted. See [Before hosting](#before-hosting).
+It is not built to be hosted. See [Before hosting](#before-hosting). It can be opened to a private network you control, with the limits in [Playing over a private network](#playing-over-a-private-network).
 
 ## Protections
 
 | Threat | Protection | Where |
 |---|---|---|
-| Network access | Binds to `127.0.0.1` | `backend/app/__main__.py` |
-| DNS rebinding | Only `localhost` and `127.0.0.1` are accepted as hosts | `TrustedHostMiddleware` in `main.py` |
+| Network access | Binds to `127.0.0.1` unless `SITEGUARD_HOST` names other addresses of this machine. Every address (`0.0.0.0`, `::`) is refused | `backend/app/__main__.py`, `security.py` |
+| DNS rebinding | Only `localhost`, `127.0.0.1`, the addresses in `SITEGUARD_HOST` and the names in `SITEGUARD_EXTRA_HOSTS` are accepted as hosts | `TrustedHostMiddleware` in `main.py` |
 | Cross-site writes | Writes must be `application/json`, and no CORS is offered, so a browser refuses the cross-site request | `RequestGuard` in `security.py` |
 | Large requests | 1 MB limit, counting what actually arrives, so chunked bodies can't dodge it | `RequestGuard` |
 | Bad input | Pydantic: known names only, coordinates in the world, finite numbers, length limits, capped lists, unknown fields refused. A unit's settings are checked for shape only (numbers from -150, for a receiver's sensitivity in dBm, lowercase choices, up to 3 pairs of whole-degree bearings, or up to 4 known jammer bands), and a jammer's hand switch can only be `on: true` or absent; the game clamps each to its own limits when it loads them | `schemas.py`, `frontend/src/sim/unit-config.js` |
 | SQL injection | Bound parameters only, with tests that check the source of both store files | `db/stores.py`, `db/account_stores.py` |
 | Script injection | React escapes everything, and a test bans `innerHTML` and similar in `ui/` | `tests/boundary.test.js` |
-| Loading other scripts | Content Security Policy with no inline scripts and same-origin connections only | `security.py` |
+| Loading other scripts | Content Security Policy with no inline scripts and same-origin connections only. One page is excepted: the lab report (`/api/v1/lab/report`), a file `tools/lab` writes on this machine, may run its own inline script. It gets no network, and `sandbox allow-scripts` puts it in an origin of its own, so it cannot act as the game's page | `security.py` |
 | Being framed | `frame-ancestors 'none'` | `security.py` |
 | Reaching files | Only `frontend/dist` is served, never the project folder or the database | `main.py` |
 | Malicious links in data | Source links render only if they are `https`, with `noopener` | `SourceLinks.jsx` |
@@ -84,6 +84,16 @@ The same quality review added checksum verification before an OS download is reu
 - **`Cross-Origin-Resource-Policy` and the rest of the headers rely on a modern browser.**
 
 Real drone figures in `frontend/src/sim/config/real-drones.js` are limited to published flight performance, size, price and reported warhead mass, each with its source. Nothing about building, modifying or arming a drone belongs in the repository. Where no source gave a munition mass for a commercial drone, the game's figure is a labelled assumption used only to scale damage.
+
+## Playing over a private network
+
+Setting `SITEGUARD_HOST` to an address of this machine on a private network, such as its Tailscale address, lets other devices on that network open the game. This was added on 15 November 2026 and has not had a security review of its own. Know these limits before using it:
+
+- **Sign-in travels over plain http.** Tailscale encrypts traffic between devices, so that is acceptable there. On ordinary Wi-Fi or a LAN, passwords and the session cookie can be read by anyone on the network: do not use it there.
+- **The session cookie is still not `Secure`,** for the same reason.
+- **Everyone on that network can make an account,** and every account can read, change and delete the shared laydowns, runs and figure sets, and can start map builds. Share the network only with people you would hand the keyboard to.
+- **Lockout is still per account,** so a person on the network can keep a known username locked.
+- **`frontend/tools/lab/share.mjs` is a second, separate server** (port 8300, read-only, no sign-in) for the lab's report and laydown files. It listens on the Tailscale address only, and anyone on that network can read what it serves.
 
 ## Before hosting
 
