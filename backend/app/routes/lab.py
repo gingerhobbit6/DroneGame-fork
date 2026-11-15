@@ -1,6 +1,7 @@
 """HTTP only, for the laydowns and report that tools/lab writes. Read-only, and only that folder's plain file names are ever served."""
 
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -35,22 +36,28 @@ def read_laydown(path: Path) -> dict[str, Any] | None:
     return data
 
 
+def results(meta: Any) -> dict[str, Any] | None:
+    """A laydown's measured results as the Lab tab shows them: short text and finite numbers only, so one odd file cannot break the list."""
+    if not isinstance(meta, dict):
+        return None
+    return {k[:40]: v[:200] if isinstance(v, str) else v for k, v in meta.items()
+            if v is None or isinstance(v, (str, int)) or (isinstance(v, float) and math.isfinite(v))} or None
+
+
 @router.get("")
 def list_laydowns() -> dict[str, Any]:
     folder = lab_dir() / "laydowns"
     rows: list[dict[str, Any]] = []
     if folder.is_dir():
-        for path in sorted(folder.iterdir())[:MAX_FILES]:
-            if not PLAIN.match(path.name) or not path.is_file():
-                continue
+        for path in [p for p in sorted(folder.iterdir()) if PLAIN.fullmatch(p.name) and p.is_file()][:MAX_FILES]:
             data = read_laydown(path)
             if data is None:
                 continue
-            meta = data.get("lab") if isinstance(data.get("lab"), dict) else None
             rows.append({"file": path.name, "name": str(data.get("name") or path.stem)[:100], "world": str(data.get("world") or ""),
-                         "systems": len(data["spec"]["structures"]), "lab": meta})
+                         "systems": len(data["spec"]["structures"]), "lab": results(data.get("lab"))})
     # the ones with a measured result come first, best first
-    rows.sort(key=lambda r: (r["lab"] is None, -((r["lab"] or {}).get("waves") or 0), r["name"]))
+    waves = lambda r: w if isinstance(w := (r["lab"] or {}).get("waves"), (int, float)) else 0  # noqa: E731
+    rows.sort(key=lambda r: (r["lab"] is None, -waves(r), r["name"]))
     return {"laydowns": rows, "report": (lab_dir() / "report.html").is_file()}
 
 

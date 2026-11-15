@@ -1,4 +1,4 @@
-// Plain-English explanations of SAPIENT (BSI Flex 335 v2.0) fields and values, for the Learn tab and the "Explain" view
+// Plain-English explanations of SAPIENT (BSI Flex 335 v2.0) fields and values, for the "Explain" view
 // of the message inspector. The field and value names are the ones in the standard; the wording is mine.
 
 const FIELD_HELP = {

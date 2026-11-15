@@ -155,6 +155,7 @@ class TestLaydowns:
     @pytest.mark.parametrize("column", [
         [{"vehicle": "foot", "system": "rf_rfpatrol", "gap": 0, "soldier": i} for i in range(25)],
         [{"vehicle": "foot", "system": "rf_rfpatrol", "gap": 0, "soldier": 100}],
+        [{"vehicle": "foot", "system": "rf_rfpatrol", "gap": 0, "soldier": 3}, {"vehicle": "foot", "system": "rf_chuyka", "gap": 0, "soldier": 3}],
         [{"vehicle": "tank", "system": "gun_hmg", "gap": 0}],
         [{"vehicle": "hilux", "system": "nuke", "gap": 0}],
         [{"vehicle": "hilux", "system": "gun_hmg", "gap": 201}],
@@ -172,7 +173,8 @@ class TestLaydowns:
         spec = client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]
         assert (spec["patrolColumn"], spec["patrolPlan"]) == (column, plan)
 
-    @pytest.mark.parametrize("plan", [{"width": 10, "formation": "file"}, {"width": 2000, "formation": "file"}, {"width": 200, "formation": "blob"}, {"width": 200}, {"width": 200, "formation": "file", "speed": 9}])
+    @pytest.mark.parametrize("plan", [{"width": 10, "formation": "file"}, {"width": 2000, "formation": "file"}, {"width": 200, "formation": "blob"}, {"width": 200}, {"width": 200, "formation": "file", "speed": 9},
+                                      {"width": 200, "formation": "file", "type": "mounted", "spacing": 5}, {"width": 200, "formation": "file", "type": "dismounted", "spacing": 60}, {"width": 200, "formation": "file", "spacing": 60}])
     def test_a_bad_patrol_plan_is_refused(self, client, plan):
         assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "patrol": [[10, 10], [30, 10]], "patrolPlan": plan})).status_code == 422
 

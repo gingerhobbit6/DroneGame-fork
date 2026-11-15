@@ -74,6 +74,9 @@ describe('the column', () => {
     expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 250 }])).toMatch(/within 200 m/);
     expect(columnProblem(Array(7).fill(COLUMN[0]))).toMatch(/6 vehicles at most/);
     expect(columnProblem([])).toBeNull(); // soldiers alone, carrying nothing
+    const bearer = (soldier) => [{ vehicle: 'foot', system: 'rf_rfpatrol', gap: 0, soldier }];
+    expect(columnProblem(bearer(FOOT.groupSize - 1))).toBeNull();
+    expect(columnProblem(bearer(FOOT.groupSize))).toMatch(/soldier in the patrol/); // there is no such soldier to carry it
     expect(columnProblem([{ vehicle: 'hilux', system: 'rf', gap: 0, side: 120 }])).toMatch(/100 m to the side/);
     expect(sim.commands.setPatrol(ROUTE, [{ vehicle: 'themis', system: 'missile_paladin', gap: 0 }])).toMatch(/cannot carry/);
     expect(sim.getPatrol()).toBeNull();
@@ -173,6 +176,13 @@ describe('walking', () => {
     for (const { s, gap, side } of p.escorts) expect(s.pos.x).toBeCloseTo(placeIn(p, gap, side).x);
     expect(p.escorts.map((e) => e.gap)).toEqual([FOOT.escortGap, -FOOT.escortGap]); // one ahead, one behind
     expect(sim.state.zoneCentre).toEqual(at); // the fusion node measures from it
+  });
+
+  it('walks when a mounted patrol has no vehicle to ride in', () => {
+    expect(sim.commands.setPatrol(ROUTE, [], { width: 200, formation: 'file', type: 'mounted', spacing: 20 })).toBeNull();
+    sim.commands.startWave();
+    sim.run(200);
+    expect(sim.getPatrol().dist * 20).toBeCloseTo(FOOT.walkSpeed * 200 * 0.05, 3);
   });
 
   it('halts while its weapon is engaging', () => {

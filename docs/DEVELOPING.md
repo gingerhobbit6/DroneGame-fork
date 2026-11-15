@@ -44,7 +44,7 @@ npm --prefix frontend run build
 uv --directory backend run --no-dev python -m app
 ```
 
-Open <http://localhost:8200>. The backend listens on 127.0.0.1 only ([`__main__.py:9`](../backend/app/__main__.py#L9)) and accepts only the host names `localhost` and `127.0.0.1` ([`security.py:8`](../backend/app/security.py#L8)). Without a build, `/` answers 503 and says how to build.
+Open <http://localhost:8200>. By default the backend listens on 127.0.0.1 only ([`__main__.py:27`](../backend/app/__main__.py#L27)) and accepts only the host names `localhost` and `127.0.0.1` ([`security.py:19`](../backend/app/security.py#L19)). Without a build, `/` answers 503 and says how to build.
 
 **For development**, run the backend and the Vite dev server in two terminals:
 
@@ -64,7 +64,8 @@ Useful while developing:
 
 - `?seed=7&terrain=3` in the address sets the scenario seed and the generated ground ([`main.jsx:10`](../frontend/src/main.jsx#L10)).
 - In the dev server the game is on `window.game` ([`main.jsx:17`](../frontend/src/main.jsx#L17)). Setting `game.debug.frozen = true` stops the frame loop stepping the simulation, so a script can drive it ([`game.js:247`](../frontend/src/game.js#L247)).
-- `SITE_GUARD_DB` moves the database file ([`main.py:32`](../backend/app/main.py#L32)), and `SITE_GUARD_MAPS` the maps folder ([`services/packs.py:45`](../backend/app/services/packs.py#L45)). A throwaway database is a quick way to test sign-up from scratch.
+- `SITE_GUARD_DB` moves the database file ([`main.py:32`](../backend/app/main.py#L32)), and `SITE_GUARD_MAPS` the maps folder ([`services/packs.py:45`](../backend/app/services/packs.py#L45)). A throwaway database is a quick way to test sign-up from scratch. `SITE_GUARD_LAB` moves the folder the Lab tab reads ([`routes/lab.py:21`](../backend/app/routes/lab.py#L21)).
+- `SITEGUARD_HOST` (no underscore after `SITE`) lists the addresses the backend listens on, separated by commas, in place of 127.0.0.1: for example `127.0.0.1,100.64.0.5` to add this machine's Tailscale address so a phone on the same Tailscale network can play. `0.0.0.0` is refused. `SITEGUARD_EXTRA_HOSTS` adds host names to accept, for a proxy such as `tailscale serve`. Read [SECURITY_NOTES.md](SECURITY_NOTES.md#playing-over-a-private-network) before setting either.
 - To build a map pack by hand, see [MAPS.md](MAPS.md). The builder's options are in [`mapbuild/__main__.py:45`](../tools/mapbuild/mapbuild/__main__.py#L45).
 
 ## Tests

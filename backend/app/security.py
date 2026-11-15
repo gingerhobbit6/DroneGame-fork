@@ -21,7 +21,8 @@ MAX_BODY_BYTES = 1024 * 1024
 # The lab report is one self-contained page with its own script and style, written by tools/lab from its own results. It may run
 # those and nothing else: no network, no frames, no forms. It is the only page given this, and only to a signed-in player.
 REPORT_PATH = "/api/v1/lab/report"
-REPORT_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+# `sandbox allow-scripts` gives it an origin of its own, so its script cannot act as the game's page either.
+REPORT_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; sandbox allow-scripts"
 HEADERS = {
     "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org https://tiles.maps.eox.at; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",

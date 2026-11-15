@@ -96,7 +96,7 @@ The game runs a complete SAPIENT network inside the simulation. It has no real n
 | [`sim/network/authority.js`](../frontend/src/sim/network/authority.js) | Alerts, and operator approval of engagements |
 | [`sim/comms.js`](../frontend/src/sim/comms.js) | Delay and loss over Starlink or cellular |
 | [`ui/dock/`](../frontend/src/ui/dock/) | The Nodes, Messages and Network tabs |
-| [`ui/sapient-help.js`](../frontend/src/ui/sapient-help.js) | Plain-English notes for each field, used by Explain and Learn |
+| [`ui/sapient-help.js`](../frontend/src/ui/sapient-help.js) | Plain-English notes for each field, used by Explain |
 
 ### Nodes
 
@@ -141,7 +141,6 @@ The **SAPIENT** panel shows the network as it runs ([USER_GUIDE.md](USER_GUIDE.m
 - **Nodes:** every node with its SAPIENT type, mode, task and message counts.
 - **Messages:** every message, filterable by type and node. **Explain** adds a plain-English note beside each field, **Inject fault** sends a malformed report to show the middleware's Error, and **Export** saves the log as newline-delimited JSON.
 - **Network:** each node's Starlink or cellular link and the packets on it.
-- **Learn:** a step-by-step tour of the protocol using real messages from your run, and **Follow a track** to see every message behind one track.
 
 ## Where the game departs from the standard
 

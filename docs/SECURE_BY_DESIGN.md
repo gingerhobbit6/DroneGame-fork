@@ -40,7 +40,7 @@ Also noted but not assessed: the NCSC's newer Software Security Code of Practice
 
 ## 2. Threat model
 
-Bombadil is a local, offline, single-machine tool. The backend binds to `127.0.0.1` ([`__main__.py:9`](../backend/app/__main__.py#L9)). Nothing is hosted, so the realistic attackers are few.
+Bombadil is a local, offline, single-machine tool. By default the backend binds to `127.0.0.1` ([`__main__.py:27`](../backend/app/__main__.py#L27)). Since 15 November 2026 the owner can also name other addresses of the same machine in `SITEGUARD_HOST`, meant for a private Tailscale network, which widens the attackers to every device and person on that network. Sections 3 to 12 were assessed before that option existed and describe the default. The limits of the option are in [SECURITY_NOTES.md](SECURITY_NOTES.md#playing-over-a-private-network).
 
 ```mermaid
 flowchart LR
@@ -79,8 +79,8 @@ Out of scope by design: network attackers, multiple untrusted users, and hosting
 
 | Default | Evidence | Verdict |
 |---|---|---|
-| Loopback-only binding | `host="127.0.0.1"` in [`__main__.py:9`](../backend/app/__main__.py#L9); Vite dev and preview servers also bind `127.0.0.1` ([`vite.config.js:7`](../frontend/vite.config.js#L7)) | Good. The port and host are hard-coded, so a mistaken environment variable cannot widen them. |
-| Host header allowlist (stops DNS rebinding) | `ALLOWED_HOSTS = ["localhost", "127.0.0.1"]` ([`security.py:8`](../backend/app/security.py#L8)), applied by `TrustedHostMiddleware` ([`main.py:83`](../backend/app/main.py#L83)). Tests refuse `evil.example`, `192.168.1.5` and `[::1]`. | Good. `[::1]` is refused, which is safe because the server does not listen on IPv6. |
+| Loopback binding by default | `BIND_HOSTS` is `127.0.0.1` unless `SITEGUARD_HOST` is set ([`security.py:18`](../backend/app/security.py#L18)); every address (`0.0.0.0`, `::`) is refused at start ([`__main__.py:27`](../backend/app/__main__.py#L27)). Vite dev and preview servers bind `127.0.0.1` ([`vite.config.js:7`](../frontend/vite.config.js#L7)) | Good by default. An environment variable can now widen it, on purpose, to named addresses only. The port is hard-coded. |
+| Host header allowlist (stops DNS rebinding) | `ALLOWED_HOSTS` is `localhost`, `127.0.0.1`, the addresses in `SITEGUARD_HOST` and the names in `SITEGUARD_EXTRA_HOSTS` ([`security.py:19`](../backend/app/security.py#L19)), applied by `TrustedHostMiddleware` ([`main.py:89`](../backend/app/main.py#L89)). Tests refuse `evil.example`, `192.168.1.5` and `[::1]`. | Good. `[::1]` is refused, which is safe because the server does not listen on IPv6. |
 | Content Security Policy | [`security.py:11`](../backend/app/security.py#L11): `default-src 'none'`, scripts and styles from `self` only, no inline script, `connect-src 'self'`, `base-uri 'none'`, `form-action 'none'`, `frame-ancestors 'none'`. Images allow `self`, `data:`, `tile.openstreetmap.org` and `tiles.maps.eox.at`. | Strong for an app that renders with React and draws pack text on a canvas. The two image hosts are a privacy trade-off (section 9). |
 | Other headers | `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-origin`, `Cache-Control: no-store` on `/api/` and `no-cache` on HTML ([`security.py:63`](../backend/app/security.py#L63)). Headers are added by the outermost middleware, so refusals carry them too. | Good. No `Permissions-Policy` or `Cross-Origin-Opener-Policy`. Both are low value here. `frame-ancestors` covers framing, so `X-Frame-Options` is not needed on modern browsers. |
 | JSON-only writes | `RequestGuard` returns 415 for any POST, PUT or PATCH whose type is not `application/json` ([`security.py:31`](../backend/app/security.py#L31)). | Good. A cross-site form cannot send JSON, and there is no CORS to allow a script to. DELETE needs no body and changes data, but the `SameSite=Strict` cookie and the host check cover it (see the note after this table). |
@@ -200,7 +200,7 @@ Limits of the builder's checks:
 
 | Check | Result |
 |---|---|
-| Configured secrets | None. No API keys, tokens or signing keys exist. The two environment variables, `SITE_GUARD_DB` and `SITE_GUARD_MAPS`, are paths. |
+| Configured secrets | None. No API keys, tokens or signing keys exist. Three environment variables are paths (`SITE_GUARD_DB`, `SITE_GUARD_MAPS`, `SITE_GUARD_LAB`) and two are network names (`SITEGUARD_HOST`, `SITEGUARD_EXTRA_HOSTS`). |
 | Secrets in git | `git ls-files` shows no `.env`, key, certificate or secret file. `.gitignore` excludes the database (`backend/data/`), packs (`*.sgmap`), `node_modules`, `dist`, virtual environments and `.claude/`. A content search for credentials in history was not run. |
 | Stored credentials | Only scrypt hashes and SHA-256 session hashes in the database. Plain recovery codes and passwords are never stored (a test checks this). |
 | Third-party identifiers | The Estonian tile URL carries a fixed application label ([`estonia.py:46`](../tools/mapbuild/mapbuild/estonia.py#L46)). It is a name, not a credential. |
@@ -253,7 +253,7 @@ What is not: no backup or export of the database, no write-ahead logging or time
 
 ### Disk-growth findings (audit of 9 November 2026)
 
-Each was checked in the code on the review date. All need someone on the same machine, because the server binds to `127.0.0.1`. None is remotely exploitable, but together they let a local user, a faulty client, or a long-running install fill the disk. The first is already accepted in SECURITY_NOTES.
+Each was checked in the code on the review date. All need someone on the same machine, because the server binds to `127.0.0.1` by default (with `SITEGUARD_HOST` set, anyone on that network who has made an account can do the same). None is remotely exploitable, but together they let a local user, a faulty client, or a long-running install fill the disk. The first is already accepted in SECURITY_NOTES.
 
 | # | Finding | Verified at | Severity | Effort to fix |
 |---|---|---|---|---|

@@ -2,13 +2,13 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSimulation } from '../src/sim/simulation.js';
-import { BUILD, COMMS, ECONOMY, FUSION, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
+import { BUILD, COMMS, DRONES, ECONOMY, FUSION, STRUCTURES, resetAllFigures } from '../src/sim/config/index.js';
 import { MIXED, setUp, play } from './support/scenarios.js';
 
 const sim = createSimulation();
 const fresh = (laydown = []) => { setUp(sim, { seed: '1', laydown }); return sim; };
 const u = (m) => m / 20;
-afterEach(() => { FUSION.authority = 'auto'; });
+afterEach(() => { FUSION.authority = 'auto'; sim.commands.setEngageRules({}); }); // rules of engagement outlive a reset
 
 // Put the operator's inputs back in at the same simulation steps.
 function replayLog(log) {
@@ -147,6 +147,29 @@ describe('the command log', () => {
     while (sim.stepCount() < steps) sim.step();
     expect(sim.digest()).toBe(digest);
   }, 30000);
+
+  it('reproduces a run fought under rules of engagement set before it began', () => {
+    const run = (rules) => {
+      fresh(MIXED);
+      sim.state.warnedWire = true;
+      if (rules) sim.commands.setEngageRules(rules);
+      sim.commands.startWave();
+      sim.run(5000); // long enough for the weapons to be tasked
+      return { digest: sim.digest(), log: [...sim.log], steps: sim.stepCount() };
+    };
+    const open = run(null);
+    const weapons = [...new Set(MIXED.map(([id]) => id).filter((id) => STRUCTURES[id].role === 'effector'))];
+    const held = run(Object.fromEntries(weapons.map((id) => [id, [...Object.keys(DRONES), 'unknown']]))); // every weapon holds fire
+    expect(held.digest).not.toBe(open.digest);
+    expect(held.log.find((e) => e.name === 'setEngageRules')?.step).toBe(0); // starting the run wipes the log, so it is put back
+
+    sim.commands.setEngageRules({}); // as a fresh game replaying the saved run
+    fresh(MIXED);
+    sim.state.warnedWire = true;
+    replayLog(held.log);
+    while (sim.stepCount() < held.steps) sim.step();
+    expect(sim.digest()).toBe(held.digest);
+  }, 60000);
 
   it('time between later waves changes the run, and the log still reproduces it', () => {
     const run = (gap) => {

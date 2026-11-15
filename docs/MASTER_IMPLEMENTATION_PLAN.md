@@ -818,7 +818,7 @@ Check in a real browser at the end of Phase 5 and again at the end of Phase 8.
 - [x] Messages tab: filters, freeze, clear, export, inject fault, explain
 - [x] Nodes tab, and Plan tab with coverage maps
 - [x] Network tab: auto-wire, clear, click to wire, tapped wires, step to next packet, band settings
-- [x] Spectrum tab, and Learn tab with follow a track
+- [x] Spectrum tab, and Learn tab with follow a track (the Learn tab was removed on 12 November 2026, when the panel became one view at a time)
 - [x] Cost tab (Magazine depth once stage B3 lands), and Sources tab with edit, reset, import, export and the range scale
 - [x] Tuning panel, legend, and `window.game` in development builds
 

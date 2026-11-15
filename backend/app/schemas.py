@@ -3,7 +3,7 @@
 import re
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, JsonValue, StringConstraints
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, JsonValue, StringConstraints, model_validator
 
 # Names the game uses. A test compares these with the frontend's config, so they cannot drift apart.
 SystemId = Literal[
@@ -30,6 +30,7 @@ MAX_ESCORT_GAP = 200  # metres along the route, ahead of the people or (negative
 MAX_ESCORT_SIDE = 100  # metres to the right of the people or (negative) to the left
 MAX_FOOT_BEARERS = 24  # soldiers carrying systems in a column (MAX_FOOT_BEARERS in frontend/src/sim/config/patrol.js)
 PatrolType = Literal["dismounted", "mounted", "mixed"]  # PATROL_TYPES in frontend/src/sim/config/patrol.js
+PATROL_SPACING = {"dismounted": (2, 30), "mounted": (10, 80), "mixed": (2, 30)}  # metres between members: `spacing` in PATROL_TYPES
 PATROL_WIDTH = (20, 1000)  # metres: CORRIDOR in frontend/src/sim/route.js
 Formation = Literal["file", "staggered", "wedge"]  # FORMATIONS in frontend/src/sim/formation.js
 
@@ -113,6 +114,9 @@ def _column_sizes(column: list[Escort] | None) -> list[Escort] | None:
     """Up to MAX_ESCORTS vehicles and MAX_FOOT_BEARERS soldiers carrying systems, as columnProblem in frontend/src/sim/patrol.js."""
     if column is not None:
         foot = sum(e.vehicle == "foot" for e in column)
+        placed = [e.soldier for e in column if e.vehicle == "foot" and e.soldier is not None]
+        if len(set(placed)) < len(placed):
+            raise ValueError("each soldier has one place in the column")
         if len(column) - foot > MAX_ESCORTS:
             raise ValueError(f"a patrol takes {MAX_ESCORTS} vehicles at most")
         if foot > MAX_FOOT_BEARERS:
@@ -127,6 +131,13 @@ class PatrolPlan(Strict):
     formation: Formation
     type: PatrolType | None = Field(default=None, exclude_if=lambda t: t is None)  # older plans have none, and are mixed
     spacing: Annotated[float, Field(ge=2, le=150)] | None = Field(default=None, exclude_if=lambda spacing: spacing is None)  # metres between members
+
+    @model_validator(mode="after")
+    def spacing_suits_the_type(self) -> "PatrolPlan":
+        low, high = PATROL_SPACING[self.type or "mixed"]
+        if self.spacing is not None and not low <= self.spacing <= high:
+            raise ValueError(f"a {self.type or 'mixed'} patrol's spacing is {low} to {high} m")
+        return self
 
 
 class LaydownSpec(Strict):

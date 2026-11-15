@@ -98,7 +98,7 @@ export function hitStructure(w, d, s) {
   const { state, ledger, net } = w;
   w.emit('explosion', { pos: d.pos, r: u(60), color: 0xff5252 });
   blastOnGround(w, d, s.pos.x, s.pos.z);
-  // Systems carried on one vehicle (s.platform, set only by tools/lab) share the strike and go down together; with no platform this is just s.
+  // Systems carried on one vehicle (s.platform: sharing.js, a patrol's column, tools/lab) share the strike and go down together; with no platform this is just s.
   const crew = s.platform != null ? w.structures.filter((o) => o.platform === s.platform) : [s];
   if (!state.sandbox) for (const o of crew) o.health -= (d.def.damage * (1 + spotterBonus(w))) / armourOf(o.def); // the sandbox protects the laydown too
   if (crew.some((o) => o.health <= 0)) for (const o of crew) o.health = Math.min(o.health, 0);

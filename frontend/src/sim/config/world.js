@@ -6,9 +6,9 @@
 // independent test results. Edit freely, or use the in-game Tuning panel.
 
 // Stored with saved laydowns and runs. Raise it when a change means old saves no longer replay the same.
-export const GAME_VERSION = '0.20.0';
-// This build's own name and version, shown on the login page and the profile hub. Bombadil is a fork of Site Guard: GAME_VERSION above
-// is the rules version it shares with Site Guard, which saved laydowns and replays check, so it changes only when the rules do.
+export const GAME_VERSION = '0.21.0';
+// The game's own name and version, shown on the login page and the profile hub. GAME_VERSION above is the rules version, which saved
+// laydowns and replays check, so it changes only when the rules do.
 export const PRODUCT = { name: 'Bombadil', version: '1.0.0' };
 
 export const WORLD = {
