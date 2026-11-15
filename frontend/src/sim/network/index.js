@@ -32,13 +32,30 @@ export function createNetwork(ctx) {
   authority = createAuthority(core, alerts, tasks.approve);
   let fusionT = 0;
 
+  // Emissions control, an option only tools/lab sets: a radar given cueHold keeps silent, neither scanning nor heard by anti-radar
+  // drones, until a passive sensor (anything but a radar) has heard a confirmed track within the last cueHold seconds. A lone false
+  // alarm makes only a tentative track, so it does not; a false track that the tracker confirms does.
+  let lastPassive = -Infinity;
+  function passiveCue() {
+    for (const tr of tracker.tracks.values()) {
+      if (tr.status === 'tentative') continue;
+      for (const [id, h] of tr.heard) if (h.t > lastPassive && nodes.get(id)?.def.kind !== 'radar') lastPassive = h.t;
+    }
+  }
+
   function update(dt) {
     S.clock.t = T();
     while (scheduled.length && scheduled[0].at <= T()) scheduled.shift().fn(); // messages that have now arrived
+    let cued = false;
     for (const s of nodes.values()) {
       if (s.def.role === 'sensor') {
+        if (s.cueHold != null) {
+          if (!cued) { passiveCue(); cued = true; }
+          s.radiating = T() - lastPassive <= s.cueHold;
+          if (s.radiating) s.onT = (s.onT || 0) + dt; else s.reportT = 0; // silent: it does not scan, though it still reports its status
+        }
         if (s.def.fov) sensors.aimCamera(s, dt);
-        s.reportT += dt;
+        if (s.radiating !== false) s.reportT += dt;
         const iv = s.def.sapient.interval || 1;
         if (s.reportT >= iv) {
           s.reportT = Math.min(s.reportT - iv, iv);
@@ -80,7 +97,7 @@ export function createNetwork(ctx) {
     nodes.clear(); tracker.clear(); names.clear();
     registration.reset();
     tasks.reset(); // what the last run taught it about jammers must not shape this one
-    fused.reset(); fusionT = 0; authority.pending.length = 0;
+    fused.reset(); fusionT = 0; lastPassive = -Infinity; authority.pending.length = 0;
     scheduled.length = 0; comms.reset(); fusion.uplinks.clear(); fusion.cellBand = 'B8';
     fusion.nodeId = S.uuid(); gui.nodeId = S.uuid(); fusion.statusT = 0;
     names.set(fusion.nodeId, fusion.name);

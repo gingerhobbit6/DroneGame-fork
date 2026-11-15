@@ -6,6 +6,6 @@ const runner = createRunner();
 parentPort.on('message', (job) => {
   if (job === 'stop') { process.exit(0); }
   let result;
-  try { result = runner.evaluate(job.design, job.seed, job.opts); } catch (e) { result = { invalid: `error: ${e?.message || e}` }; }
+  try { result = job.opts?.raid ? runner.raid(job.design, job.seed, job.opts.raid, job.opts) : runner.evaluate(job.design, job.seed, job.opts); } catch (e) { result = { invalid: `error: ${e?.message || e}` }; }
   parentPort.postMessage({ id: job.id, tag: job.tag, result });
 });

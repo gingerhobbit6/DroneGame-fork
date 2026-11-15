@@ -227,6 +227,15 @@ Full detail is in `docs/MASTER_IMPLEMENTATION_PLAN.md`.
 - [x] Drone trails, a switch in the controls: every drone draws a line of where it has flown, the real drone with the truth overlay on, its track without, so the switch shows nothing the system does not know (`render/trail.js`)
 - [ ] Jamming time in the statistics is for the whole run, even when one wave is chosen; jamming kills are credited to the jammer type that would crash the drone soonest; a laser has no hit rate
 
+**Future work**
+
+- [ ] **Vehicles that move between positions for on-station periods** (on hold, 15 November 2026). In station mode, each vehicle would cycle between its own positions, staying on station for a while and then driving to the next, so the enemy's picture of where it is goes stale. Today a parked vehicle never moves (only a patrol's column does, in `sim/patrol.js`). To decide first:
+  - **Where it lives:** the game and the lab together, or a lab switch first to see if it pays off.
+  - **What triggers a move:** a timer, staggered so some vehicles stay up and coverage holds; a timer for all at once; after firing (shoot and scoot); or whichever comes first.
+  - **What works on the move:** sensors on and weapons off (masts down, shorter reach; jammers work, as in a patrol), everything off, or everything on.
+  - **What the enemy knows:** where the target was at launch, updated only while a spotter (Orlan, Mohajer) sees it; an older reconnaissance picture; or always live. Drones that home on radars or radios would still follow live emissions.
+  - **Needed whichever is chosen:** strike drones home on a system's live position (`pickTarget` and `plainAim` in `sim/targeting.js`), and a strike that reaches its aim damages the chosen system wherever it now stands (`hitStructure`, called from `sim/drones.js`). A strike should land on the spot and only damage what is within its blast. Score it on the team sheet (`frontend/tools/lab/teams.mjs`), with a raid that sends its sensor-hunting drones first, as moving should matter most against those.
+
 ## Known limits to fix if they start to matter
 
 - [ ] **A test that sometimes fails.** `save-panels.test.jsx`, "shows kept runs and saves them when the server is back", failed in about 1 of 4 runs on a busy machine: it checks for the error message before the list has finished reloading.

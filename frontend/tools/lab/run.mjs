@@ -19,6 +19,8 @@ export function createRunner() {
     if (bad) return { error: bad };
     ECONOMY.budget = budget;
     sim.state.seed = String(seed); sim.commands.reset('clear'); sim.state.started = true;
+    const lit = sim.commands.setConditions(design.conditions || 'day'); // every time: a worker's sim keeps the last run's conditions across a reset
+    if (lit) return { error: lit };
     if (design.attack?.length) { const refused = sim.commands.setAttack(design.attack); if (refused) return { error: refused }; } // which drones the waves send; the default is the four generic types
     const tags = new Map(), keyOf = (st) => `${st.def.id}@${Math.round(st.pos.x * 20)},${Math.round(st.pos.z * 20)}`;
     const retag = () => { for (const st of sim.structures) { const t = tags.get(keyOf(st)); if (t != null) st.platform = t; } }; // the first wave rebuilds the laydown and drops our tags
@@ -87,5 +89,35 @@ export function createRunner() {
       vehiclesLeft: alive(), firstVehicleLost, leaked: { ...sim.ledger.leaked }, perWave, steps, ms: Date.now() - t0,
     };
   }
-  return { evaluate, exportLaydown, sim };
+  // One fixed raid (raids.mjs) against a design, as the first wave, so the enemy has not adapted. The site is given health out of
+  // reach, so it cannot fall and every leak's damage counts in full. `queue` is the raid's spawns, as a wave's queue (waves.js).
+  // Returns the harm done, what it cost each side, and for each drone how it ended and how far out it was first seen.
+  function raid(design, seed, queue, { budget = 7_000_000, dt = SIM_STEP } = {}) {
+    const b = build(design, seed, budget);
+    if (b.error) return { invalid: b.error };
+    sim.commands.startWave(); b.retag();
+    if (sim.structures.filter((st) => st.platform != null).length !== b.expected) return { invalid: 'systems lost in the first rebuild' };
+    const radars = sim.structures.filter((st) => st.def.kind === 'radar');
+    if (design.radarCue != null) for (const st of radars) st.cueHold = design.radarCue; // emissions control: silent until a passive sensor cues it
+    const HEALTH = 1e6;
+    sim.state.queue = queue.map((q) => ({ ...q })); sim.state.health = HEALTH;
+    const cap = Math.ceil(MAX_WAVE_SECONDS / dt);
+    const t0 = sim.state.time;
+    for (let n = 0; sim.state.waveActive && n < cap; n++) sim.step(dt);
+    const seconds = sim.state.time - t0;
+    const flights = sim.ledger.flights.map((f) => {
+      const seen = Object.values(f.seen).sort((p, q) => p.t - q.t)[0];
+      return { type: f.type, end: f.end ?? 'airborne', site: f.site ?? null, by: f.by ?? null, seenSite: seen ? seen.site : null, seenBy: Object.keys(f.seen),
+        warning: seen && f.t1 != null ? f.t1 - seen.t : null };
+    });
+    const spent = ECONOMY.budget - sim.state.budget;
+    const radarsLost = radars.filter((st) => !sim.structures.includes(st)).length;
+    const radarOn = design.radarCue != null && radars.length ? radars.reduce((n, st) => n + (st.onT || 0), 0) / radars.length : null; // seconds each radar radiated, on average
+    return {
+      radars: radars.length, radarsLost, radarOn: radarOn == null ? null : radarOn / Math.max(seconds, 1), // the share of the raid each radar radiated
+      seed: String(seed), capex: b.capex, shots: spent - b.capex, damage: HEALTH - sim.state.health, killed: sim.state.killed, injured: sim.state.injured,
+      lostValue: sim.ledger.lostValue, destroyed: enemyCost(sim.ledger.killed), launched: enemyCost(sim.ledger.launched), flights, cutOff: sim.state.waveActive,
+    };
+  }
+  return { evaluate, raid, exportLaydown, sim };
 }
