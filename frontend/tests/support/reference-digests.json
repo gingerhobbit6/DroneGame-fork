@@ -1,27 +1,27 @@
 {
   "mixed-seed1": {
-    "digest": "c4372085",
+    "digest": "5844806d",
     "wave": 6,
-    "kills": 68,
+    "kills": 72,
     "leaks": 2,
     "health": 40,
-    "budget": 11052953
+    "budget": 10252953
   },
   "mixed-seed7": {
-    "digest": "436eca81",
+    "digest": "18241a04",
     "wave": 6,
-    "kills": 71,
+    "kills": 74,
     "leaks": 0,
     "health": 100,
-    "budget": 10852953
+    "budget": 10652953
   },
   "mixed-gnss-seed42": {
-    "digest": "33482c2e",
+    "digest": "60167eb3",
     "wave": 4,
-    "kills": 40,
+    "kills": 39,
     "leaks": 0,
     "health": 100,
-    "budget": 12007953
+    "budget": 11937953
   },
   "lasers-seed42": {
     "digest": "7a997a93",

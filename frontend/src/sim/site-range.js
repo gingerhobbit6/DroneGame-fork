@@ -36,11 +36,37 @@ export function reachFor(def, droneDef, band = def.senses === 'rf' ? heardBand(d
   const kind = def.kind || def.id;
   if (def.senses === 'rf' && !band) return 0; // silent, on no band it covers, or drowned on every one by your own jamming (rf-model.js)
   if (kind === 'radar') return def.range * Math.pow((droneDef.rcs ?? SENSING.refRcs) / SENSING.refRcs, 0.25);
-  if (kind === 'camera') return def.range * ((droneDef.size ?? SENSING.refSize) / SENSING.refSize);
+  if (kind === 'camera') return hazeLimit(def, pixelReach(def, droneDef));
   if (kind === 'rf') return def.range * Math.sqrt(droneDef.rfPower ?? 1) * bandReach(band, droneDef); // a louder link, or one on a band that carries further
   if (kind === 'acoustic') return def.range * (droneDef.sound ?? 1);
   return def.range;
 }
+
+// Haze. A camera's pixels across a drone go with its size over its range, so a drone seven times the reference size covers the same
+// pixels seven times as far out. But air scatters light, and the drone's contrast against the sky falls as exp(-3.912 R / V) with
+// range R in air of visibility V (Koschmieder). The catalogue range already holds the haze at that range for the reference drone, so a
+// camera keeps its catalogue range for it, and a bigger drone, or a zoomed view, is seen as far as pixels times contrast still give what
+// the reference drone gives at the catalogue range: (pixelReach / R) * exp(-sigma (R - range)) = 1. Smaller targets keep the pixel law.
+export function hazeLimit(def, pixelReach) {
+  const R0 = def.range, sigma = 3.912 / SENSING.visibility;
+  if (!(pixelReach > R0) || !(R0 > 0)) return pixelReach;
+  let R = R0; // Newton's method from below: f(R) = ln(pixelReach / R) - sigma (R - R0) falls and curves upward, so it closes on the root from this side
+  for (let i = 0; i < 12; i++) {
+    const f = Math.log(pixelReach / R) - sigma * (R - R0), step = f / (1 / R + sigma);
+    R += step;
+    if (step < 0.5) break;
+  }
+  return Math.min(R, pixelReach);
+}
+
+// A camera's reach in a zoomed view: zoom multiplies its pixels, and haze then limits that as above. Anything else reaches zoom times as far.
+// reach: the system's reach along this path at no zoom (0 if it cannot see along it).
+export function zoomedReach(def, droneDef, reach, zoom) {
+  if (zoom === 1 || !reach || (def.kind || def.id) !== 'camera') return reach * zoom;
+  return hazeLimit(def, pixelReach(def, droneDef) * zoom);
+}
+// Where this drone covers a camera's 4 detection pixels, before haze: what its pixel count is worked out from (camera-model.js pixelsOn).
+export const pixelReach = (def, droneDef) => def.range * ((droneDef.size ?? SENSING.refSize) / SENSING.refSize);
 
 // The frequency a path is worked out at: the radar's own band, the band a detector hears the drone on, or the band given.
 function pathGhz(def, droneDef, ghz) {

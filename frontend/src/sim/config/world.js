@@ -6,7 +6,7 @@
 // independent test results. Edit freely, or use the in-game Tuning panel.
 
 // Stored with saved laydowns and runs. Raise it when a change means old saves no longer replay the same.
-export const GAME_VERSION = '0.20.0';
+export const GAME_VERSION = '0.20.1'; // 0.20.1: haze limits how far a camera sees a big drone
 // This build's own name and version, shown on the login page and the profile hub. Bombadil is a fork of Site Guard: GAME_VERSION above
 // is the rules version it shares with Site Guard, which saved laydowns and replays check, so it changes only when the rules do.
 export const PRODUCT = { name: 'Bombadil', version: '1.0.0' };
@@ -79,6 +79,7 @@ export const SENSING = {
   refSize: 0.35,         // m, a small quadcopter
   pdEdge: 1.35, pdSlope: 6,
   rangeCap: 2.2,         // detections beyond this many "reaches" are ignored
+  visibility: 23000,     // m, clear-air meteorological visibility, the standard "clear" atmosphere: haze limits how far a camera sees a big drone (site-range.js hazeLimit)
   clutterPenalty: 0.3,   // detection chance multiplier for a low flyer inside radar ground clutter
   clutterSpeed: 5,       // m/s: a radar's Doppler filter loses a low flyer in ground clutter only below this speed. An ASSUMPTION;
                          // drone radars are Doppler radars, so a drone moving faster stands out from the still ground

@@ -229,7 +229,7 @@ describe('auto-start', () => {
     sim.state.warnedWire = true;
     sim.commands.setAutoStart(true);
     sim.commands.startWave();
-    for (let i = 0; i < 100 && sim.state.waveActive; i++) sim.run(200);
+    for (let i = 0; i < 40000 && sim.state.waveActive; i++) sim.run(1); // a step at a time until wave 1 is over: a longer run could reach the end of the countdown too
     expect(sim.state.autoTimer).toBeGreaterThan(0); // counting down to wave 2
     sim.commands.setAutoStart(false);
     sim.run(400); // 20 s, well past the countdown

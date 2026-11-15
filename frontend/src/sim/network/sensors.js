@@ -4,7 +4,7 @@ import * as S from '../sapient.js';
 import { SENSING } from '../config/index.js';
 import { rand, gauss } from '../rng.js';
 import { terrainState } from '../terrain.js';
-import { errorScale, inClutter, reachFor, reachOnPath } from '../site-range.js';
+import { errorScale, inClutter, pixelReach, reachFor, reachOnPath, zoomedReach } from '../site-range.js';
 import { blindSpeed, classifiesAt, coverArc, elevationBand, inCover, outwardFrom } from '../sensor-model.js';
 import { IDENTIFY_PX, airframeConfidence, hasZoom, pixelsOn } from '../camera-model.js';
 import { LIBRARIES, bandGhz, covers, heardBand, libraryKnows } from '../rf-model.js';
@@ -66,7 +66,7 @@ export function createSensors(core, feed) {
     pathReach = undefined;
     if (def.senses === 'perimeter') return r.hr < def.range ? 0.98 : 0;
     const zoom = pointing ? zoomOf(s) : 1; // coverage maps assume a camera's search view
-    const far = open * zoom;
+    const far = zoomedReach(def, d.def, open, zoom); // a zoomed camera's pixels reach further, until haze stops them
     if (!far || r.rng > far * SENSING.rangeCap) return 0;
     const b = bearingOf(r);
     if (!inCover(def, b.az, b.el)) return 0; // outside a radar's arc, or above or below its beam
@@ -76,7 +76,7 @@ export function createSensors(core, feed) {
     const p = inClutter(def, T3, dxm, dzm, dym - T3.groundAt(dxm, dzm), r.hr, speed) ? SENSING.clutterPenalty : 1; // lost in clutter
     const blind = blindSpeed(def);
     if (blind && d.vel && Math.abs((d.vel.x * r.east - d.vel.z * r.north + d.vel.y * r.up) * m) < blind * r.rng) return 0; // too slow, or crossing, for its clutter filter
-    const reach = (pathReach = reachTo(s, d, open, deaf)) * zoom;
+    const reach = zoomedReach(def, d.def, (pathReach = reachTo(s, d, open, deaf)), zoom);
     if (!reach) return 0;
     if (pointing && def.fov && !inView(s, r)) return 0;
     return p / (1 + Math.pow(r.rng / (reach * SENSING.pdEdge), SENSING.pdSlope));
@@ -135,7 +135,7 @@ export function createSensors(core, feed) {
     const r = d ? (def.kind === 'acoustic' ? heardFrom(s, d) : rel(s, d)) : falseGeometry(s);
     if (!r) return null;
     const b = bearingOf(r);
-    const reach = pathed * zoomOf(s), k = errorScale(def, r.rng, reach); // a weak signal gives a worse measurement, and the sensor knows it
+    const reach = d ? zoomedReach(def, d.def, pathed, zoomOf(s)) : pathed * zoomOf(s), k = errorScale(def, r.rng, reach); // a weak signal gives a worse measurement, and the sensor knows it
     const errAz = n.az * k, errEl = n.el * k, errRange = n.range * k;
     const azM = (b.az + gauss() * (errAz || 0) + 360) % 360;
     const elM = b.el + gauss() * (errEl || 0);
@@ -163,7 +163,7 @@ export function createSensors(core, feed) {
     const report = {
       report_id: S.ulid(), object_id: objectId,
       range_bearing: rb, detection_confidence: round(conf, 2),
-      classification: classification(s, d, r.rng, reach),
+      classification: classification(s, d, r.rng, d && def.kind === 'camera' && pathed ? pixelReach(def, d.def) * zoomOf(s) : reach), // pixels on it: haze limits the detection, not the pixels
     };
     if (def.sapient.signal) { // the band it heard the drone on, or for a false alarm any band it covers
       const bands = covers(def), band = d ? bandOn(s, d, deaf) : bands[Math.floor(rand() * bands.length)];
