@@ -35,11 +35,12 @@ export const MAST_SIDE = 1.5; // metres from the mast's middle, so the two model
 export function regroupVehicles(w) {
   const near = (a, b) => hdist(a.pos, b.pos) < u(RIDER_STEP * 2.5);
   for (const s of w.structures) {
-    if (!s.def.vehicle || s.escort || s.platform != null) continue;
+    if (!s.def.vehicle || s.escort || s.platform != null || s.def.rider) continue; // one saved as riding never carries the vehicle
     const crew = w.structures.filter((o) => o !== s && !o.escort && o.platform == null && o.def.vehicle === s.def.vehicle && near(o, s));
     if (!crew.length) continue;
     s.platform = nextPlatform(w);
     s.def.rider = false;
     for (const o of crew.slice(0, MAX_ON_VEHICLE - 1)) { o.platform = s.platform; o.def.rider = true; }
   }
+  for (const s of w.structures) if (s.def.rider && s.platform == null && !s.escort) s.def.rider = false; // its vehicle was left out: it stands alone
 }

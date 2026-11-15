@@ -32,9 +32,9 @@ def kind_of(name: str) -> str | None:
     return found.pop().lower() if len(found) == 1 else None
 
 
-def sources(folder: str) -> list[tuple[str, str]]:
-    """(kind, GDAL path) for every tile in the folder: .tif files, and .tif members of zips."""
-    found = []
+def sources(folder: str) -> tuple[list[tuple[str, str]], int]:
+    """(kind, GDAL path) for every tile in the folder: .tif files, and .tif members of zips. With them, how many zips were refused."""
+    found, refused = [], 0
     for name in sorted(os.listdir(folder)):
         path = os.path.join(folder, name)
         if TIF.search(name):
@@ -43,10 +43,12 @@ def sources(folder: str) -> list[tuple[str, str]]:
             try:
                 with zipfile.ZipFile(path) as archive:
                     members = [m.filename for m in safe_archive_members(archive) if TIF.search(m.filename)]
-            except (zipfile.BadZipFile, OSError):
+            except (zipfile.BadZipFile, OSError, SystemExit):  # SystemExit is how an unsafe archive is refused: one odd zip must not stop the build
+                refused += 1
                 continue
-            found += [(kind_of(m) or kind_of(name), f"/vsizip/{path}/{m}") for m in members]
-    return [(kind, path) for kind, path in found if kind]
+            # in braces, as everywhere else here, so GDAL is told which part is the archive and does not work it out from the names
+            found += [(kind_of(m) or kind_of(name), f"/vsizip/{{{path}}}/{m}") for m in members]
+    return [(kind, path) for kind, path in found if kind], refused
 
 
 def tile_bounds(tif) -> tuple[int, int, int, int] | None:
@@ -81,8 +83,8 @@ def import_tiles(folder: str, cache: str, wanted: set[tuple[int, int]], reduce, 
     from .terrain import cached_square, keep_square
 
     tiles: dict[tuple[int, int, int, int], dict[str, str]] = {}
-    refused = 0
-    for kind, path in sources(folder):
+    found, refused = sources(folder)
+    for kind, path in found:
         try:
             with rasterio.open(path, driver="GTiff") as tif:  # GTiff only: a VRT could read any file GDAL can reach
                 check_raster_blocks(tif)
@@ -94,7 +96,7 @@ def import_tiles(folder: str, cache: str, wanted: set[tuple[int, int]], reduce, 
             continue
         tiles.setdefault(bounds, {})[kind] = path
     if refused:
-        say(f"lidar tiles: {refused} file(s) in {folder} are not 1 m national grid GeoTIFF tiles, and were left out")
+        say(f"lidar tiles: {refused} file(s) in {folder} are not 1 m national grid GeoTIFF tiles or safe zips of them, and were left out")
     kept = unpaired = 0
     for (west, north, width, height), pair in sorted(tiles.items()):
         if set(pair) != {"dtm", "dsm"}:

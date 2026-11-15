@@ -88,6 +88,7 @@ class PlacedSystem(Strict):
     name: UnitName | None = Field(default=None, exclude_if=lambda v: v is None)
     callsign: Callsign | None = Field(default=None, exclude_if=lambda v: v is None)
     vehicle: PatrolVehicle | None = Field(default=None, exclude_if=lambda v: v is None)  # parked on one from a deployment pack
+    rider: Literal[True] | None = Field(default=None, exclude_if=lambda v: v is None)  # a second or third system on the vehicle beside it
 
 
 class PlacedPeople(Strict):
@@ -156,6 +157,8 @@ class LaydownSpec(Strict):
     patrolColumn: Annotated[list[Escort] | None, AfterValidator(_column_sizes)] = Field(default=None, min_length=0, max_length=MAX_ESCORTS + MAX_FOOT_BEARERS, exclude_if=lambda column: column is None)
     # its corridor and formation; a patrol saved before there was a choice gets the default plan
     patrolPlan: PatrolPlan | None = Field(default=None, exclude_if=lambda plan: plan is None)
+    # rules of engagement: for a weapon, the drone types it must not fire at ("unknown" is a track no sensor has named). cleanRules in engage-rules.js
+    engageRules: dict[SystemId, Annotated[list[DroneTypeId], Field(min_length=1, max_length=MAX_ATTACK_TYPES + 1)]] | None = Field(default=None, max_length=MAX_SYSTEMS, exclude_if=lambda rules: rules is None)
 
 
 FigureGroup = Annotated[dict[FigureKey, Annotated[dict[FigureKey, Figure], Field(max_length=MAX_FIGURES_PER_ITEM)]], Field(max_length=MAX_FIGURES_PER_ITEM)]

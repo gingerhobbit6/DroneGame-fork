@@ -24,14 +24,15 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
 }
 
 @media (hover: none) and (pointer: coarse) and (max-width: 1000px), (max-width: 640px) {
-  :root { --strip: 60px; --tools: 56px; --left: 8px; --top: 60px; }
+  :root { --strip: 64px; --tools: 64px; --left: 8px; --top: 60px; } /* the timeline's height with its gap, and the purchase strip's */
 
   /* top bar: status on the left, guide and menu buttons on the right */
   #left-col { display: contents; }
   #brand-bar { display: none; } /* no room on a phone: the Run panel takes the top left */
   #left-col .panel { position: fixed; }
   #right-col, #map-rail-slot { display: contents; }
-  #acct-chip { right: auto; left: 12px; } /* the map buttons have the bottom right on a phone */
+  /* the map buttons have the bottom right on a phone and the timeline the bottom edge, so the profile button is its initials alone, above the minimap */
+  #acct-chip { right: auto; left: 8px; bottom: calc(var(--strip) + var(--tools) + 124px); padding: 4px; gap: 0; font-size: 0; }
   #right-col .panel { position: fixed; }
   #hud-top-left { top: 8px; left: 8px; width: calc(100vw - 120px); padding: 6px 10px; z-index: 2; }
   #hud-top-left .label { margin-bottom: 2px; }
@@ -40,14 +41,17 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
   #btn-menu { display: flex; align-items: center; justify-content: center; position: fixed; top: 8px; right: 8px; width: 44px; height: 44px; padding: 0; font-size: 20px; z-index: 4; background: rgba(12, 20, 34, 0.92); }
   #btn-wizard { top: 8px; right: 60px; width: 44px; height: 44px; font-size: 0; gap: 0; }
 
-  /* the controls: hidden until the menu button is pressed, then a sheet below the top bar */
-  #hud-top-right { display: none; top: var(--top); left: 8px; right: 8px; width: auto; max-height: calc(100vh - var(--top) - 8px); max-height: calc(100dvh - var(--top) - 8px); z-index: 7; overflow-y: auto; }
-  #hud-top-right.menu-open { display: flex; }
+  /* the controls: a sheet below the top bar once the menu button is pressed. Until then only Start wave, and the warning it can
+     raise, are shown, out on the map between the minimap and the map buttons: nothing else on a phone starts the attack. */
+  #hud-top-right { top: var(--top); left: 8px; right: 8px; width: auto; max-height: calc(100vh - var(--top) - 8px); max-height: calc(100dvh - var(--top) - 8px); z-index: 7; overflow-y: auto; }
+  #hud-top-right:not(.menu-open) { top: auto; left: max(124px, calc(var(--left) + 48px)); right: 110px; bottom: calc(var(--strip) + var(--tools) + 30px); width: auto; padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; overflow: visible; z-index: 2; }
+  #hud-top-right:not(.menu-open) > :not(#btn-wave):not(#wire-warning) { display: none; }
   #hud-top-right label { font-size: 14px; padding: 4px 0; }
   #hud-top-right button, #hud-top-right select { min-height: 40px; font-size: 14px; }
 
   /* the purchase bar: a strip you swipe along, above the timeline */
   #toolbar { left: 8px; right: 8px; bottom: var(--strip); width: auto; flex-direction: row; gap: 4px; padding: 4px; overflow-x: auto; overflow-y: hidden; z-index: 2; }
+  #right-col #toolbar { min-height: 0; } /* its desktop floor would leave an empty band under the strip */
   #toolbar .tool-row { flex: none; width: 128px; }
   #toolbar .tool .k { display: none; }
   #toolbar .tool.sized { padding-bottom: 24px; }
@@ -59,9 +63,16 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
   #review-banner { top: var(--top); max-width: calc(100vw - 16px); font-size: 12px; text-align: center; }
 
   /* the minimap shrinks to a corner thumbnail above the strip; the map buttons go down the other side */
-  #minimap { left: 8px; bottom: calc(var(--strip) + var(--tools) + 8px); width: 108px; height: 108px; padding: 3px; z-index: 1; }
-  #minimap-canvas { width: 100px; height: 100px; }
-  #map-rail { left: auto; right: 8px; bottom: calc(var(--strip) + var(--tools) + 8px); }
+  /* named through #left-col, as the desktop rules for the two are (style.css), or those would win */
+  #left-col #minimap { left: 8px; bottom: calc(var(--strip) + var(--tools) + 8px); width: 108px; height: auto; margin: 0; padding: 3px; z-index: 1; }
+  #left-col #minimap-canvas { width: 100px; height: 100px; }
+  #left-col #map-rail { position: fixed; left: auto; right: 8px; bottom: calc(var(--strip) + var(--tools) + 8px); grid-template-columns: repeat(2, 44px); }
+  #left-col #map-rail > button { width: 44px; height: 44px; }
+  /* nothing is dragged about on a phone: every pane has its place, so the bars to drag them by go, and their height with them */
+  #hud-top-left > .mv-bar, #hud-top-right > .mv-bar, #toolbar > .mv-bar, #timeline > .mv-bar, #minimap > .mv-bar { display: none; }
+  /* the Run panel's buttons: one row to swipe along, so the panel stays a strip across the top */
+  #hud-top-left .hud-actions { display: flex; gap: 6px; margin: 4px 0 0; overflow-x: auto; }
+  #hud-top-left .hud-actions button { flex: none; }
   #map-credit { bottom: calc(var(--strip) + var(--tools) + 8px); max-width: calc(100vw - 140px); font-size: 10px; }
   #hud-bottom-left { display: none; } /* the legend; the same names are on the labels */
 
@@ -118,18 +129,25 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
   #hud-top-left .budget-bar { flex: none; width: 70px; height: 8px; margin: 0; }
   #hud-top-left .stats { display: flex; margin: 0; gap: 8px; font-size: 11px; white-space: nowrap; }
   #hud-top-left .stats span { white-space: nowrap; }
+  /* one row, swiped along: the counts, then the Run panel's buttons. Its ammunition and spending lines are in Statistics. */
+  #hud-top-left { overflow-x: auto; }
+  #hud-top-left > * { flex: none; }
+  #hud-top-left .hud-ammo, #hud-top-left .hud-spend { display: none; }
+  #hud-top-left .hud-actions { margin: 0; overflow: visible; }
+  #hud-top-left .hud-actions button { min-height: 30px; padding: 2px 8px; }
   #btn-menu, #btn-wizard { top: 4px; width: 36px; height: 36px; font-size: 18px; }
   #btn-menu { right: 4px; }
   #btn-wizard { right: 44px; font-size: 0; }
 
-  #toolbar { left: 4px; right: auto; top: var(--top); bottom: calc(var(--strip) + 4px); width: 128px; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+  #right-col #toolbar { left: 4px; right: auto; top: var(--top); bottom: calc(var(--strip) + 4px); width: 128px; min-height: 0; flex-direction: column; overflow-x: hidden; overflow-y: auto; } /* through #right-col, as its desktop width is */
   #toolbar .tool-row { width: 100%; }
 
   #timeline { left: 4px; right: 4px; bottom: 4px; padding: 3px 8px; }
   .tl-row button { padding: 2px 10px; min-height: 28px; }
-  #minimap { display: none; }
-  #map-rail { right: 4px; bottom: calc(var(--strip) + 8px); gap: 4px; }
-  #map-rail button { width: 36px; height: 36px; }
+  #left-col #minimap { display: none; }
+  #acct-chip { left: calc(var(--left) + 8px); bottom: calc(var(--strip) + 28px); } /* beside the purchase column, where the minimap is not */
+  #left-col #map-rail { right: 4px; bottom: calc(var(--strip) + 8px); gap: 4px; grid-template-columns: repeat(2, 36px); }
+  #left-col #map-rail > button { width: 36px; height: 36px; }
   #map-credit { bottom: calc(var(--strip) + 6px); left: calc(var(--left) + 8px); transform: none; }
   #hud-top-right { left: auto; width: min(360px, calc(100vw - 16px)); }
   #dock, #dock.max { bottom: calc(var(--strip) + 4px); }

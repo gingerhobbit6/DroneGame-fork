@@ -228,3 +228,40 @@ describe('bearing-only measurements', () => {
     expect(tk.candidates.length).toBe(0);
   });
 });
+
+describe('very precise bearings', () => {
+  // Six staring cameras good to a few hundredths of a degree, on a track that began where two bearings crossed, for ten minutes.
+  // Each update leaves the covariance a little lopsided, and unless the tracker makes it symmetric again the error feeds on itself:
+  // measured without that step, this track ended millions of metres from its target. The textbook Joseph form of the update was
+  // tried in its place and did no better alone, so the step stays.
+  it.each([0.05, 0.03])('hold one track within metres of its target at %s°, as the SPYKE and the PodView give', (deg) => {
+    const tk = newTracker(), sig = rad(deg);
+    const cams = [[0, 0, 3], [800, 0, 3], [300, 900, 3], [-600, 400, 3], [1200, 300, 3], [500, -700, 3]];
+    const truth = (t) => [1500 - 2 * t, 1500 - t, 100];
+    let seed = 12345;
+    const noise = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 31 - 1; }; // the same every run, within ±1
+    const look = (from, c, t, scan, jitter) => {
+      const p = truth(t), d = [p[0] - from[0], p[1] - from[1], p[2] - from[2]], hr = Math.hypot(d[0], d[1]);
+      return { node: `cam${c}`, from, az: Math.atan2(d[0], d[1]) + jitter * noise() * sig, el: Math.atan2(d[2], hr) + jitter * noise() * sig, range: null, sigAz: sig, sigEl: sig, sigRange: 0, t, scan, every: 0.5 };
+    };
+    let tr = null;
+    for (let i = 0; i < 4 && !tr; i++) cams.forEach((from, c) => { tr = tk.ingest(look(from, c, i, -1 - i, 0), i) || tr; });
+    expect(tr).not.toBeNull();
+    let lost = 0, worst = 0, lopsided = 0, least = Infinity;
+    for (let k = 0; k < 1200; k++) {
+      const t = 3 + k * 0.5, p = truth(t);
+      cams.forEach((from, c) => { if (tk.ingest(look(from, c, t, k, 1), t)?.id !== tr.id) lost++; });
+      const cur = tk.tracks.get(tr.id);
+      worst = Math.max(worst, Math.hypot(cur.pos[0] - p[0], cur.pos[1] - p[1], cur.pos[2] - p[2]));
+      for (const P of [cur.P11, cur.P22]) {
+        lopsided = Math.max(lopsided, Math.abs(P[1] - P[3]), Math.abs(P[2] - P[6]), Math.abs(P[5] - P[7]));
+        least = Math.min(least, P[0], P[4], P[8]);
+      }
+    }
+    expect(lost).toBe(0);
+    expect(tk.tracks.size).toBe(1);
+    expect(worst).toBeLessThan(5);
+    expect(lopsided).toBe(0);
+    expect(least).toBeGreaterThan(0);
+  });
+});

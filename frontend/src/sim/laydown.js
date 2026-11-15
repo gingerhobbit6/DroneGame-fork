@@ -10,6 +10,7 @@ import { cleanZone, reachProblem, siteIsFree, zoneCentre } from './attack-area.j
 import { outwardFrom } from './sensor-model.js';
 import { cleanMix, hasStrike, isDefaultMix } from './attack-mix.js';
 import { ENV, cleanConditions } from './conditions.js';
+import { cleanRules } from './engage-rules.js';
 import { buyTerminal, money } from './economy.js';
 import { capturePeople, clearPeople, removePeople, restorePeople } from './people.js';
 import { fillMagazine } from './magazine.js';
@@ -117,6 +118,7 @@ function captureOne(s) {
     ...(s.jamOn && s.def.trigger === 'manual' ? { on: true } : {}), // switched on by hand
     ...(Object.keys(s.def.settings).length ? { settings: { ...s.def.settings } } : {}),
     ...(s.def.vehicle ? { vehicle: s.def.vehicle } : {}),
+    ...(s.def.rider ? { rider: true } : {}), // it rides on the vehicle the system beside it carries
     ...(s.custom?.name ? { name: s.custom.name } : {}),
     ...(s.custom?.callsign ? { callsign: s.custom.callsign } : {}),
   };
@@ -144,7 +146,8 @@ export function move(w, s, x, z) {
   }));
   const from = { x: s.pos.x, z: s.pos.z };
   for (const o of crew) { if (o.uplink) w.ledger.terminals[o.uplink]--; removeStructure(w, o); } // judged as if it were not there
-  const problem = placementProblem(w, x, z, s.def, 0); // nothing is bought, so the budget is not asked
+  // nothing is bought, so the budget is not asked. A new system may go onto a vehicle or a mast here; one that is moved keeps its own ground
+  const problem = placementProblem(w, x, z, s.def, 0) || (w.structures.some((o) => hdist(o.pos, { x, z }) < u(BUILD.spacing)) ? 'Too close to another structure' : null);
   const at = problem ? from : { x, z };
   const moved = kept.map(({ l, dx, dz }) => restoreOne(w, { ...l, x: at.x + dx, z: at.z + dz }));
   if (platform != null) for (const o of moved) o.platform = platform;
@@ -177,6 +180,7 @@ export function captureLaydown(w) {
     structures: w.structures.filter((s) => !s.escort).map(captureOne) // the patrol's escort is rebuilt from its route
       .sort((a, b) => a.id.localeCompare(b.id) || a.x - b.x || a.z - b.z),
     fusionUplinks: [...w.net.fusion.uplinks], fusionCell: w.net.fusion.cellBand,
+    ...(Object.keys(cleanRules(w.engageRules)).length ? { engageRules: cleanRules(w.engageRules) } : {}), // left out with none, so older laydowns stay as they were
     ...capturePeople(w),
     ...(w.state.zone ? { zone: w.state.zone } : {}),
     ...(isDefaultMix(w.state.attack) ? {} : { attack: w.state.attack }),
@@ -213,6 +217,8 @@ export function restoreLaydown(w, spec, here = false) {
   applyZone(w, cleanZone(spec.zone));
   w.state.attack = cleanMix(spec.attack);
   applyConditions(w, spec.conditions);
+  w.engageRules = cleanRules(spec.engageRules); // the laydown's own: one saved without any allows everything
+  w.emit('engageRules');
   const refused = spec.patrol && setPatrol(w, spec.patrol, spec.patrolColumn?.map((e) => ({ ...e, vehicle: vehicleId(e.vehicle) })) ?? PATROL.foot.column, spec.patrolPlan ?? DEFAULT_PLAN); // a saved route comes from outside the game, so it is checked again
   if (refused) w.emit('toast', `The saved patrol was left out: ${refused}`);
   return left;

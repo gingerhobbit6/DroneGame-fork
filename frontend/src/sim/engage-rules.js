@@ -4,7 +4,7 @@
 // it; an airframe alone (multirotor or fixed wing) holds fire only if every drone type in the attack with that airframe is barred;
 // an unnamed track is held only where 'unknown' is barred. A crew working its weapon by eye knows what it is looking at.
 
-import { DRONES } from './config/index.js';
+import { DRONES, STRUCTURES } from './config/index.js';
 
 export const UNKNOWN = 'unknown';
 const byModel = new Map(Object.entries(DRONES).map(([id, d]) => [d.label ?? d.name, id]));
@@ -20,6 +20,17 @@ export function barsTrack(rules, effectorId, tr, attack = []) {
     return types.length > 0 && types.every((t) => barred.includes(t));
   }
   return barred.includes(UNKNOWN);
+}
+
+// The rules as a laydown keeps them: known weapons and drone types only, in a settled order. Whatever else a file holds is dropped.
+export function cleanRules(rules) {
+  const out = {};
+  if (!rules || typeof rules !== 'object' || Array.isArray(rules)) return out;
+  for (const e of Object.keys(rules).sort()) {
+    const barred = Array.isArray(rules[e]) ? [...new Set(rules[e].filter((d) => d === UNKNOWN || Object.hasOwn(DRONES, d)))].sort() : [];
+    if (Object.hasOwn(STRUCTURES, e) && barred.length) out[e] = barred;
+  }
+  return out;
 }
 
 // A crew sees the drone itself.

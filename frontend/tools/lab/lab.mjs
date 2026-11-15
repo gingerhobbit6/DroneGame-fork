@@ -17,7 +17,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPool, defaultWorkers } from './pool.mjs';
 import { fromParams, V11, describe } from './model.mjs';
-import { mean, sd, ci, summary, gci } from './stats.mjs';
+import { mean, sd, ci, summary, stepStudy } from './stats.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const OUT_DIR = resolve(HERE, '../../lab-results');
@@ -98,9 +98,10 @@ const main = async () => {
     while (waves.length < maxSeeds) {
       const seeds = Array.from({ length: batch }, () => seed++);
       const results = await pool.run(seeds.map((s) => ({ design, seed: s, opts: { maxWaves: max, budget } })));
+      const before = waves.length; // an invalid run adds no wave, so the batch size cannot stand in for this
       for (const r of results) if (!r.invalid) waves.push(scoreOf(r, max));
       // the interval after each seed added, in order, so the plot shows it closing
-      for (let n = Math.max(2, waves.length - results.length + 1); n <= waves.length; n++) series.push({ n, mean: mean(waves.slice(0, n)), ci: ci(waves.slice(0, n)) });
+      for (let n = Math.max(2, before + 1); n <= waves.length; n++) series.push({ n, mean: mean(waves.slice(0, n)), ci: ci(waves.slice(0, n)) });
       const now = summary(waves);
       console.log(`  ${now.n} seeds: mean ${fmt(now.mean, 2)} +-${fmt(now.ci, 2)}  (sd ${fmt(now.sd, 2)})`);
       if (now.ci <= tol) break;
@@ -126,9 +127,12 @@ const main = async () => {
       console.log(`  dt ${dt}: waves ${waves.map((w) => fmt(w, 0)).join('/')}  mean ${fmt(mean(waves), 2)} +-${fmt(ci(waves), 2)}  leaks/wave ${fmt(rows.at(-1).leakRate, 3)}  ${rows.at(-1).runSeconds.toFixed(0)} s of run time`);
     }
     await pool.close();
-    let g = null;
-    if (rows.length === 3) { const [coarse, mid, fine] = [...rows].sort((a, b) => b.dt - a.dt); g = gci(fine.mean, mid.mean, coarse.mean, coarse.dt / mid.dt); console.log(`  grid convergence: order ${fmt(g.p, 2)}, extrapolated ${fmt(g.ext, 2)} waves, GCI of the finest ${fmt(100 * g.gciFine, 1)}%${g.note ? ` (${g.note})` : ''}`); }
-    console.log('saved', save(args.out || 'timestep.json', { kind: 'timestep', design, seeds, rows, gci: g }));
+    // an order and a GCI are printed only when the steps really differ: see stepStudy
+    const study = rows.length === 3 ? stepStudy(rows) : null, g = study?.gci ?? null;
+    if (g) console.log(`  grid convergence: order ${fmt(g.p, 2)}, extrapolated ${fmt(g.ext, 2)} waves, GCI of the finest ${fmt(100 * g.gciFine, 1)}%${g.note ? ` (${g.note})` : ''}`);
+    else if (study?.same) console.log(`  the step sizes cannot be told apart with ${seeds.length} seeds: the means differ by at most ${fmt(study.diff, 2)} waves, inside the 95% interval of a difference (up to +-${fmt(study.noise, 2)})`);
+    else if (study) console.log(`  the answer changes with the step (by up to ${fmt(study.diff, 2)} waves), but no order or GCI is given: ${study.why}`);
+    console.log('saved', save(args.out || 'timestep.json', { kind: 'timestep', design, seeds, rows, gci: g, study }));
     return;
   }
 

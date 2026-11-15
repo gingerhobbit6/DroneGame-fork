@@ -234,6 +234,7 @@ table.mini i { display: inline-block; width: 9px; height: 9px; border-radius: 50
 .cost-src { margin: 6px 0; padding-left: 6px; border-left: 2px solid #263754; }
 .sys { padding: 8px; border: 1px solid #1c2b46; border-radius: 6px; margin-bottom: 8px; }
 .sys.note { color: #9fb2cf; }
+.sys.note.warn { color: #ffcf66; }
 .sys-h { margin-bottom: 4px; }
 .sys .k { display: inline-block; width: 88px; color: #7f93b2; vertical-align: top; }
 .sys div { margin: 2px 0; }

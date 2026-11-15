@@ -232,7 +232,7 @@ export function createSimulation({ seed = '1', terrainSeed = '1' } = {}) {
     configureUnit: (s, key, value) => laydown.configureUnit(w, s, key, value),
     renameUnit: (s, name, callsign) => laydown.renameUnit(w, s, name, callsign),
     autoWire: () => laydown.autoWire(w),
-    setEngageRules: (rules) => { w.engageRules = rules ?? {}; emit('engageRules'); }, // kept across runs, like the laydown
+    setEngageRules: (rules) => { w.engageRules = rules ?? {}; emit('engageRules'); }, // part of the laydown: kept across runs and saved with it
     wireAll: (kind) => laydown.wireAll(w, kind),
     clearAll: () => laydown.clearWires(w),
     enterSandbox: () => enterSandbox(w),

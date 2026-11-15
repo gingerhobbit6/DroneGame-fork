@@ -12,7 +12,7 @@ import { MAST_SIDE } from '../src/sim/sharing.js';
 import { terrainState } from '../src/sim/terrain.js';
 import { u } from '../src/sim/units.js';
 import { createSimulation } from '../src/sim/simulation.js';
-import { unitDef } from '../src/sim/unit-config.js';
+import { cleanSettings, unitDef } from '../src/sim/unit-config.js';
 import { setUp } from './support/scenarios.js';
 
 const NEW = ['gun_shotgun', 'gun_droneround', 'rf_rfpatrol', 'rf_chuyka', 'camera_podview', 'camera_spyke', 'camera_skyspyke', 'radar_xenta', 'jammer_vepr'];
@@ -105,6 +105,16 @@ describe('the PodView camera, XENTA-M5 radar and VEPR dome jammer', () => {
     expect(inCover(def, 90, 50)).toBe(false);
     expect(inCover(STRUCTURES.camera_podview, 270, 50)).toBe(true); // a pointed camera's view is checked by its aim instead
     expect(unitDef('camera_spyke').settings ?? {}).not.toHaveProperty('slew');
+  });
+
+  it('lets the SPYKE’s fixed view be pointed, and leaves the all-round SkySpyke with nothing to point', () => {
+    expect(cleanSettings('camera_spyke', { facing: 90 })).toEqual({ facing: 90 });
+    expect(cleanSettings('camera_skyspyke', { facing: 90 })).toEqual({});
+    expect(sim.commands.place('camera_spyke', 30, 0, { facing: 90 })).toBeNull();
+    const def = sim.structures[0].def;
+    expect(def.facing).toBe(90);
+    expect(inCover(def, 120, 5)).toBe(true);
+    expect(inCover(def, 270, 5)).toBe(false);
   });
 
   it('has the XENTA-M5 see all round, further than any other radar here but the Giraffe', () => {
@@ -214,6 +224,19 @@ describe('moving a placed system', () => {
     expect(sim.commands.move(radar, 71, 1)).toMatch(/Too close/);
     expect(sim.structures.find((s) => s.def.id === 'radar_s').pos.x).toBe(30);
   });
+
+  it('does not move a system onto a parked vehicle’s ground or beside a radar’s mast, where a new one would be taken aboard', () => {
+    sim.commands.place('radar_a800', 30, 0, undefined, 'patria');
+    sim.commands.place('gun_hmg', 60, 0);
+    const gun = sim.structures.find((s) => s.def.id === 'gun_hmg');
+    expect(sim.commands.move(gun, 31, 0)).toMatch(/Too close/);
+    sim.commands.place('radar_s', 40, 30);
+    sim.commands.place('camera_podview', 60, 30);
+    const camera = sim.structures.find((s) => s.def.id === 'camera_podview');
+    expect(sim.commands.move(camera, 40.5, 30)).toMatch(/Too close/);
+    expect(sim.structures.map((s) => s.platform).filter((p) => p != null)).toEqual([]); // nothing was joined to anything
+    expect(sim.structures.find((s) => s.def.id === 'camera_podview').pos.x).toBe(60);
+  });
 });
 
 describe('removing people', () => {
@@ -249,6 +272,8 @@ describe('up to three systems on a vehicle', () => {
     expect(crew).toHaveLength(2);
     expect(crew[0].platform).toBe(crew[1].platform);
     expect(crew.filter((s) => s.def.rider)).toHaveLength(1);
+    expect(spec.structures.filter((l) => l.rider).map((l) => l.id)).toEqual(['gun_hmg']); // saved, so the radar still carries the vehicle
+    expect(crew.find((s) => !s.def.rider).def.id).toBe('radar_a800');
   });
 
   it('carries extra systems in a patrol column, at most three a vehicle and one heavy', () => {

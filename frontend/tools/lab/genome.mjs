@@ -43,7 +43,8 @@ function repairVehicle(list) {
     if (out.length >= RULES.maxPerVehicle) continue;
     out.push(id);
   }
-  if (out.some((id) => MOUNTS[id] === 3) && out.length > 2) { const heavy = out.find((id) => MOUNTS[id] === 3); return [heavy, out.find((id) => id !== heavy)]; }
+  const heavy = out.findIndex((id) => MOUNTS[id] === 3);
+  if (heavy >= 0 && out.length > 2) return [out[heavy], out[heavy ? 0 : 1]]; // by place, not by id: the other one may be the same system again
   return out.length ? out : ['gun_hmg'];
 }
 

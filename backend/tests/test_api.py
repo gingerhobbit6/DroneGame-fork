@@ -112,6 +112,17 @@ class TestLaydowns:
         assert made.status_code == 201
         assert client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]["patrol"] == route
 
+    def test_rules_of_engagement_and_riders_are_kept_with_the_laydown(self, client):
+        rules = {"missile": ["fpv", "unknown"]}
+        rider = {"id": "jammer", "x": 5.0, "z": 5.0, "uplink": None, "cellBand": "B8", "jam": None, "vehicle": "patria", "rider": True}
+        made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "structures": [rider], "engageRules": rules}))
+        assert made.status_code == 201
+        spec = client.get(f"{API}/laydowns/{made.json()['id']}").json()["spec"]
+        assert spec["engageRules"] == rules and spec["structures"] == [rider]
+        for bad in ({"tank": ["fpv"]}, {"missile": []}, {"missile": ["NOT A DRONE"]}, {"missile": "fpv"}):
+            assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "engageRules": bad})).status_code == 422, bad
+        assert client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "structures": [{**rider, "rider": False}]})).status_code == 422
+
     def test_a_system_parked_on_a_vehicle_is_kept_with_the_laydown(self, client):
         parked = {"id": "jammer", "x": 5.0, "z": 5.0, "uplink": None, "cellBand": "B8", "jam": None, "vehicle": "themis"}
         made = client.post(f"{API}/laydowns", json=laydown(spec={**SPEC, "structures": [parked]}))

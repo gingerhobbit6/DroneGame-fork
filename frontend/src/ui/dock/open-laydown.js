@@ -15,6 +15,7 @@ const okSystem = (l) => l && Object.hasOwn(STRUCTURES, l.id) && onMap(l.x) && on
 const okPoint = (p) => Array.isArray(p) && onMap(p[0]) && onMap(p[1]);
 export const readable = (spec) => list(spec?.structures, MAX_SYSTEMS, okSystem) && list(spec.fusionUplinks, 2, (k) => LINKS.includes(k)) && band(spec.fusionCell)
   && (spec.people == null || list(spec.people, PEOPLE_LIMITS.groups, (g) => g && onMap(g.x) && onMap(g.z)))
+  && (spec.engageRules == null || typeof spec.engageRules === 'object')
   && [spec.zone, spec.patrol].every((points) => points == null || list(points, MAX_POINTS, okPoint));
 
 // here: lay it out round the site on the ground in play now, instead of switching to the ground it was made for.

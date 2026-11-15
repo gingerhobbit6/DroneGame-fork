@@ -171,6 +171,20 @@ describe('the command log', () => {
     expect(sim.digest()).toBe(held.digest);
   }, 60000);
 
+  it('saves rules of engagement with the laydown, and a laydown saved without any allows everything', () => {
+    fresh(MIXED);
+    const plain = JSON.parse(JSON.stringify(sim.currentLaydown()));
+    expect(plain.engageRules).toBeUndefined();
+    sim.commands.setEngageRules({ missile: ['unknown', 'fpv', 'fpv'], not_a_weapon: ['fpv'], jammer: ['not_a_drone'] });
+    const spec = JSON.parse(JSON.stringify(sim.currentLaydown()));
+    expect(spec.engageRules).toEqual({ missile: ['fpv', 'unknown'] }); // known weapons and drone types only, in a settled order
+    sim.commands.setEngageRules({});
+    expect(sim.commands.loadLaydown(spec, '1')).toBeNull();
+    expect(sim.engageRules()).toEqual({ missile: ['fpv', 'unknown'] });
+    expect(sim.commands.loadLaydown(plain, '1')).toBeNull();
+    expect(sim.engageRules()).toEqual({});
+  });
+
   it('time between later waves changes the run, and the log still reproduces it', () => {
     const run = (gap) => {
       fresh(MIXED);

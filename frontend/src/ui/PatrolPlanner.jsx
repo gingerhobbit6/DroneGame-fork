@@ -3,7 +3,7 @@
 // (or the catalogue, with no pack). The pack can fill the patrol for you; going beyond it is allowed, with a warning. Every change
 // rebuilds the patrol on the same route (sim/patrol.js), so it is only open before the first wave. The working is in patrol-bearers.js.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ESCORT_CARRIERS, MAX_ESCORTS, MAX_ESCORT_GAP, MAX_ESCORT_SIDE, MOUNTS, PATROL_TYPES, STRUCTURES } from '../sim/config/index.js';
 import { FORMATIONS } from '../sim/formation.js';
 import { planOf } from '../sim/patrol.js';
@@ -17,6 +17,20 @@ import { ICONS, Icon } from './icons.jsx';
 import { useBeside } from './beside.js';
 import { NumberInput } from './NumberInput.jsx';
 import { DEFAULT_SPACING, VEHICLE_SHAPES, bearers, carryProblem, fill, giveTo, overPack, packLeft, relay, takeOff, typeProblem } from './patrol-bearers.js';
+
+// A slider that shows its value while it is dragged and commits when it is let go (the browser's change event, as NumberInput uses):
+// each commit rebuilds the patrol, which dragging should not do at every step.
+function Slider({ value, unit, onCommit, ...rest }) {
+  const ref = useRef(null), latest = useRef(onCommit), [live, setLive] = useState(value);
+  latest.current = onCommit;
+  useEffect(() => setLive(value), [value]);
+  useEffect(() => {
+    const el = ref.current, done = () => latest.current(Number(el.value));
+    el.addEventListener('change', done);
+    return () => el.removeEventListener('change', done);
+  }, []);
+  return <><input ref={ref} type="range" value={live} onChange={(e) => setLive(Number(e.target.value))} {...rest} /> <b>{live} {unit}</b></>;
+}
 
 const TOKEN = 46, PAD = 54; // marker size and margin, in pixels
 const CLASS = { 1: 'light', 2: 'medium', 3: 'heavy' };
@@ -57,7 +71,7 @@ function Bearer({ b, plan, left, locked, change }) {
         <ul className="pp-slots">
           {Array.from({ length: b.slots }, (_, k) => (
             <li key={k} className={b.systems[k] ? 'filled' : ''}>
-              {b.systems[k] ? <>{STRUCTURES[b.systems[k]].name}{!locked && (b.kind === 'soldier' || b.systems.length > 1) && <button type="button" data-take-off={k} onClick={() => change(takeOff, b, k)}>Take off</button>}</> : 'Room for a system'}
+              {b.systems[k] ? <>{STRUCTURES[b.systems[k]].name}{!locked && (b.kind === 'soldier' || b.systems.length > 1) && <button type="button" data-take-off={k} aria-label={`Take the ${STRUCTURES[b.systems[k]].name} off ${b.name}`} onClick={() => change(takeOff, b, k)}>Take off</button>}</> : 'Room for a system'}
             </li>
           ))}
         </ul>
@@ -74,7 +88,7 @@ function Bearer({ b, plan, left, locked, change }) {
           {rows.map(({ id, why }) => (
             <li key={id} className={why ? 'grey' : ''}>
               <span>{STRUCTURES[id].name}<small>{why ?? `${CLASS[MOUNTS[id]]}${left ? ` · ${Math.max(0, left.systems[id] ?? 0)} in the pack` : ` · ${pounds(STRUCTURES[id].cost)}`}`}</small></span>
-              <button type="button" data-give={id} disabled={!!why} onClick={() => change(giveTo, b, id)}>Add</button>
+              <button type="button" data-give={id} aria-label={`Add the ${STRUCTURES[id].name} to ${b.name}`} disabled={!!why} onClick={() => change(giveTo, b, id)}>Add</button>
             </li>
           ))}
         </ul>
@@ -137,8 +151,8 @@ export function PatrolPlanner({ patrol, locked, onClose }) {
         {plan.type === 'mounted'
           ? <label>Vehicles in <select id="pp-shape" value={shape} disabled={locked} onChange={(e) => { setShape(e.target.value); setPlan({}, e.target.value); }}>{Object.entries(VEHICLE_SHAPES).map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select></label>
           : <label>Formation <select id="pp-formation" value={plan.formation} disabled={locked} onChange={(e) => setPlan({ formation: e.target.value })}>{Object.entries(FORMATIONS).map(([id, f]) => <option key={id} value={id}>{f.name}</option>)}</select></label>}
-        <label>Spacing <input type="range" id="pp-spacing" min={type.spacing[0]} max={type.spacing[1]} step={1} value={plan.spacing} disabled={locked} onChange={(e) => setPlan({ spacing: Number(e.target.value) })} /> <b>{plan.spacing} m</b> between {plan.type === 'mounted' ? 'vehicles' : 'soldiers'}</label>
-        <label>Corridor <NumberInput id="pp-width" aria-label="Corridor width in metres" value={plan.width} min={CORRIDOR.min} max={CORRIDOR.max} step={10} onCommit={(v) => setPlan({ width: Math.round(v) })} /> m</label>
+        <label>Spacing <Slider id="pp-spacing" min={type.spacing[0]} max={type.spacing[1]} step={1} value={plan.spacing} unit="m" disabled={locked} onCommit={(v) => setPlan({ spacing: v })} /> between {plan.type === 'mounted' ? 'vehicles' : 'soldiers'}</label>
+        <label>Corridor <NumberInput id="pp-width" aria-label="Corridor width in metres" value={plan.width} min={CORRIDOR.min} max={CORRIDOR.max} step={10} disabled={locked} onCommit={(v) => setPlan({ width: Math.round(v) })} /> m</label>
       </div>
       <p className="muted">{plan.type === 'mounted' ? `${soldiers} soldiers ride in the vehicles, which drive the route. Each vehicle carries up to 3 systems, one heavy at most; a THeMIS takes light ones, a Hilux medium ones too.` : `${soldiers} soldiers walk the route. Each can carry 2 hand-held systems, and a THeMIS walks beside them with light ones. Anything bigger needs a mounted patrol, so it is greyed out.`} Weapons halt the patrol to fire.</p>
       <div className="pp-wrap"><Formation list={list} plan={plan} selected={selected} onSelect={setSelected} /></div>
